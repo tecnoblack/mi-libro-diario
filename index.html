@@ -34,7 +34,7 @@
 
     <div class="resumen-seccion">
         <label><b>Descripción del Asiento (Glosa):</b></label>
-        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Ej. Venta de mercancía según factura #001">
+        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Ej. Venta de mercancía...">
     </div>
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
@@ -65,7 +65,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // --- CONFIGURACIÓN DE SUPABASE ---
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -73,149 +72,114 @@
     let asignacionesRef = {};
     let proximoNumero = 1;
 
-    function obtenerFecha() {
-        return new Date().toISOString().split('T')[0];
-    }
-
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
-            <td style="color: #666; font-size: 0.85rem; text-align:center;">${obtenerFecha()}</td>
-            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" oninput="gestionarIVA(this)"></td>
+            <td style="color: #666; font-size: 0.85rem; text-align:center;">${new Date().toISOString().split('T')[0]}</td>
+            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" onkeyup="ejecutarLogicaIVA(this)"></td>
             <td contenteditable="true" class="col-ref"></td>
-            <td contenteditable="true" class="val-debito" oninput="actualizarTotales()">0</td>
-            <td contenteditable="true" class="val-credito" oninput="actualizarTotales()">0</td>
+            <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA(this)">0</td>
+            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA(this)">0</td>
             <td style="text-align:center"><button class="btn-eliminar" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
     }
 
-    // --- FUNCIÓN DE LA COLUMNA REF (VINCULACIÓN) ---
     function asignarRef(elemento) {
-        const fila = elemento.closest('tr');
         const nombre = elemento.innerText.toLowerCase().trim();
-        const celdaRef = fila.querySelector('.col-ref');
-        
+        const celdaRef = elemento.closest('tr').querySelector('.col-ref');
         if (nombre === "") return;
-        
-        // Si ya existe la cuenta, usa su número, si no, crea uno nuevo
-        if (asignacionesRef[nombre]) {
-            celdaRef.innerText = asignacionesRef[nombre];
-        } else {
-            asignacionesRef[nombre] = proximoNumero;
-            celdaRef.innerText = proximoNumero;
-            proximoNumero++;
-        }
+        if (!asignacionesRef[nombre]) { asignacionesRef[nombre] = proximoNumero++; }
+        celdaRef.innerText = asignacionesRef[nombre];
     }
 
-    // --- LÓGICA DEL IVA ---
-    function gestionarIVA(elemento) {
-        const filaActual = elemento.closest('tr');
-        const nombreCuenta = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-        
-        if (nombreCuenta === 'caja' || nombreCuenta === 'banco') {
-            const montoDebito = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
-            const montoCredito = parseFloat(filaActual.querySelector('.val-credito').innerText) || 0;
+    function ejecutarLogicaIVA(elemento) {
+        actualizarTotales();
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        let cuentaDinero = null;
+        let montoTotal = 0;
+        let esDebito = false;
 
-            if (montoDebito > 0) {
-                const neto = montoDebito / 1.16;
-                const iva = montoDebito - neto;
-                distribuir(nombreCuenta, 'debito fiscal', neto, iva, 'credito');
-            } else if (montoCredito > 0) {
-                const neto = montoCredito / 1.16;
-                const iva = montoCredito - neto;
-                distribuir(nombreCuenta, 'credito fiscal', neto, iva, 'debito');
+        filas.forEach(f => {
+            const txt = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            if (txt === 'caja' || txt === 'banco') {
+                const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+                const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+                if (d > 0 || c > 0) {
+                    cuentaDinero = txt;
+                    montoTotal = d > 0 ? d : c;
+                    esDebito = d > 0;
+                }
             }
-        }
+        });
+
+        if (!cuentaDinero || montoTotal === 0) return;
+
+        const neto = (montoTotal / 1.16).toFixed(2);
+        const iva = (montoTotal - neto).toFixed(2);
+
+        filas.forEach(f => {
+            const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            const cellD = f.querySelector('.val-debito');
+            const cellC = f.querySelector('.val-credito');
+
+            if (nombre.includes('fiscal')) {
+                if (esDebito) { cellC.innerText = iva; cellD.innerText = "0"; }
+                else { cellD.innerText = iva; cellC.innerText = "0"; }
+            } else if (nombre !== '' && nombre !== cuentaDinero && !nombre.includes('fiscal')) {
+                if (esDebito) { cellC.innerText = neto; cellD.innerText = "0"; }
+                else { cellD.innerText = neto; cellC.innerText = "0"; }
+            }
+        });
         actualizarTotales();
     }
 
-    function distribuir(cuentaDinero, cuentaFiscalBuscada, neto, iva, columnaDestino) {
-        const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        let netoAsignado = false;
-
-        filas.forEach(f => {
-            const nombreFila = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            const celdaDebito = f.querySelector('.val-debito');
-            const celdaCredito = f.querySelector('.val-credito');
-
-            if (nombreFila.includes('fiscal') && nombreFila.includes(cuentaFiscalBuscada.split(' ')[0])) {
-                if (columnaDestino === 'debito') { celdaDebito.innerText = iva.toFixed(2); celdaCredito.innerText = "0"; }
-                else { celdaCredito.innerText = iva.toFixed(2); celdaDebito.innerText = "0"; }
-            } 
-            else if (nombreFila !== '' && nombreFila !== cuentaDinero && !nombreFila.includes('fiscal') && !netoAsignado) {
-                if (columnaDestino === 'debito') { celdaDebito.innerText = neto.toFixed(2); celdaCredito.innerText = "0"; }
-                else { celdaCredito.innerText = neto.toFixed(2); celdaDebito.innerText = "0"; }
-                netoAsignado = true;
-            }
-        });
-    }
-
     function actualizarTotales() {
-        let d = 0, c = 0;
-        document.querySelectorAll('.val-debito').forEach(t => d += parseFloat(t.innerText) || 0);
-        document.querySelectorAll('.val-credito').forEach(t => c += parseFloat(t.innerText) || 0);
-        
-        document.getElementById('totalDebito').innerText = d.toFixed(2);
-        document.getElementById('totalCredito').innerText = c.toFixed(2);
+        let deb = 0, cre = 0;
+        document.querySelectorAll('.val-debito').forEach(t => deb += parseFloat(t.innerText) || 0);
+        document.querySelectorAll('.val-credito').forEach(t => cre += parseFloat(t.innerText) || 0);
+        document.getElementById('totalDebito').innerText = deb.toFixed(2);
+        document.getElementById('totalCredito').innerText = cre.toFixed(2);
         
         const btn = document.getElementById('btnGuardar');
-        const msg = document.getElementById('mensajeValidacion');
-        
-        if (d.toFixed(2) === c.toFixed(2) && d > 0) {
+        if (deb > 0 && deb.toFixed(2) === cre.toFixed(2)) {
             btn.disabled = false;
-            msg.innerHTML = "<span style='color: green;'>✓ Asiento cuadrado.</span>";
+            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:green;'>✓ Cuadrado</span>";
         } else {
             btn.disabled = true;
-            msg.innerHTML = "<span style='color: red;'>⚠ El asiento no cuadra.</span>";
+            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:red;'>⚠ No cuadra</span>";
         }
     }
 
-    // --- FUNCIÓN GUARDAR (SINCRONIZADA CON TU SUPABASE) ---
     async function guardarAsiento() {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        const datosAPublicar = [];
-        const nroAsientoUnico = Date.now();
-        const desc = document.getElementById('resumenAsiento').value;
+        const datos = [];
+        const idGrupo = Date.now();
+        const glosa = document.getElementById('resumenAsiento').value;
         const rif = document.getElementById('empresaRif').innerText.trim();
-        const peri = document.getElementById('periodoActual').innerText.trim();
+        const per = document.getElementById('periodoActual').innerText.trim();
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            const refContable = f.querySelector('.col-ref').innerText.trim();
-            const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
-            const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-
             if (cuenta !== "") {
-                datosAPublicar.push({ 
-                    asiento_id: nroAsientoUnico,
-                    descripcion: desc,
+                datos.push({ 
+                    asiento_id: idGrupo,
+                    glosa: glosa,
                     cuenta: cuenta,
-                    ref: refContable || "1", 
+                    ref: f.querySelector('.col-ref').innerText.trim() || "1",
                     rif: rif,
-                    debito: deb,
-                    credito: cre,
-                    fecha: obtenerFecha(),
-                    periodo: peri
+                    debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
+                    credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
+                    fecha: new Date().toISOString().split('T')[0],
+                    periodo: per
                 });
             }
         });
 
-        if (datosAPublicar.length === 0) return alert("Asiento vacío");
-
-        const { error } = await _supabase.from('asientos').insert(datosAPublicar);
-        
-        if (error) {
-            alert("Error de Supabase: " + error.message);
-        } else {
-            alert("¡Éxito! Asiento guardado.");
-            // Resetear todo
-            document.getElementById('cuerpo-tabla').innerHTML = "";
-            document.getElementById('resumenAsiento').value = "";
-            for(let i=0; i<4; i++) agregarFila();
-            actualizarTotales();
-        }
+        const { error } = await _supabase.from('asientos').insert(datos);
+        if (error) alert("Error: " + error.message);
+        else { alert("¡Guardado!"); location.reload(); }
     }
 
     window.onload = () => { for(let i=0; i<4; i++) agregarFila(); }

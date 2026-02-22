@@ -2,41 +2,26 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Libro Diario Profesional - Comercial A B C</title>
+    <title>Libro Diario - Comercial A B C</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        
-        /* Encabezado */
         .header-box { border: 2px solid #2563eb; text-align: center; padding: 20px; margin-bottom: 25px; border-radius: 6px; }
         .editable { outline: none; padding: 2px 5px; }
         .header-box h1 { margin: 0; font-size: 1.8rem; text-transform: uppercase; }
-        .header-box p { margin: 5px 0; font-weight: bold; }
-
-        /* Sección de Registro */
         .resumen-seccion { margin-bottom: 20px; }
         .input-resumen { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1rem; }
-
-        /* Tabla Estilizada */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; }
-        
         [contenteditable="true"] { outline: none; min-height: 20px; border-bottom: 1px dashed #ccc; }
         [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid #2563eb; }
-        
         .col-ref { background-color: #f9f9f9; text-align: center; font-weight: bold; color: #555; }
-        
-        .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; transition: 0.3s; }
-        .btn-add:hover { background-color: #047857; }
+        .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         .btn-eliminar { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-        
-        /* Totales y Mensajes */
         .totales-seccion { background: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
-        .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; transition: 0.3s; }
-        .btn-guardar:hover:not(:disabled) { background-color: #1d4ed8; }
+        .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
         .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
-        #mensajeValidacion { margin-top:10px; font-weight:bold; text-align: center; }
     </style>
 </head>
 <body>
@@ -50,8 +35,8 @@
     </div>
 
     <div class="resumen-seccion">
-        <label><b>Descripción del Asiento:</b></label><br><br>
-        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Ej. Venta de mercancía al contado según factura #123">
+        <label><b>Descripción del Asiento (Glosa)</b></label>
+        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Ej. Venta de mercancía según factura #001">
     </div>
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
@@ -75,15 +60,15 @@
         <span>Débito: <span id="totalDebito">0.00</span></span>
         <span>Crédito: <span id="totalCredito">0.00</span></span>
     </div>
-    <div id="mensajeValidacion"></div>
+    <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
 
     <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // Configuración de Supabase con tus credenciales
-    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
+    // --- CONFIGURACIÓN DE SUPABASE ---
+    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -149,15 +134,13 @@
             const celdaDebito = f.querySelector('.val-debito');
             const celdaCredito = f.querySelector('.val-credito');
 
-            if (nombreFila.includes('fiscal') && (nombreFila.includes('debito') || nombreFila.includes('débito') || nombreFila.includes('credito') || nombreFila.includes('crédito'))) {
-                if (nombreFila.includes(cuentaFiscalBuscada.split(' ')[0])) {
-                    if (columnaDestino === 'debito') celdaDebito.innerText = iva.toFixed(2);
-                    else celdaCredito.innerText = iva.toFixed(2);
-                }
+            if (nombreFila.includes('fiscal') && nombreFila.includes(cuentaFiscalBuscada.split(' ')[0])) {
+                if (columnaDestino === 'debito') { celdaDebito.innerText = iva.toFixed(2); celdaCredito.innerText = "0"; }
+                else { celdaCredito.innerText = iva.toFixed(2); celdaDebito.innerText = "0"; }
             } 
             else if (nombreFila !== '' && nombreFila !== cuentaDinero && !nombreFila.includes('fiscal') && !netoAsignado) {
-                if (columnaDestino === 'debito') celdaDebito.innerText = neto.toFixed(2);
-                else celdaCredito.innerText = neto.toFixed(2);
+                if (columnaDestino === 'debito') { celdaDebito.innerText = neto.toFixed(2); celdaCredito.innerText = "0"; }
+                else { celdaCredito.innerText = neto.toFixed(2); celdaDebito.innerText = "0"; }
                 netoAsignado = true;
             }
         });
@@ -176,32 +159,43 @@
         
         if (d.toFixed(2) === c.toFixed(2) && d > 0) {
             btn.disabled = false;
-            msg.innerHTML = "<span style='color: green;'>✓ Asiento cuadrado correctamente.</span>";
+            msg.innerHTML = "<span style='color: green;'>✓ Asiento cuadrado.</span>";
         } else {
             btn.disabled = true;
-            msg.innerHTML = "<span style='color: red;'>⚠ El asiento no cuadra (Débito ≠ Crédito).</span>";
+            msg.innerHTML = "<span style='color: red;'>⚠ El asiento no cuadra.</span>";
         }
     }
 
     async function guardarAsiento() {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const datos = [];
-        const nroAsiento = Date.now();
+        const nro = Date.now();
         const resumen = document.getElementById('resumenAsiento').value;
-
-        if (!resumen) { alert("Por favor, escribe una descripción del asiento."); return; }
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const ref = f.querySelector('.col-ref').innerText.trim();
             const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            
-            if (cuenta !== "" && (deb > 0 || cre > 0)) {
-                datos.push({ 
-                    asiento_id: nroAsiento, 
-                    cuenta: cuenta, 
-                    ref: ref, 
-                    debito: deb, 
-                    credito: cre,
-                    descripcion
+            if (cuenta !== "") {
+                datos.push({ asiento_id: nro, cuenta, ref, debito: deb, credito: cre, descripcion: resumen });
+            }
+        });
+
+        const { error } = await _supabase.from('asientos').insert(datos);
+        
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            alert("¡Asiento guardado!");
+            document.getElementById('cuerpo-tabla').innerHTML = "";
+            document.getElementById('resumenAsiento').value = "";
+            for(let i=0; i<4; i++) agregarFila();
+            actualizarTotales();
+        }
+    }
+
+    window.onload = () => { for(let i=0; i<4; i++) agregarFila(); }
+</script>
+</body>
+</html>

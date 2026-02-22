@@ -5,12 +5,12 @@
     <title>Libro Diario Profesional</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
-        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         
-        /* Encabezado solicitado con borde azul y editable */
+        /* Encabezado con Borde Azul */
         .header-box { border: 2px solid #2563eb; text-align: center; padding: 20px; margin-bottom: 25px; border-radius: 6px; }
         .editable { outline: none; transition: background 0.3s; padding: 2px 5px; }
-        .editable:focus { background: #eef2ff; border-bottom: 1px dashed #2563eb; }
+        .editable:focus { background: #fffde7; border-bottom: 2px solid #2563eb; }
         .header-box h1 { margin: 0; font-size: 1.8rem; text-transform: uppercase; }
         .header-box p { margin: 5px 0; font-weight: bold; }
         .header-box h2 { margin: 15px 0 0 0; text-decoration: underline; font-size: 1.3rem; }
@@ -20,23 +20,25 @@
         .resumen-seccion label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.95rem; }
         .input-resumen { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
 
-        /* Tabla Estilo Profesional */
+        /* Tabla Estilo Diario */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; }
-        td { padding: 10px; border: 1px solid #e5e7eb; }
-
-        .input-tabla { width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; }
-        .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
-        .btn-add:hover { background-color: #047857; }
+        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; text-transform: uppercase; }
+        td { border: 1px solid #e5e7eb; padding: 10px; }
         
-        .total-row { background-color: #f8fafc; font-weight: bold; font-size: 1.1rem; }
-        .status-msg { margin-top: 15px; font-weight: bold; }
+        [contenteditable="true"] { outline: none; min-height: 20px; }
+        .col-ref { background-color: #f9f9f9; text-align: center; font-weight: bold; color: #555; }
+        
+        .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .btn-eliminar { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+        
+        .totales-seccion { background: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
         .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
+        .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="contenedor-principal">
     <div class="header-box">
         <h1 contenteditable="true" class="editable">COMERCIAL A B C, C.A.</h1>
         <p contenteditable="true" class="editable">RIF: J-00000000-0</p>
@@ -51,7 +53,7 @@
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
 
-    <table>
+    <table id="tabla-asientos">
         <thead>
             <tr>
                 <th style="width: 12%;">FECHA</th>
@@ -59,85 +61,135 @@
                 <th style="width: 10%;">REF</th>
                 <th style="width: 20%;">DÉBITO</th>
                 <th style="width: 20%;">CRÉDITO</th>
+                <th style="width: 5%;"></th>
             </tr>
         </thead>
-        <tbody id="tabla-body">
-            </tbody>
-        <tfoot>
-            <tr class="total-row">
-                <td colspan="3" style="text-align: right; padding-right: 20px;">TOTALES:</td>
-                <td id="total-debito">0.00</td>
-                <td id="total-credito">0.00</td>
-            </tr>
-        </tfoot>
+        <tbody id="cuerpo-tabla"></tbody>
     </table>
 
-    <div id="mensaje" class="status-msg"></div>
-    <button class="btn-guardar">Guardar Asiento</button>
+    <div class="totales-seccion">
+        <span>TOTALES</span>
+        <span>Débito: <span id="totalDebito">0.00</span></span>
+        <span>Crédito: <span id="totalCredito">0.00</span></span>
+    </div>
+    <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
+
+    <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento en Supabase</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    const TASA_IVA = 0.16;
+    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhS...'; 
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let asignacionesRef = {};
+    let proximoNumero = 1;
 
     function obtenerFecha() {
         const d = new Date();
         return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     }
 
-    function agregarFila(nombre = "", ref = "", deb = 0, cre = 0) {
-        const tbody = document.getElementById('tabla-body');
-        const esPrimera = tbody.rows.length === 0;
-        const fila = tbody.insertRow();
-
-        fila.innerHTML = `
-            <td><input type="text" class="input-tabla" value="${esPrimera ? obtenerFecha() : ''}" readonly></td>
-            <td><input type="text" class="input-tabla" value="${nombre}" placeholder="..."></td>
-            <td><input type="text" class="input-tabla" value="${ref}" placeholder="0"></td>
-            <td><input type="number" class="input-tabla val-debito" value="${deb}" step="0.01" oninput="controlIVA(this)"></td>
-            <td><input type="number" class="input-tabla val-credito" value="${cre}" step="0.01" oninput="calcular()"></td>
+    function agregarFila() {
+        const tabla = document.getElementById('cuerpo-tabla');
+        const esPrimera = tabla.rows.length === 0;
+        const nuevaFila = document.createElement('tr');
+        
+        nuevaFila.innerHTML = `
+            <td style="color: #666; font-size: 0.9rem;">${esPrimera ? obtenerFecha() : ''}</td>
+            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" oninput="gestionarIVA(this)"></td>
+            <td class="col-ref"></td>
+            <td contenteditable="true" class="val-debito" oninput="gestionarIVA(this)">0</td>
+            <td contenteditable="true" class="val-credito" oninput="actualizarTotales()">0</td>
+            <td style="text-align:center"><button class="btn-eliminar" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
-        calcular();
+        tabla.appendChild(nuevaFila);
     }
 
-    function controlIVA(input) {
-        const tbody = document.getElementById('tabla-body');
-        const monto = parseFloat(input.value);
+    function asignarRef(elemento) {
+        const fila = elemento.closest('tr');
+        const nombre = elemento.innerText.toLowerCase().trim();
+        const celdaRef = fila.querySelector('.col-ref');
 
-        // LOGICA FUNCIONAL: Si es la primera fila y pones un monto en Débito
-        if (tbody.rows.length === 1 && monto > 0) {
-            const base = monto / (1 + TASA_IVA);
-            const iva = monto - base;
-
-            // Agregamos las filas automáticas con sus REF (2 y 3)
-            agregarFila("Venta", "2", 0, base.toFixed(2));
-            agregarFila("Débito Fiscal", "3", 0, iva.toFixed(2));
+        if (nombre === "") {
+            celdaRef.innerText = "";
+            return;
         }
-        calcular();
-    }
 
-    function calcular() {
-        let dTotal = 0, cTotal = 0;
-        document.querySelectorAll('.val-debito').forEach(i => dTotal += parseFloat(i.value || 0));
-        document.querySelectorAll('.val-credito').forEach(i => cTotal += parseFloat(i.value || 0));
-
-        document.getElementById('total-debito').innerText = dTotal.toFixed(2);
-        document.getElementById('total-credito').innerText = cTotal.toFixed(2);
-
-        const m = document.getElementById('mensaje');
-        if (dTotal.toFixed(2) === cTotal.toFixed(2) && dTotal > 0) {
-            m.innerText = "✓ Asiento cuadrado.";
-            m.style.color = "#059669";
+        if (asignacionesRef[nombre]) {
+            celdaRef.innerText = asignacionesRef[nombre];
         } else {
-            m.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
-            m.style.color = "#dc2626";
+            asignacionesRef[nombre] = proximoNumero;
+            celdaRef.innerText = proximoNumero;
+            proximoNumero++;
         }
     }
 
-    // Al cargar: Primera fila vacía en Cuenta y REF 1
-    window.onload = () => {
-        agregarFila("", "1"); // Cuenta vacía para que tú escribas "Caja" o lo que gustes
-    };
-</script>
+    function gestionarIVA(elemento) {
+        const filaActual = elemento.closest('tr');
+        const nombre = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
 
+        if (nombre === 'caja' || nombre === 'banco') {
+            const montoPrincipal = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
+            if (montoPrincipal > 0) {
+                const neto = montoPrincipal / 1.16;
+                const iva = montoPrincipal - neto;
+
+                document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
+                    const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+                    if (n === 'venta') f.querySelector('.val-credito').innerText = neto.toFixed(2);
+                    if (n === 'debito fiscal' || n === 'débito fiscal') f.querySelector('.val-credito').innerText = iva.toFixed(2);
+                });
+            }
+        }
+        actualizarTotales();
+    }
+
+    function actualizarTotales() {
+        let d = 0, c = 0;
+        document.querySelectorAll('.val-debito').forEach(t => d += parseFloat(t.innerText) || 0);
+        document.querySelectorAll('.val-credito').forEach(t => c += parseFloat(t.innerText) || 0);
+
+        document.getElementById('totalDebito').innerText = d.toFixed(2);
+        document.getElementById('totalCredito').innerText = c.toFixed(2);
+
+        const btn = document.getElementById('btnGuardar');
+        const msg = document.getElementById('mensajeValidacion');
+
+        if (d.toFixed(2) === c.toFixed(2) && d > 0) {
+            btn.disabled = false;
+            msg.innerText = "✓ Asiento cuadrado correctamente.";
+            msg.style.color = "green";
+        } else {
+            btn.disabled = true;
+            msg.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
+            msg.style.color = "red";
+        }
+    }
+
+    async function guardarAsiento() {
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        const datos = [];
+        const nro = Date.now();
+
+        filas.forEach(f => {
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            const ref = f.querySelector('.col-ref').innerText.trim();
+            const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            if (cuenta !== "") datos.push({ asiento_id: nro, cuenta, ref, debito: deb, credito: cre });
+        });
+
+        const { error } = await _supabase.from('asientos').insert(datos);
+        if (error) alert("Error: " + error.message);
+        else { alert("¡Asiento guardado en Supabase!"); location.reload(); }
+    }
+
+    // Iniciar con 3 filas vacías como tu código original
+    window.onload = () => {
+        agregarFila(); agregarFila(); agregarFila();
+    }
+</script>
 </body>
 </html>

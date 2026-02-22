@@ -2,25 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Libro Diario - Comercial A B C</title>
+    <title>Libro Diario Inteligente - Comercial A B C</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
-        .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .contenedor-principal { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .header-box { border: 2px solid #2563eb; text-align: center; padding: 20px; margin-bottom: 25px; border-radius: 6px; }
-        .header-box h1 { margin: 0; font-size: 1.8rem; text-transform: uppercase; }
-        .resumen-seccion { margin-bottom: 20px; }
-        .input-resumen { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1rem; }
+        .header-box h1 { margin: 0; font-size: 1.8rem; text-transform: uppercase; color: #1e40af; }
+        .resumen-seccion { margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; }
+        .input-resumen { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 1rem; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; text-transform: uppercase; }
+        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.85rem; border: 1px solid #1d4ed8; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; }
-        [contenteditable="true"] { outline: none; min-height: 20px; border-bottom: 1px dashed #ccc; }
-        [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid #2563eb; }
-        .col-ref { background-color: #f9f9f9; text-align: center; font-weight: bold; color: #555; }
+        [contenteditable="true"] { outline: none; min-height: 20px; padding: 2px; }
+        [contenteditable="true"]:focus { background: #fffde7; box-shadow: inset 0 0 0 1px #2563eb; }
+        .col-ref { text-align: center; font-weight: bold; color: #2563eb; background: #f1f5f9; }
         .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
-        .btn-eliminar { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-        .totales-seccion { background: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
-        .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
-        .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
+        .totales-seccion { background: #1e293b; color: white; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
+        .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 16px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
+        .btn-guardar:disabled { background-color: #94a3b8; cursor: not-allowed; }
         .status-msg { margin-top:10px; font-weight:bold; text-align: center; }
     </style>
 </head>
@@ -29,26 +28,26 @@
 <div class="contenedor-principal">
     <div class="header-box">
         <h1 contenteditable="true">COMERCIAL A B C, C.A.</h1>
-        <p contenteditable="true">RIF: J-00000000-0</p>
-        <h2 contenteditable="true">LIBRO DIARIO - FEBRERO 2026</h2>
+        <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
+        <h2 id="periodoActual" contenteditable="true">FEBRERO 2026</h2>
     </div>
 
     <div class="resumen-seccion">
-        <label><b>Descripción del Asiento (Glosa):</b></label>
-        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Ej. Venta de mercancía según factura #001">
+        <label><b>Descripción del Asiento:</b></label>
+        <input type="text" id="resumenAsiento" class="input-resumen" placeholder="Concepto del asiento...">
     </div>
 
-    <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
+    <button class="btn-add" onclick="agregarFila()">+ Añadir Línea</button>
 
     <table id="tabla-asientos">
         <thead>
             <tr>
-                <th style="width: 12%;">FECHA</th>
-                <th style="width: 38%;">CUENTA</th>
-                <th style="width: 10%;">REF</th>
-                <th style="width: 20%;">DÉBITO</th>
-                <th style="width: 20%;">CRÉDITO</th>
-                <th style="width: 5%;"></th>
+                <th style="width: 10%;">FECHA</th>
+                <th style="width: 40%;">CUENTA</th>
+                <th style="width: 8%;">REF</th>
+                <th style="width: 18%;">DÉBITO</th>
+                <th style="width: 18%;">CRÉDITO</th>
+                <th style="width: 6%;"></th>
             </tr>
         </thead>
         <tbody id="cuerpo-tabla"></tbody>
@@ -61,52 +60,34 @@
     </div>
     <div id="mensajeValidacion" class="status-msg"></div>
 
-    <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
+    <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar en Supabase</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // --- CONFIGURACIÓN DE SUPABASE ---
-    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
-    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
+    const SUPABASE_URL = 'TU_URL_AQUÍ'; 
+    const SUPABASE_KEY = 'TU_KEY_AQUÍ'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    let asignacionesRef = {};
-    let proximoNumero = 1;
-
-    function obtenerFecha() {
-        const d = new Date();
-        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    }
 
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
-        const esPrimera = tabla.rows.length === 0;
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
-            <td style="color: #666; font-size: 0.85rem;">${esPrimera ? obtenerFecha() : ''}</td>
-            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" oninput="gestionarIVA(this)"></td>
-            <td class="col-ref"></td>
+            <td style="color: #64748b; font-size: 0.85rem; text-align:center;">${new Date().toLocaleDateString()}</td>
+            <td contenteditable="true" class="txt-cuenta" oninput="gestionarIVA(this)"></td>
+            <td contenteditable="true" class="col-ref"></td>
             <td contenteditable="true" class="val-debito" oninput="gestionarIVA(this)">0</td>
             <td contenteditable="true" class="val-credito" oninput="gestionarIVA(this)">0</td>
-            <td style="text-align:center"><button class="btn-eliminar" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
+            <td style="text-align:center"><button style="background:red;color:white;border:none;cursor:pointer;" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
-    }
-
-    function asignarRef(elemento) {
-        const fila = elemento.closest('tr');
-        const nombre = elemento.innerText.toLowerCase().trim();
-        const celdaRef = fila.querySelector('.col-ref');
-        if (nombre === "") return;
-        if (asignacionesRef[nombre]) { celdaRef.innerText = asignacionesRef[nombre]; } 
-        else { asignacionesRef[nombre] = proximoNumero; celdaRef.innerText = proximoNumero; proximoNumero++; }
     }
 
     function gestionarIVA(elemento) {
         const filaActual = elemento.closest('tr');
         const nombreCuenta = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
         
+        // Solo actúa si es Caja o Banco
         if (nombreCuenta === 'caja' || nombreCuenta === 'banco') {
             const montoDebito = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
             const montoCredito = parseFloat(filaActual.querySelector('.val-credito').innerText) || 0;
@@ -114,28 +95,34 @@
             if (montoDebito > 0) {
                 const neto = montoDebito / 1.16;
                 const iva = montoDebito - neto;
-                distribuir(nombreCuenta, 'debito fiscal', neto, iva, 'credito');
+                distribuirIVA(nombreCuenta, 'debito fiscal', neto, iva, 'credito');
             } else if (montoCredito > 0) {
                 const neto = montoCredito / 1.16;
                 const iva = montoCredito - neto;
-                distribuir(nombreCuenta, 'credito fiscal', neto, iva, 'debito');
+                distribuirIVA(nombreCuenta, 'credito fiscal', neto, iva, 'debito');
             }
         }
         actualizarTotales();
     }
 
-    function distribuir(cuentaDinero, cuentaFiscalBuscada, neto, iva, columnaDestino) {
+    function distribuirIVA(cuentaPrincipal, tipoIVA, neto, iva, columnaDestino) {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let netoAsignado = false;
+
         filas.forEach(f => {
-            const nombreFila = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            if (nombreFila.includes('fiscal') && nombreFila.includes(cuentaFiscalBuscada.split(' ')[0])) {
-                if (columnaDestino === 'debito') f.querySelector('.val-debito').innerText = iva.toFixed(2);
-                else f.querySelector('.val-credito').innerText = iva.toFixed(2);
+            const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            const cDebito = f.querySelector('.val-debito');
+            const cCredito = f.querySelector('.val-credito');
+
+            // Busca la cuenta de IVA
+            if (nombre.includes('fiscal') && nombre.includes(tipoIVA.split(' ')[0])) {
+                if (columnaDestino === 'debito') { cDebito.innerText = iva.toFixed(2); cCredito.innerText = "0"; }
+                else { cCredito.innerText = iva.toFixed(2); cDebito.innerText = "0"; }
             } 
-            else if (nombreFila !== '' && nombreFila !== cuentaDinero && !nombreFila.includes('fiscal') && !netoAsignado) {
-                if (columnaDestino === 'debito') f.querySelector('.val-debito').innerText = neto.toFixed(2);
-                else f.querySelector('.val-credito').innerText = neto.toFixed(2);
+            // Busca la cuenta de contrapartida (Gasto/Venta)
+            else if (nombre !== '' && nombre !== cuentaPrincipal && !nombre.includes('fiscal') && !netoAsignado) {
+                if (columnaDestino === 'debito') { cDebito.innerText = neto.toFixed(2); cCredito.innerText = "0"; }
+                else { cCredito.innerText = neto.toFixed(2); cDebito.innerText = "0"; }
                 netoAsignado = true;
             }
         });
@@ -147,48 +134,47 @@
         document.querySelectorAll('.val-credito').forEach(t => c += parseFloat(t.innerText) || 0);
         document.getElementById('totalDebito').innerText = d.toFixed(2);
         document.getElementById('totalCredito').innerText = c.toFixed(2);
+        
         const btn = document.getElementById('btnGuardar');
-        if (d.toFixed(2) === c.toFixed(2) && d > 0) {
+        if (Math.abs(d - c) < 0.01 && d > 0) {
             btn.disabled = false;
-            document.getElementById('mensajeValidacion').innerHTML = "<span style='color: green;'>✓ Asiento cuadrado.</span>";
+            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:green;'>✓ Cuadrado</span>";
         } else {
             btn.disabled = true;
-            document.getElementById('mensajeValidacion').innerHTML = "<span style='color: red;'>⚠ El asiento no cuadra.</span>";
+            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:red;'>⚠ No cuadra</span>";
         }
     }
 
     async function guardarAsiento() {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const datos = [];
-        const nroUnico = Date.now();
-        const textoDescripcion = document.getElementById('resumenAsiento').value;
+        const idAsiento = Date.now();
+        const desc = document.getElementById('resumenAsiento').value;
+        const rif = document.getElementById('empresaRif').innerText.trim();
+        const per = document.getElementById('periodoActual').innerText.trim();
 
         filas.forEach(f => {
-            const nombreCuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            if (nombreCuenta !== "") {
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            if (cuenta !== "") {
                 datos.push({ 
-                    asiento_id: nroUnico,
-                    descripcion: textoDescripcion,
-                    cuenta: nombreCuenta,
-                    ref: f.querySelector('.col-ref').innerText,
+                    asiento_id: idAsiento,
+                    descripcion: desc,
+                    cuenta: cuenta,
+                    ref: f.querySelector('.col-ref').innerText.trim(),
+                    rif: rif,
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
                     fecha: new Date().toISOString().split('T')[0],
-                    periodo: "FEBRERO 2026",
-                    rif: "J-00000000-0"
+                    periodo: per
                 });
             }
         });
 
         const { error } = await _supabase.from('asientos').insert(datos);
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            alert("¡Asiento guardado con éxito!");
-            document.getElementById('cuerpo-tabla').innerHTML = "";
-            document.getElementById('resumenAsiento').value = "";
-            for(let i=0; i<4; i++) agregarFila();
-            actualizarTotales();
+        if (error) alert("Error: " + error.message);
+        else {
+            alert("¡Guardado con éxito!");
+            location.reload(); 
         }
     }
 

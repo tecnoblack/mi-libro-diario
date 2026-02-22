@@ -10,11 +10,11 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #0056b3; color: white; }
-        .inputs-row input { width: 90%; padding: 5px; border: 1px solid #ccc; }
+        input { width: 90%; padding: 5px; border: 1px solid #ccc; }
         .total-row { font-weight: bold; background: #eee; }
         .btn { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; }
         .btn-add { background: #28a745; margin-bottom: 10px; }
-        .btn-save { background: #007bff; width: 100%; font-size: 1.1em; }
+        .btn-save { background: #007bff; width: 100%; font-size: 1.1em; margin-top: 15px; }
         .btn-save:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 </head>
@@ -43,7 +43,7 @@
             </tr>
         </thead>
         <tbody id="cuerpoAsiento">
-            </tbody>
+        </tbody>
         <tfoot>
             <tr class="total-row">
                 <td colspan="2">TOTALES</td>
@@ -57,58 +57,97 @@
     <button id="btnGuardar" class="btn btn-save" disabled>Guardar Asiento</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+    // CONEXIÓN CON TUS DATOS REALES
+    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     let filas = [];
 
     function agregarFila() {
-        const tbody = document.getElementById('cuerpoAsiento');
         const index = filas.length;
+        const proximoRef = index + 1; // REF AUTOMÁTICO
+
+        const tbody = document.getElementById('cuerpoAsiento');
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><input type="text" oninput="actualizarDato(${index}, 'cuenta', this.value)" placeholder="Caja, Venta..."></td>
-            <td><input type="number" oninput="actualizarDato(${index}, 'ref', this.value)"></td>
+            <td><input type="number" value="${proximoRef}" oninput="actualizarDato(${index}, 'ref', this.value)"></td>
             <td><input type="number" step="0.01" class="debito" oninput="actualizarDato(${index}, 'debito', this.value)" value="0"></td>
             <td><input type="number" step="0.01" class="credito" oninput="actualizarDato(${index}, 'credito', this.value)" value="0"></td>
         `;
         tbody.appendChild(tr);
-        filas.push({ cuenta: '', ref: '', debito: 0, credito: 0 });
+        filas.push({ cuenta: '', ref: proximoRef, debito: 0, credito: 0 });
+        calcularTotales();
     }
 
     function actualizarDato(index, campo, valor) {
         filas[index][campo] = campo === 'cuenta' ? valor : parseFloat(valor || 0);
+        
+        // IVA AUTOMÁTICO (Sugerencia al escribir "Venta")
+        if(campo === 'debito' && valor > 0 && filas[index].cuenta.toLowerCase().includes('venta')) {
+            const sugerenciaIVA = (valor * 0.16).toFixed(2);
+            alert("Sugerencia Contable: El IVA (16%) para este monto es " + sugerenciaIVA);
+        }
         calcularTotales();
     }
 
     function calcularTotales() {
-        let tDebito = 0;
-        let tCredito = 0;
-        
-        filas.forEach(f => {
-            tDebito += f.debito;
-            tCredito += f.credito;
-        });
-
+        let tDebito = 0; let tCredito = 0;
+        filas.forEach(f => { tDebito += f.debito; tCredito += f.credito; });
         document.getElementById('totalDebito').innerText = tDebito.toFixed(2);
         document.getElementById('totalCredito').innerText = tCredito.toFixed(2);
-
+        
         const btn = document.getElementById('btnGuardar');
         const msg = document.getElementById('mensajeValidacion');
-
+        
         if (tDebito === tCredito && tDebito > 0) {
             btn.disabled = false;
-            msg.innerText = "✓ El asiento está cuadrado.";
+            msg.innerText = "✓ Asiento cuadrado.";
             msg.style.color = "green";
         } else {
             btn.disabled = true;
-            msg.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
+            msg.innerText = "⚠ No cuadra (Débito ≠ Crédito).";
             msg.style.color = "red";
         }
     }
-    
-    // Iniciar con dos filas por defecto
+
+    document.getElementById('btnGuardar').onclick = async () => {
+        const glosa = document.getElementById('glosa').value;
+        if(!glosa) return alert("Por favor, pon una descripción al asiento.");
+
+        // Guardar en tabla 'asientos'
+        const { data: asiento, error: errA } = await _supabase
+            .from('asientos')
+            .insert([{ glosa: glosa, periodo: 'FEBRERO 2026' }])
+            .select();
+
+        if (errA) return alert("Error: " + errA.message);
+
+        // Guardar detalles
+        const detalles = filas.map(f => ({
+            asiento_id: asiento[0].id,
+            cuenta_nombre: f.cuenta,
+            ref: f.ref,
+            debito: f.debito,
+            credito: f.credito
+        }));
+
+        const { error: errD } = await _supabase.from('detalles_asiento').insert(detalles);
+        
+        if (!errD) {
+            alert("✅ Asiento N° " + asiento[0].id + " guardado con éxito.");
+            location.reload();
+        } else {
+            alert("Error en detalles: " + errD.message);
+        }
+    };
+
+    // Iniciar con dos filas
     agregarFila();
     agregarFila();
 </script>
-
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Asiento Contable Inteligente Dinámico</title>
+    <title>Asiento Contable Correcto</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; }
         .contenedor { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
@@ -34,8 +34,7 @@
                 <th style="width: 10%;">Acción</th>
             </tr>
         </thead>
-        <tbody id="cuerpo-tabla">
-            </tbody>
+        <tbody id="cuerpo-tabla"></tbody>
     </table>
 
     <div class="totales-seccion">
@@ -50,63 +49,67 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // 1. CONFIGURACIÓN DE SUPABASE
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhS...'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // VARIABLES PARA LA INTELIGENCIA DE REF
-    let historialCodigos = {}; 
-    let ultimoNumeroAsignado = 0;
+    // Diccionario de memoria para esta sesión
+    let asignacionesRef = {};
+    let proximoNumero = 1;
 
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
-            <td contenteditable="true" class="txt-cuenta" oninput="procesarFila(this)"></td>
+            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" oninput="gestionarIVA(this)"></td>
             <td class="col-ref"></td>
-            <td contenteditable="true" class="val-debito" oninput="procesarFila(this)">0</td>
+            <td contenteditable="true" class="val-debito" oninput="gestionarIVA(this)">0</td>
             <td contenteditable="true" class="val-credito" oninput="actualizarTotales()">0</td>
-            <td style="text-align:center"><button class="btn-eliminar" onclick="eliminarFila(this)">✕</button></td>
+            <td style="text-align:center"><button class="btn-eliminar" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
     }
 
-    function eliminarFila(btn) {
-        btn.closest('tr').remove();
-        actualizarTotales();
+    // Esta función solo se activa cuando dejas de escribir en la celda de cuenta
+    function asignarRef(elemento) {
+        const fila = elemento.closest('tr');
+        const nombre = elemento.innerText.toLowerCase().trim();
+        const celdaRef = fila.querySelector('.col-ref');
+
+        if (nombre === "") {
+            celdaRef.innerText = "";
+            return;
+        }
+
+        // Si la cuenta ya tiene un número asignado anteriormente, lo usamos
+        if (asignacionesRef[nombre]) {
+            celdaRef.innerText = asignacionesRef[nombre];
+        } 
+        // Si es una cuenta nueva, le damos el siguiente número disponible
+        else {
+            asignacionesRef[nombre] = proximoNumero;
+            celdaRef.innerText = proximoNumero;
+            proximoNumero++;
+        }
     }
 
-    // FUNCIÓN PRINCIPAL QUE GESTIONA REF E IVA
-    function procesarFila(elemento) {
+    function gestionarIVA(elemento) {
         const filaActual = elemento.closest('tr');
         const nombre = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-        const celdaRef = filaActual.querySelector('.col-ref');
 
-        if (nombre !== "") {
-            // ASIGNACIÓN AUTOMÁTICA DE REF
-            if (historialCodigos[nombre]) {
-                celdaRef.innerText = historialCodigos[nombre];
-            } else {
-                ultimoNumeroAsignado++;
-                historialCodigos[nombre] = ultimoNumeroAsignado;
-                celdaRef.innerText = ultimoNumeroAsignado;
-            }
-
-            // LÓGICA DE IVA (Solo si es 'caja')
+        // Lógica de IVA Automático para "caja"
+        if (nombre === 'caja') {
             const montoCaja = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
-            if (nombre === 'caja' && montoCaja > 0) {
+            if (montoCaja > 0) {
                 const neto = montoCaja / 1.16;
                 const iva = montoCaja - neto;
 
                 document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
                     const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
                     if (n === 'venta') f.querySelector('.val-credito').innerText = neto.toFixed(2);
-                    if (n === 'debito fiscal') f.querySelector('.val-credito').innerText = iva.toFixed(2);
+                    if (n === 'debito fiscal' || n === 'débito fiscal') f.querySelector('.val-credito').innerText = iva.toFixed(2);
                 });
             }
-        } else {
-            celdaRef.innerText = "";
         }
         actualizarTotales();
     }
@@ -124,11 +127,11 @@
 
         if (d.toFixed(2) === c.toFixed(2) && d > 0) {
             btn.disabled = false;
-            msg.innerText = "✓ Asiento cuadrado correctamente.";
+            msg.innerText = "✓ Asiento cuadrado.";
             msg.style.color = "green";
         } else {
             btn.disabled = true;
-            msg.innerText = "⚠ El asiento no cuadra.";
+            msg.innerText = "⚠ No cuadra.";
             msg.style.color = "red";
         }
     }
@@ -143,17 +146,15 @@
             const ref = f.querySelector('.col-ref').innerText.trim();
             const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            if (cuenta !== "") {
-                datos.push({ asiento_id: nro, cuenta, ref, debito: deb, credito: cre });
-            }
+            if (cuenta !== "") datos.push({ asiento_id: nro, cuenta, ref, debito: deb, credito: cre });
         });
 
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) alert("Error: " + error.message);
-        else { alert("¡Asiento guardado exitosamente!"); location.reload(); }
+        else { alert("¡Guardado!"); location.reload(); }
     }
 
-    // Iniciamos con 3 filas vacías
+    // Iniciar con 3 filas
     agregarFila(); agregarFila(); agregarFila();
 </script>
 </body>

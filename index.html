@@ -156,8 +156,7 @@
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const datos = [];
         const idGrupo = Date.now();
-        const glosa = document.getElementById('resumenAsiento').value;
-        const rif = document.getElementById('empresaRif').innerText.trim();
+        const glosaTexto = document.getElementById('resumenAsiento').value;
         const per = document.getElementById('periodoActual').innerText.trim();
 
         filas.forEach(f => {
@@ -165,10 +164,9 @@
             if (cuenta !== "") {
                 datos.push({ 
                     asiento_id: idGrupo,
-                    glosa: glosa,
+                    descripcion: glosaTexto, 
                     cuenta: cuenta,
                     ref: f.querySelector('.col-ref').innerText.trim() || "1",
-                    rif: rif,
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
                     fecha: new Date().toISOString().split('T')[0],
@@ -178,8 +176,12 @@
         });
 
         const { error } = await _supabase.from('asientos').insert(datos);
-        if (error) alert("Error: " + error.message);
-        else { alert("¡Guardado!"); location.reload(); }
+        if (error) {
+            alert("Error de Supabase: " + error.message);
+        } else { 
+            alert("¡Asiento guardado con éxito!"); 
+            location.reload(); 
+        }
     }
 
     window.onload = () => { for(let i=0; i<4; i++) agregarFila(); }

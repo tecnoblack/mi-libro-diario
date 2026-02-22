@@ -2,38 +2,41 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <title>Libro Diario Profesional</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; }
-        .libro-diario-container { max-width: 1000px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         
-        /* Encabezado Editable con Borde Azul */
-        .header-box { border: 2px solid #3b82f6; text-align: center; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-        .editable:hover { background-color: #f0f7ff; cursor: pointer; border-radius: 3px; }
-        .header-box h1 { margin: 0; font-size: 1.6rem; color: #1a1a1a; outline: none; }
-        .header-box p { margin: 5px 0; font-weight: bold; font-size: 0.9rem; outline: none; }
-        .header-box h2 { margin: 10px 0 0 0; text-decoration: underline; font-size: 1.2rem; outline: none; }
+        /* Encabezado solicitado con borde azul y editable */
+        .header-box { border: 2px solid #2563eb; text-align: center; padding: 20px; margin-bottom: 25px; border-radius: 6px; }
+        .editable { outline: none; transition: background 0.3s; padding: 2px 5px; }
+        .editable:focus { background: #eef2ff; border-bottom: 1px dashed #2563eb; }
+        .header-box h1 { margin: 0; font-size: 1.8rem; text-transform: uppercase; }
+        .header-box p { margin: 5px 0; font-weight: bold; }
+        .header-box h2 { margin: 15px 0 0 0; text-decoration: underline; font-size: 1.3rem; }
 
-        .registro-info { margin-bottom: 20px; }
-        .input-descripcion { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        /* Apartado Resumen del Asiento */
+        .resumen-seccion { margin-bottom: 20px; }
+        .resumen-seccion label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.95rem; }
+        .input-resumen { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
 
-        /* Tabla Completa: FECHA | CUENTA | REF | DÉBITO | CRÉDITO */
+        /* Tabla Estilo Profesional */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.85rem; text-transform: uppercase; }
-        td { padding: 10px; border-bottom: 1px solid #e5e7eb; }
+        th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; }
+        td { padding: 10px; border: 1px solid #e5e7eb; }
 
-        .input-tabla { width: 100%; border: none; background: transparent; outline: none; font-size: 0.95rem; }
-        .input-tabla:focus { border-bottom: 1px solid #3b82f6; }
+        .input-tabla { width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; }
+        .btn-add { background-color: #059669; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .btn-add:hover { background-color: #047857; }
         
-        .btn-add { background-color: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
-        .btn-save { background-color: #3b82f6; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 25px; font-size: 1rem; }
-        
-        .total-row { font-weight: bold; background-color: #f9fafb; font-size: 1.1rem; }
-        .status-msg { font-size: 0.9rem; font-weight: bold; margin-top: 15px; }
+        .total-row { background-color: #f8fafc; font-weight: bold; font-size: 1.1rem; }
+        .status-msg { margin-top: 15px; font-weight: bold; }
+        .btn-guardar { background-color: #2563eb; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
-<div class="libro-diario-container">
+<div class="container">
     <div class="header-box">
         <h1 contenteditable="true" class="editable">COMERCIAL A B C, C.A.</h1>
         <p contenteditable="true" class="editable">RIF: J-00000000-0</p>
@@ -41,9 +44,9 @@
         <p contenteditable="true" class="editable">PERÍODO: FEBRERO 2026</p>
     </div>
 
-    <div class="registro-info">
-        <label><b>Registro de Asiento</b></label>
-        <input type="text" id="glosa" class="input-descripcion" placeholder="Escriba aquí la descripción del asiento (ej. Venta al Contado)...">
+    <div class="resumen-seccion">
+        <label>Resumen del Asiento</label>
+        <input type="text" class="input-resumen" placeholder="Ej. Venta de mercancía al contado según factura...">
     </div>
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
@@ -58,7 +61,8 @@
                 <th style="width: 20%;">CRÉDITO</th>
             </tr>
         </thead>
-        <tbody id="cuerpo-asiento"></tbody>
+        <tbody id="tabla-body">
+            </tbody>
         <tfoot>
             <tr class="total-row">
                 <td colspan="3" style="text-align: right; padding-right: 20px;">TOTALES:</td>
@@ -68,73 +72,70 @@
         </tfoot>
     </table>
 
-    <div id="mensaje-estado" class="status-msg"></div>
-    <button class="btn-save">Guardar Asiento en Sistema</button>
+    <div id="mensaje" class="status-msg"></div>
+    <button class="btn-guardar">Guardar Asiento</button>
 </div>
 
 <script>
-    const IVA_TASA = 0.16;
+    const TASA_IVA = 0.16;
 
-    function obtenerFechaHoy() {
-        const hoy = new Date();
-        return `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+    function obtenerFecha() {
+        const d = new Date();
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     }
 
-    function agregarFila(nombre = "", ref = "", debito = 0, credito = 0) {
-        const tbody = document.getElementById('cuerpo-asiento');
+    function agregarFila(nombre = "", ref = "", deb = 0, cre = 0) {
+        const tbody = document.getElementById('tabla-body');
         const esPrimera = tbody.rows.length === 0;
-        const nuevaFila = tbody.insertRow();
+        const fila = tbody.insertRow();
 
-        nuevaFila.innerHTML = `
-            <td><input type="text" class="input-tabla" value="${esPrimera ? obtenerFechaHoy() : ''}" readonly></td>
-            <td><input type="text" class="input-tabla" value="${nombre}" placeholder="Nombre de cuenta"></td>
+        fila.innerHTML = `
+            <td><input type="text" class="input-tabla" value="${esPrimera ? obtenerFecha() : ''}" readonly></td>
+            <td><input type="text" class="input-tabla" value="${nombre}" placeholder="..."></td>
             <td><input type="text" class="input-tabla" value="${ref}" placeholder="0"></td>
-            <td><input type="number" class="input-tabla v-debito" value="${debito}" step="0.01" oninput="validarIVA(this)"></td>
-            <td><input type="number" class="input-tabla v-credito" value="${credito}" step="0.01" oninput="calcularTotales()"></td>
+            <td><input type="number" class="input-tabla val-debito" value="${deb}" step="0.01" oninput="controlIVA(this)"></td>
+            <td><input type="number" class="input-tabla val-credito" value="${cre}" step="0.01" oninput="calcular()"></td>
         `;
-        calcularTotales();
+        calcular();
     }
 
-    // Lógica de IVA Automático al escribir en la primera fila (Débito)
-    function validarIVA(elemento) {
-        const tbody = document.getElementById('cuerpo-asiento');
-        const monto = parseFloat(elemento.value);
+    function controlIVA(input) {
+        const tbody = document.getElementById('tabla-body');
+        const monto = parseFloat(input.value);
 
-        // Si es la primera fila y no hay más filas creadas, generamos el desglose
+        // LOGICA FUNCIONAL: Si es la primera fila y pones un monto en Débito
         if (tbody.rows.length === 1 && monto > 0) {
-            const baseImponible = monto / (1 + IVA_TASA);
-            const iva = monto - baseImponible;
+            const base = monto / (1 + TASA_IVA);
+            const iva = monto - base;
 
-            // Añadimos las filas de contrapartida automáticas
-            agregarFila("Venta", "2", 0, baseImponible.toFixed(2));
+            // Agregamos las filas automáticas con sus REF (2 y 3)
+            agregarFila("Venta", "2", 0, base.toFixed(2));
             agregarFila("Débito Fiscal", "3", 0, iva.toFixed(2));
         }
-        calcularTotales();
+        calcular();
     }
 
-    function calcularTotales() {
-        let debitoTotal = 0;
-        let creditoTotal = 0;
+    function calcular() {
+        let dTotal = 0, cTotal = 0;
+        document.querySelectorAll('.val-debito').forEach(i => dTotal += parseFloat(i.value || 0));
+        document.querySelectorAll('.val-credito').forEach(i => cTotal += parseFloat(i.value || 0));
 
-        document.querySelectorAll('.v-debito').forEach(i => debitoTotal += parseFloat(i.value || 0));
-        document.querySelectorAll('.v-credito').forEach(i => creditoTotal += parseFloat(i.value || 0));
+        document.getElementById('total-debito').innerText = dTotal.toFixed(2);
+        document.getElementById('total-credito').innerText = cTotal.toFixed(2);
 
-        document.getElementById('total-debito').innerText = debitoTotal.toFixed(2);
-        document.getElementById('total-credito').innerText = creditoTotal.toFixed(2);
-
-        const msg = document.getElementById('mensaje-estado');
-        if (debitoTotal.toFixed(2) === creditoTotal.toFixed(2) && debitoTotal > 0) {
-            msg.innerText = "✓ Asiento cuadrado correctamente.";
-            msg.style.color = "#059669";
+        const m = document.getElementById('mensaje');
+        if (dTotal.toFixed(2) === cTotal.toFixed(2) && dTotal > 0) {
+            m.innerText = "✓ Asiento cuadrado.";
+            m.style.color = "#059669";
         } else {
-            msg.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
-            msg.style.color = "#dc2626";
+            m.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
+            m.style.color = "#dc2626";
         }
     }
 
-    // Al cargar, inicializamos con la cuenta principal
+    // Al cargar: Primera fila vacía en Cuenta y REF 1
     window.onload = () => {
-        agregarFila("Caja", "1");
+        agregarFila("", "1"); // Cuenta vacía para que tú escribas "Caja" o lo que gustes
     };
 </script>
 

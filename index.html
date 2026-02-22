@@ -2,41 +2,40 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Asiento Contable</title>
+    <title>Asiento Contable Inteligente</title>
     <style>
-        /* Estilos para imitar tu primera interfaz */
-        body { font-family: Arial, sans-serif; background-color: #f0f2f5; padding: 20px; }
-        .contenedor { background: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; }
+        .contenedor { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
         
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th { background-color: #0044cc; color: white; padding: 12px; text-align: left; text-transform: uppercase; font-size: 14px; }
         td { border: 1px solid #ccc; padding: 10px; }
         
-        .btn-accion { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .btn-add { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         .btn-eliminar { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-        .btn-guardar { background-color: #0044cc; color: white; border: none; padding: 12px 30px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; opacity: 0.6; }
-        .btn-guardar:enabled { opacity: 1; }
+        .btn-guardar { background-color: #0044cc; color: white; border: none; padding: 12px 30px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
 
-        .totales-seccion { background: #e9ecef; padding: 15px; border-radius: 4px; }
-        .error-msg { color: #d9534f; font-weight: bold; margin-top: 10px; }
-        .success-msg { color: #28a745; font-weight: bold; margin-top: 10px; }
+        .totales-seccion { background: #e9ecef; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; }
+        .status-msg { margin-top: 10px; font-size: 14px; font-weight: bold; }
         
         [contenteditable="true"] { outline: none; min-height: 20px; }
-        [contenteditable="true"]:focus { background: #fffde7; border: 1px solid #0044cc; }
+        [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid #0044cc; }
+        .col-ref { background-color: #f9f9f9; font-weight: bold; color: #555; text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="contenedor">
-    <button class="btn-accion" onclick="agregarFila()">+ Añadir Cuenta</button>
+    <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
 
     <table id="tabla-asientos">
         <thead>
             <tr>
-                <th style="width: 30%;">Cuenta</th>
-                <th style="width: 10%;">REF</th>
-                <th style="width: 25%;">Débito</th>
-                <th style="width: 25%;">Crédito</th>
+                <th style="width: 35%;">Cuenta</th>
+                <th style="width: 15%;">REF (Código)</th>
+                <th style="width: 20%;">Débito</th>
+                <th style="width: 20%;">Crédito</th>
                 <th style="width: 10%;">Acción</th>
             </tr>
         </thead>
@@ -45,65 +44,83 @@
     </table>
 
     <div class="totales-seccion">
-        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-            <span>TOTALES</span>
-            <span>Débito: <span id="totalDebito">0.00</span></span>
-            <span>Crédito: <span id="totalCredito">0.00</span></span>
-        </div>
-        <div id="mensajeValidacion" class="error-msg">⚠ No cuadra (Débito ≠ Crédito).</div>
+        <span>TOTALES</span>
+        <span>Débito: <span id="totalDebito">0.00</span></span>
+        <span>Crédito: <span id="totalCredito">0.00</span></span>
     </div>
+    <div id="mensajeValidacion" class="status-msg"></div>
 
     <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // Configuración de Supabase
+    // 1. CONFIGURACIÓN DE SUPABASE
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
-    const SUPABASE_KEY = 'TU_LLAVE_AQUI'; 
+    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhS...'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let contadorRef = 1;
+    // 2. CATÁLOGO DE CUENTAS (Aquí vinculas el nombre con el número)
+    const CATALOGO = {
+        "caja": "1101",
+        "banco": "1102",
+        "clientes": "1103",
+        "venta": "4101",
+        "ventas": "4101",
+        "debito fiscal": "2105",
+        "débito fiscal": "2105",
+        "credito fiscal": "1106",
+        "crédito fiscal": "1106",
+        "compras": "5101"
+    };
 
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
-            <td contenteditable="true" class="txt-cuenta" oninput="validarNombre(this)"></td>
-            <td>${contadorRef++}</td>
-            <td contenteditable="true" class="val-debito" oninput="gestionarIVA(this)">0</td>
+            <td contenteditable="true" class="txt-cuenta" oninput="vincularCodigoIVA(this)"></td>
+            <td contenteditable="true" class="col-ref"></td>
+            <td contenteditable="true" class="val-debito" oninput="actualizarTotales()">0</td>
             <td contenteditable="true" class="val-credito" oninput="actualizarTotales()">0</td>
-            <td style="text-align:center"><button class="btn-eliminar" onclick="eliminarFila(this)">✕</button></td>
+            <td style="text-align:center"><button class="btn-eliminar" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
     }
 
-    function eliminarFila(btn) {
-        btn.closest('tr').remove();
+    // 3. VINCULACIÓN DE CÓDIGO + CÁLCULO DE IVA
+    function vincularCodigoIVA(elemento) {
+        const filaActual = elemento.closest('tr');
+        const nombreLimpio = elemento.innerText.toLowerCase().trim();
+        const celdaRef = filaActual.querySelector('.col-ref');
+
+        // Vincular Código REF automáticamente
+        if (CATALOGO[nombreLimpio]) {
+            celdaRef.innerText = CATALOGO[nombreLimpio];
+        }
+
+        // Si es caja, activamos el cálculo de IVA en las otras filas
+        // (Nota: Solo calcula si el usuario ya puso un monto en Débito)
+        const montoDebito = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
+        if (nombreLimpio === 'caja' && montoDebito > 0) {
+            ejecutarCalculoIVA(montoDebito);
+        }
+        
         actualizarTotales();
     }
 
-    function gestionarIVA(elemento) {
-        const filaActual = elemento.closest('tr');
-        const nombre = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+    function ejecutarCalculoIVA(total) {
+        const neto = total / 1.16;
+        const iva = total - neto;
 
-        // Lógica de IVA Automático
-        if (nombre === 'caja') {
-            const total = parseFloat(elemento.innerText) || 0;
-            const neto = total / 1.16;
-            const iva = total - neto;
-
-            const filas = document.querySelectorAll('#cuerpo-tabla tr');
-            filas.forEach(f => {
-                const nombreFila = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-                if (nombreFila === 'venta') {
-                    f.querySelector('.val-credito').innerText = neto.toFixed(2);
-                } else if (nombreFila === 'debito fiscal' || nombreFila === 'débito fiscal') {
-                    f.querySelector('.val-credito').innerText = iva.toFixed(2);
-                }
-            });
-        }
-        actualizarTotales();
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        filas.forEach(f => {
+            const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            if (nombre === 'venta' || nombre === 'ventas') {
+                f.querySelector('.val-credito').innerText = neto.toFixed(2);
+            } else if (nombre === 'debito fiscal' || nombre === 'débito fiscal') {
+                f.querySelector('.val-credito').innerText = iva.toFixed(2);
+            }
+        });
     }
 
     function actualizarTotales() {
@@ -122,32 +139,37 @@
         if (debito.toFixed(2) === credito.toFixed(2) && debito > 0) {
             btn.disabled = false;
             msg.innerText = "✓ Asiento cuadrado.";
-            msg.className = "success-msg";
+            msg.style.color = "#28a745";
         } else {
             btn.disabled = true;
-            msg.innerText = "⚠ No cuadra (Débito ≠ Crédito).";
-            msg.className = "error-msg";
+            msg.innerText = "⚠ No cuadra (Diferencia: " + Math.abs(debito - credito).toFixed(2) + ")";
+            msg.style.color = "#dc3545";
         }
     }
 
     async function guardarAsiento() {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const datos = [];
+        const nroAsiento = Date.now();
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            const ref = f.querySelector('.col-ref').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            if (cuenta !== "") datos.push({ cuenta, debito: d, credito: c });
+            
+            if (cuenta !== "") {
+                datos.push({ asiento_nro: nroAsiento, cuenta, ref, debito: d, credito: c });
+            }
         });
 
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) alert("Error: " + error.message);
-        else { alert("¡Guardado!"); location.reload(); }
+        else { alert("Asiento guardado."); location.reload(); }
     }
 
-    // Iniciar con una fila vacía
-    agregarFila();
+    // Iniciar con 3 filas
+    agregarFila(); agregarFila(); agregarFila();
 </script>
 
 </body>

@@ -2,152 +2,225 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Libro Diario - Comercial ABC</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Contable - Libro Diario Inteligente</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        .header { text-align: center; background: white; padding: 20px; border: 2px solid #0056b3; margin-bottom: 20px; }
-        .asiento-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #0056b3; color: white; }
-        input { width: 90%; padding: 5px; border: 1px solid #ccc; }
-        .total-row { font-weight: bold; background: #eee; }
-        .btn { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; }
-        .btn-add { background: #28a745; margin-bottom: 10px; }
-        .btn-save { background: #007bff; width: 100%; font-size: 1.1em; margin-top: 15px; }
-        .btn-save:disabled { background: #ccc; cursor: not-allowed; }
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+            --accent-color: #238636;
+            --error-color: #f85149;
+            --success-color: #3fb950;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background-color: #21262d;
+            text-align: left;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        input {
+            background-color: #0d1117;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            width: 90%;
+            border-radius: 4px;
+        }
+
+        .btn-add {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-add:hover { background-color: #2ea043; }
+
+        .status-msg {
+            margin-top: 15px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .error { color: var(--error-color); background: rgba(248, 81, 73, 0.1); }
+        .success { color: var(--success-color); background: rgba(63, 185, 80, 0.1); }
+
+        .total-row {
+            font-weight: bold;
+            background: #21262d;
+        }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2 id="nombreEmpresa" contenteditable="true">COMERCIAL A B C, C.A.</h2>
-    <p>RIF: <span id="rifEmpresa" contenteditable="true">J-00000000-0</span></p>
-    <h3>LIBRO DIARIO</h3>
-    <p>PERÍODO: <span contenteditable="true">FEBRERO 2026</span></p>
-</div>
+<div class="container">
+    <h2>📓 Registro de Asiento Contable</h2>
+    <p>Escribe "caja" o "banco" primero, luego "venta/debito fiscal" o "compra/credito fiscal".</p>
 
-<div class="asiento-card">
-    <h4>Registro de Asiento</h4>
-    <input type="text" id="glosa" placeholder="Descripción del asiento (ej. Venta al Contado)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
-    
-    <button class="btn btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
-    
-    <table id="tablaAsiento">
+    <table id="tablaContable">
         <thead>
             <tr>
                 <th>Cuenta</th>
-                <th>REF</th>
-                <th>Débito</th>
-                <th>Crédito</th>
+                <th style="width: 80px;">REF</th>
+                <th>Débito (Bs)</th>
+                <th>Crédito (Bs)</th>
             </tr>
         </thead>
-        <tbody id="cuerpoAsiento">
-        </tbody>
+        <tbody id="cuerpoTabla">
+            </tbody>
         <tfoot>
             <tr class="total-row">
-                <td colspan="2">TOTALES</td>
+                <td colspan="2" style="text-align: right;">TOTALES:</td>
                 <td id="totalDebito">0.00</td>
                 <td id="totalCredito">0.00</td>
             </tr>
         </tfoot>
     </table>
-    
-    <p id="mensajeValidacion" style="color: red; font-weight: bold; margin-top: 10px;"></p>
-    <button id="btnGuardar" class="btn btn-save" disabled>Guardar Asiento</button>
+
+    <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
+    <div id="mensajeValidacion" class="status-msg error">⚠️ No cuadra (Débito ≠ Crédito)</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // CONEXIÓN CON TUS DATOS REALES
-    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk';
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Memoria persistente para Referencias (como obtenerRefInteligente)
+    const mapaReferencias = {};
+    let proximaRef = 1;
 
-    let filas = [];
-
+    // 1. Agregar nueva fila a la tabla
     function agregarFila() {
-        const index = filas.length;
-        const proximoRef = index + 1; // REF AUTOMÁTICO
-
-        const tbody = document.getElementById('cuerpoAsiento');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><input type="text" oninput="actualizarDato(${index}, 'cuenta', this.value)" placeholder="Caja, Venta..."></td>
-            <td><input type="number" value="${proximoRef}" oninput="actualizarDato(${index}, 'ref', this.value)"></td>
-            <td><input type="number" step="0.01" class="debito" oninput="actualizarDato(${index}, 'debito', this.value)" value="0"></td>
-            <td><input type="number" step="0.01" class="credito" oninput="actualizarDato(${index}, 'credito', this.value)" value="0"></td>
-        `;
-        tbody.appendChild(tr);
-        filas.push({ cuenta: '', ref: proximoRef, debito: 0, credito: 0 });
-        calcularTotales();
-    }
-
-    function actualizarDato(index, campo, valor) {
-        filas[index][campo] = campo === 'cuenta' ? valor : parseFloat(valor || 0);
+        const tbody = document.getElementById('cuerpoTabla');
+        const fila = document.createElement('tr');
         
-        // IVA AUTOMÁTICO (Sugerencia al escribir "Venta")
-        if(campo === 'debito' && valor > 0 && filas[index].cuenta.toLowerCase().includes('venta')) {
-            const sugerenciaIVA = (valor * 0.16).toFixed(2);
-            alert("Sugerencia Contable: El IVA (16%) para este monto es " + sugerenciaIVA);
-        }
-        calcularTotales();
+        fila.innerHTML = `
+            <td><input type="text" class="nombre-cuenta" oninput="procesarInteligencia(this)" placeholder="Ej: caja"></td>
+            <td><input type="number" class="ref-cuenta" readonly></td>
+            <td><input type="number" class="monto-debito" oninput="actualizarTotales()" value="0" step="0.01"></td>
+            <td><input type="number" class="monto-credito" oninput="actualizarTotales()" value="0" step="0.01"></td>
+        `;
+        tbody.appendChild(fila);
     }
 
-    function calcularTotales() {
-        let tDebito = 0; let tCredito = 0;
-        filas.forEach(f => { tDebito += f.debito; tCredito += f.credito; });
+    // 2. Lógica de Inteligencia: IVA y Referencias (Tu onEdit adaptado)
+    function procesarInteligencia(input) {
+        const filaActual = input.parentElement.parentElement;
+        const nombre = input.value.toLowerCase().trim();
+        const refInput = filaActual.querySelector('.ref-cuenta');
+
+        // --- REFERENCIAS AUTOMÁTICAS ---
+        if (nombre !== "") {
+            if (!mapaReferencias[nombre]) {
+                mapaReferencias[nombre] = proximaRef++;
+            }
+            refInput.value = mapaReferencias[nombre];
+        }
+
+        // --- CÁLCULO DE IVA DUAL ---
+        const filas = document.querySelectorAll('#cuerpoTabla tr');
+        let montoTotalAsiento = 0;
+        let esEntrada = false; // Define si es Venta (Débito) o Compra (Crédito)
+
+        // Buscamos el monto base en Caja o Banco (como en tu código original)
+        filas.forEach(f => {
+            const n = f.querySelector('.nombre-cuenta').value.toLowerCase();
+            if (n.includes("caja") || n.includes("banco")) {
+                const deb = parseFloat(f.querySelector('.monto-debito').value) || 0;
+                const cre = parseFloat(f.querySelector('.monto-credito').value) || 0;
+                
+                if (deb > 0) { 
+                    montoTotalAsiento = deb; 
+                    esEntrada = true; // Flujo de Venta
+                } else if (cre > 0) { 
+                    montoTotalAsiento = cre; 
+                    esEntrada = false; // Flujo de Compra
+                }
+            }
+        });
+
+        if (montoTotalAsiento > 0) {
+            const neto = montoTotalAsiento / 1.16;
+            const iva = montoTotalAsiento - neto;
+
+            // CASO: VENTAS (Usa Débito Fiscal al Crédito)
+            if (esEntrada) {
+                if (nombre.includes("venta")) {
+                    filaActual.querySelector('.monto-credito').value = neto.toFixed(2);
+                }
+                if (nombre.includes("debito fiscal")) {
+                    filaActual.querySelector('.monto-credito').value = iva.toFixed(2);
+                }
+            } 
+            // CASO: COMPRAS (Usa Crédito Fiscal al Débito)
+            else {
+                if (nombre.includes("compra")) {
+                    filaActual.querySelector('.monto-debito').value = neto.toFixed(2);
+                }
+                if (nombre.includes("credito fiscal")) {
+                    filaActual.querySelector('.monto-debito').value = iva.toFixed(2);
+                }
+            }
+        }
+        actualizarTotales();
+    }
+
+    // 3. Validación de totales (El mensaje que tenías en rojo/verde)
+    function actualizarTotales() {
+        let tDebito = 0;
+        let tCredito = 0;
+        
+        document.querySelectorAll('.monto-debito').forEach(i => tDebito += parseFloat(i.value || 0));
+        document.querySelectorAll('.monto-credito').forEach(i => tCredito += parseFloat(i.value || 0));
+
         document.getElementById('totalDebito').innerText = tDebito.toFixed(2);
         document.getElementById('totalCredito').innerText = tCredito.toFixed(2);
-        
-        const btn = document.getElementById('btnGuardar');
+
         const msg = document.getElementById('mensajeValidacion');
-        
-        if (tDebito === tCredito && tDebito > 0) {
-            btn.disabled = false;
-            msg.innerText = "✓ Asiento cuadrado.";
-            msg.style.color = "green";
+        if (tDebito.toFixed(2) === tCredito.toFixed(2) && tDebito > 0) {
+            msg.innerText = "✅ El asiento está cuadrado.";
+            msg.className = "status-msg success";
         } else {
-            btn.disabled = true;
-            msg.innerText = "⚠ No cuadra (Débito ≠ Crédito).";
-            msg.style.color = "red";
+            msg.innerText = "⚠️ No cuadra (Débito ≠ Crédito)";
+            msg.className = "status-msg error";
         }
     }
 
-    document.getElementById('btnGuardar').onclick = async () => {
-        const glosa = document.getElementById('glosa').value;
-        if(!glosa) return alert("Por favor, pon una descripción al asiento.");
-
-        // Guardar en tabla 'asientos'
-        const { data: asiento, error: errA } = await _supabase
-            .from('asientos')
-            .insert([{ glosa: glosa, periodo: 'FEBRERO 2026' }])
-            .select();
-
-        if (errA) return alert("Error: " + errA.message);
-
-        // Guardar detalles
-        const detalles = filas.map(f => ({
-            asiento_id: asiento[0].id,
-            cuenta_nombre: f.cuenta,
-            ref: f.ref,
-            debito: f.debito,
-            credito: f.credito
-        }));
-
-        const { error: errD } = await _supabase.from('detalles_asiento').insert(detalles);
-        
-        if (!errD) {
-            alert("✅ Asiento N° " + asiento[0].id + " guardado con éxito.");
-            location.reload();
-        } else {
-            alert("Error en detalles: " + errD.message);
-        }
-    };
-
-    // Iniciar con dos filas
-    agregarFila();
-    agregarFila();
+    // Inicializar con 4 filas
+    for(let i=0; i<4; i++) agregarFila();
 </script>
+
 </body>
 </html>

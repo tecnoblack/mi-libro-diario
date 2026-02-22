@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Libro Diario - Comercial ABC</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .header { text-align: center; background: white; padding: 20px; border: 2px solid #0056b3; margin-bottom: 20px; }
+        .asiento-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #0056b3; color: white; }
+        .inputs-row input { width: 90%; padding: 5px; border: 1px solid #ccc; }
+        .total-row { font-weight: bold; background: #eee; }
+        .btn { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; }
+        .btn-add { background: #28a745; margin-bottom: 10px; }
+        .btn-save { background: #007bff; width: 100%; font-size: 1.1em; }
+        .btn-save:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2 id="nombreEmpresa" contenteditable="true">COMERCIAL A B C, C.A.</h2>
+    <p>RIF: <span id="rifEmpresa" contenteditable="true">J-00000000-0</span></p>
+    <h3>LIBRO DIARIO</h3>
+    <p>PERÍODO: <span contenteditable="true">FEBRERO 2026</span></p>
+</div>
+
+<div class="asiento-card">
+    <h4>Registro de Asiento</h4>
+    <input type="text" id="glosa" placeholder="Descripción del asiento (ej. Venta al Contado)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+    
+    <button class="btn btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
+    
+    <table id="tablaAsiento">
+        <thead>
+            <tr>
+                <th>Cuenta</th>
+                <th>REF</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+            </tr>
+        </thead>
+        <tbody id="cuerpoAsiento">
+            </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="2">TOTALES</td>
+                <td id="totalDebito">0.00</td>
+                <td id="totalCredito">0.00</td>
+            </tr>
+        </tfoot>
+    </table>
+    
+    <p id="mensajeValidacion" style="color: red; font-weight: bold; margin-top: 10px;"></p>
+    <button id="btnGuardar" class="btn btn-save" disabled>Guardar Asiento</button>
+</div>
+
+<script>
+    let filas = [];
+
+    function agregarFila() {
+        const tbody = document.getElementById('cuerpoAsiento');
+        const index = filas.length;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" oninput="actualizarDato(${index}, 'cuenta', this.value)" placeholder="Caja, Venta..."></td>
+            <td><input type="number" oninput="actualizarDato(${index}, 'ref', this.value)"></td>
+            <td><input type="number" step="0.01" class="debito" oninput="actualizarDato(${index}, 'debito', this.value)" value="0"></td>
+            <td><input type="number" step="0.01" class="credito" oninput="actualizarDato(${index}, 'credito', this.value)" value="0"></td>
+        `;
+        tbody.appendChild(tr);
+        filas.push({ cuenta: '', ref: '', debito: 0, credito: 0 });
+    }
+
+    function actualizarDato(index, campo, valor) {
+        filas[index][campo] = campo === 'cuenta' ? valor : parseFloat(valor || 0);
+        calcularTotales();
+    }
+
+    function calcularTotales() {
+        let tDebito = 0;
+        let tCredito = 0;
+        
+        filas.forEach(f => {
+            tDebito += f.debito;
+            tCredito += f.credito;
+        });
+
+        document.getElementById('totalDebito').innerText = tDebito.toFixed(2);
+        document.getElementById('totalCredito').innerText = tCredito.toFixed(2);
+
+        const btn = document.getElementById('btnGuardar');
+        const msg = document.getElementById('mensajeValidacion');
+
+        if (tDebito === tCredito && tDebito > 0) {
+            btn.disabled = false;
+            msg.innerText = "✓ El asiento está cuadrado.";
+            msg.style.color = "green";
+        } else {
+            btn.disabled = true;
+            msg.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
+            msg.style.color = "red";
+        }
+    }
+    
+    // Iniciar con dos filas por defecto
+    agregarFila();
+    agregarFila();
+</script>
+
+</body>
+</html>

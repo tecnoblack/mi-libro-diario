@@ -3,49 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .libro-diario-container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
-        /* Contenedor del Encabezado (Imagen 4) */
-        .libro-diario-container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .header-box {
-            border: 2px solid #3b82f6;
-            text-align: center;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .header-box h1 { margin: 0; font-size: 1.6rem; color: #1a1a1a; }
+        /* Encabezado solicitado */
+        .header-box { border: 2px solid #3b82f6; text-align: center; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        .header-box h1 { margin: 0; font-size: 1.6rem; }
         .header-box p { margin: 5px 0; font-weight: bold; font-size: 0.9rem; }
         .header-box h2 { margin: 10px 0 0 0; text-decoration: underline; font-size: 1.2rem; }
 
-        /* Sección de Glosa y Registro */
         .registro-info { margin-bottom: 20px; }
-        .registro-info label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
-        .input-descripcion { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .input-descripcion { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
 
-        /* Tabla Estilizada */
+        /* Tabla con REF y FECHA */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
         td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
 
-        .input-tabla { width: 100%; border: none; background: transparent; padding: 5px; outline: none; }
-        .input-tabla:focus { background: #f0f7ff; }
-        
-        .btn-add { background-color: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .input-tabla { width: 100%; border: none; background: transparent; outline: none; padding: 5px; }
+        .btn-add { background-color: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-bottom: 10px; font-weight: bold; }
         .btn-save { background-color: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; }
         
         .total-row { font-weight: bold; background-color: #f9fafb; }
-        .error-msg { color: #dc2626; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: none; }
-        .success-msg { color: #059669; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: none; }
+        .status-msg { font-size: 0.85rem; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -55,12 +35,12 @@
         <h1>COMERCIAL A B C, C.A.</h1>
         <p>RIF: J-00000000-0</p>
         <h2>LIBRO DIARIO</h2>
-        <p id="periodo-actual">PERÍODO: FEBRERO 2026</p>
+        <p>PERÍODO: FEBRERO 2026</p>
     </div>
 
     <div class="registro-info">
-        <label>Registro de Asiento</label>
-        <input type="text" id="glosa" class="input-descripcion" placeholder="Descripción del asiento (ej. Venta al Contado)">
+        <label><b>Registro de Asiento</b></label>
+        <input type="text" class="input-descripcion" placeholder="Descripción del asiento...">
     </div>
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
@@ -68,79 +48,87 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 15%;">FECHA</th>
-                <th style="width: 45%;">CUENTA</th>
+                <th style="width: 12%;">FECHA</th>
+                <th style="width: 38%;">CUENTA</th>
+                <th style="width: 10%;">REF</th>
                 <th style="width: 20%;">DÉBITO</th>
                 <th style="width: 20%;">CRÉDITO</th>
             </tr>
         </thead>
-        <tbody id="cuerpo-asiento">
-            </tbody>
+        <tbody id="cuerpo-asiento"></tbody>
         <tfoot>
             <tr class="total-row">
-                <td colspan="2" style="text-align: right;">TOTALES:</td>
+                <td colspan="3" style="text-align: right;">TOTALES:</td>
                 <td id="total-debito">0.00</td>
                 <td id="total-credito">0.00</td>
             </tr>
         </tfoot>
     </table>
 
-    <p id="mensaje-error" class="error-msg">⚠ El asiento no cuadra (Débito ≠ Crédito).</p>
-    <p id="mensaje-exito" class="success-msg">✓ Asiento cuadrado.</p>
-
-    <button class="btn-save" id="btnGuardar">Guardar Asiento</button>
+    <div id="mensaje-estado" class="status-msg"></div>
+    <button class="btn-save">Guardar Asiento</button>
 </div>
 
 <script>
-    // Obtener fecha de hoy en formato DD/MM/YYYY
+    const IVA_PORCENTAJE = 0.16;
+
     function obtenerFechaHoy() {
         const hoy = new Date();
-        const dia = String(hoy.getDate()).padStart(2, '0');
-        const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-        const anio = hoy.getFullYear();
-        return `${dia}/${mes}/${anio}`;
+        return `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
     }
 
-    function agregarFila() {
+    function agregarFila(nombre = "", ref = "", debito = 0, credito = 0) {
         const tbody = document.getElementById('cuerpo-asiento');
-        const numeroFilas = tbody.rows.length;
+        const esPrimera = tbody.rows.length === 0;
         const nuevaFila = tbody.insertRow();
 
-        // Lógica de fecha: Solo la primera fila (índice 0) lleva la fecha
-        const fechaCelda = numeroFilas === 0 ? obtenerFechaHoy() : "";
-
         nuevaFila.innerHTML = `
-            <td><input type="text" class="input-tabla" value="${fechaCelda}" readonly></td>
-            <td><input type="text" class="input-tabla" placeholder="Nombre de la cuenta..."></td>
-            <td><input type="number" class="input-tabla valor-debito" value="0" onchange="calcularTotales()"></td>
-            <td><input type="number" class="input-tabla valor-credito" value="0" onchange="calcularTotales()"></td>
+            <td><input type="text" class="input-tabla" value="${esPrimera ? obtenerFechaHoy() : ''}" readonly></td>
+            <td><input type="text" class="input-tabla" value="${nombre}" placeholder="Cuenta..."></td>
+            <td><input type="text" class="input-tabla" value="${ref}" placeholder="0"></td>
+            <td><input type="number" class="input-tabla v-debito" value="${debito}" onchange="procesarCambio(this)"></td>
+            <td><input type="number" class="input-tabla v-credito" value="${credito}" onchange="procesarCambio(this)"></td>
         `;
+        calcularTotales();
+    }
+
+    function procesarCambio(elemento) {
+        const tbody = document.getElementById('cuerpo-asiento');
+        
+        // Si es la primera fila y tiene un monto, autogeneramos Venta e IVA (según tu imagen anterior)
+        if (tbody.rows.length === 1 && parseFloat(elemento.value) > 0) {
+            const montoTotal = parseFloat(elemento.value);
+            const baseImponible = montoTotal / (1 + IVA_PORCENTAJE);
+            const iva = montoTotal - baseImponible;
+
+            // Actualizamos la primera fila (Caja/Banco)
+            // Agregamos las filas automáticas
+            agregarFila("Venta", "2", 0, baseImponible.toFixed(2));
+            agregarFila("Débito Fiscal", "3", 0, iva.toFixed(2));
+        }
+        calcularTotales();
     }
 
     function calcularTotales() {
-        let debito = 0;
-        let credito = 0;
-
-        document.querySelectorAll('.valor-debito').forEach(i => debito += parseFloat(i.value || 0));
-        document.querySelectorAll('.valor-credito').forEach(i => credito += parseFloat(i.value || 0));
+        let debito = 0, credito = 0;
+        document.querySelectorAll('.v-debito').forEach(i => debito += parseFloat(i.value || 0));
+        document.querySelectorAll('.v-credito').forEach(i => credito += parseFloat(i.value || 0));
 
         document.getElementById('total-debito').innerText = debito.toFixed(2);
         document.getElementById('total-credito').innerText = credito.toFixed(2);
 
-        const error = document.getElementById('mensaje-error');
-        const exito = document.getElementById('mensaje-exito');
-
-        if (debito === credito && debito > 0) {
-            exito.style.display = 'block';
-            error.style.display = 'none';
+        const msg = document.getElementById('mensaje-estado');
+        if (debito.toFixed(2) === credito.toFixed(2) && debito > 0) {
+            msg.innerText = "✓ Asiento cuadrado.";
+            msg.style.color = "#059669";
         } else {
-            exito.style.display = 'none';
-            error.style.display = 'block';
+            msg.innerText = "⚠ El asiento no cuadra (Débito ≠ Crédito).";
+            msg.style.color = "#dc2626";
         }
     }
 
-    // Inicializar con una fila vacía
-    window.onload = agregarFila;
+    // Iniciar con la primera fila
+    window.onload = () => agregarFila("Caja", "1");
 </script>
 
 </body>

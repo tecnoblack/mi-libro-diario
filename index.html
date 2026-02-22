@@ -7,7 +7,6 @@
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         
-        /* Encabezado con Borde Azul */
         .header-box { border: 2px solid #2563eb; text-align: center; padding: 20px; margin-bottom: 25px; border-radius: 6px; }
         .editable { outline: none; transition: background 0.3s; padding: 2px 5px; }
         .editable:focus { background: #fffde7; border-bottom: 2px solid #2563eb; }
@@ -15,12 +14,10 @@
         .header-box p { margin: 5px 0; font-weight: bold; }
         .header-box h2 { margin: 15px 0 0 0; text-decoration: underline; font-size: 1.3rem; }
 
-        /* Apartado Resumen */
         .resumen-seccion { margin-bottom: 20px; }
         .resumen-seccion label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.95rem; }
         .input-resumen { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
 
-        /* Tabla */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background-color: #2563eb; color: white; padding: 12px; text-align: left; font-size: 0.9rem; border: 1px solid #1d4ed8; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; }
@@ -48,7 +45,7 @@
 
     <div class="resumen-seccion">
         <label>Resumen del Asiento</label>
-        <input type="text" class="input-resumen" placeholder="Ej. Venta de mercancía al contado...">
+        <input type="text" class="input-resumen" placeholder="Ej. Pago de papelería / Venta de productos...">
     </div>
 
     <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
@@ -79,7 +76,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
-    // Configuración Supabase
+    // Tu configuración de Supabase se mantiene igual
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhS...'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -96,7 +93,6 @@
         const tabla = document.getElementById('cuerpo-tabla');
         const esPrimera = tabla.rows.length === 0;
         const nuevaFila = document.createElement('tr');
-        
         nuevaFila.innerHTML = `
             <td style="color: #666; font-size: 0.9rem;">${esPrimera ? obtenerFecha() : ''}</td>
             <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" oninput="gestionarIVA(this)"></td>
@@ -113,50 +109,53 @@
         const nombre = elemento.innerText.toLowerCase().trim();
         const celdaRef = fila.querySelector('.col-ref');
         if (nombre === "") { celdaRef.innerText = ""; return; }
-
-        if (asignacionesRef[nombre]) {
-            celdaRef.innerText = asignacionesRef[nombre];
-        } else {
-            asignacionesRef[nombre] = proximoNumero;
-            celdaRef.innerText = proximoNumero;
-            proximoNumero++;
-        }
+        if (asignacionesRef[nombre]) { celdaRef.innerText = asignacionesRef[nombre]; } 
+        else { asignacionesRef[nombre] = proximoNumero; celdaRef.innerText = proximoNumero; proximoNumero++; }
     }
 
     function gestionarIVA(elemento) {
         const filaActual = elemento.closest('tr');
-        const nombrePrincipal = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+        const nombreCuenta = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
         
-        if (nombrePrincipal === 'caja' || nombrePrincipal === 'banco') {
+        // El disparador siempre es Caja o Banco
+        if (nombreCuenta === 'caja' || nombreCuenta === 'banco') {
             const montoDebito = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
             const montoCredito = parseFloat(filaActual.querySelector('.val-credito').innerText) || 0;
 
-            // CASO: VENTA (Débito Fiscal)
+            // --- CASO VENTA (Dinero al DÉBITO) ---
             if (montoDebito > 0) {
                 const neto = montoDebito / 1.16;
                 const iva = montoDebito - neto;
-                distribuirMontos('venta', 'debito fiscal', neto, iva, 'credito');
+                distribuir(nombreCuenta, 'venta', 'débito fiscal', neto, iva, 'credito');
             } 
-            // CASO: COMPRA (Crédito Fiscal)
+            // --- CASO COMPRA (Dinero al CRÉDITO) ---
             else if (montoCredito > 0) {
                 const neto = montoCredito / 1.16;
                 const iva = montoCredito - neto;
-                distribuirMontos('compra', 'credito fiscal', neto, iva, 'debito');
+                distribuir(nombreCuenta, '', 'crédito fiscal', neto, iva, 'debito');
             }
         }
         actualizarTotales();
     }
 
-    function distribuirMontos(cuentaBase, cuentaFiscal, neto, iva, lado) {
-        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            // Asignar neto a la cuenta de compra/venta
-            if (n.includes(cuentaBase) || (cuentaBase === 'compra' && n !== 'caja' && n !== 'banco' && !n.includes('fiscal') && n !== '')) {
-                f.querySelector(`.val-${lado}`).innerText = neto.toFixed(2);
-            }
-            // Asignar IVA a la cuenta fiscal correspondiente
-            if (n.includes('fiscal') && n.includes(cuentaFiscal.split(' ')[0])) {
-                f.querySelector(`.val-${lado}`).innerText = iva.toFixed(2);
+    function distribuir(cuentaOrigen, cuentaFija, cuentaFiscal, neto, iva, columnaDestino) {
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        let netoAsignado = false;
+
+        filas.forEach(f => {
+            const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            
+            // 1. Buscamos la cuenta de IVA (Crédito fiscal o Débito fiscal)
+            if (nombre === cuentaFiscal || (nombre.includes('fiscal') && nombre.includes(cuentaFiscal.split(' ')[0]))) {
+                f.querySelector(`.val-${columnaDestino}`).innerText = iva.toFixed(2);
+            } 
+            // 2. Buscamos la cuenta del NETO
+            else if (nombre !== '' && nombre !== cuentaOrigen && !nombre.includes('fiscal') && !netoAsignado) {
+                // Si es venta, podemos vincular a 'venta'. Si es compra, a CUALQUIER otra cuenta.
+                if (cuentaFija === '' || nombre === cuentaFija) {
+                    f.querySelector(`.val-${columnaDestino}`).innerText = neto.toFixed(2);
+                    netoAsignado = true;
+                }
             }
         });
     }
@@ -165,13 +164,10 @@
         let d = 0, c = 0;
         document.querySelectorAll('.val-debito').forEach(t => d += parseFloat(t.innerText) || 0);
         document.querySelectorAll('.val-credito').forEach(t => c += parseFloat(t.innerText) || 0);
-
         document.getElementById('totalDebito').innerText = d.toFixed(2);
         document.getElementById('totalCredito').innerText = c.toFixed(2);
-
         const btn = document.getElementById('btnGuardar');
         const msg = document.getElementById('mensajeValidacion');
-
         if (d.toFixed(2) === c.toFixed(2) && d > 0) {
             btn.disabled = false;
             msg.innerText = "✓ Asiento cuadrado.";
@@ -199,7 +195,7 @@
         else { alert("¡Guardado!"); location.reload(); }
     }
 
-    window.onload = () => { for(let i=0; i<3; i++) agregarFila(); }
+    window.onload = () => { for(let i=0; i<4; i++) agregarFila(); }
 </script>
 </body>
 </html>

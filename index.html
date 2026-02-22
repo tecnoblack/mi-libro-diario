@@ -1,42 +1,160 @@
-// Variable global para llevar el control de qué número le toca a cada nombre
-let historialCodigos = {};
-let ultimoNumeroAsignado = 0;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Asiento Contable Inteligente Dinámico</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; padding: 20px; }
+        .contenedor { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background-color: #0044cc; color: white; padding: 12px; text-align: left; text-transform: uppercase; font-size: 14px; }
+        td { border: 1px solid #ccc; padding: 10px; }
+        .btn-add { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .btn-eliminar { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+        .btn-guardar { background-color: #0044cc; color: white; border: none; padding: 12px 30px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
+        .totales-seccion { background: #e9ecef; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; }
+        [contenteditable="true"] { outline: none; min-height: 20px; }
+        [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid #0044cc; }
+        .col-ref { background-color: #f9f9f9; text-align: center; font-weight: bold; color: #555; }
+    </style>
+</head>
+<body>
 
-function inteligenciaFila(elemento) {
-    const filaActual = elemento.closest('tr');
-    const nombre = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-    const celdaRef = filaActual.querySelector('.col-ref');
+<div class="contenedor">
+    <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
 
-    if (nombre !== "") {
-        // 1. ¿Ya le habíamos asignado un número a esta cuenta en este asiento?
-        if (historialCodigos[nombre]) {
-            celdaRef.innerText = historialCodigos[nombre];
-        } 
-        // 2. Si es la primera vez que escribes este nombre, le damos el siguiente número disponible
-        else {
-            ultimoNumeroAsignado++;
-            historialCodigos[nombre] = ultimoNumeroAsignado;
-            celdaRef.innerText = ultimoNumeroAsignado;
+    <table id="tabla-asientos">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Cuenta</th>
+                <th style="width: 10%;">REF</th>
+                <th style="width: 20%;">Débito</th>
+                <th style="width: 20%;">Crédito</th>
+                <th style="width: 10%;">Acción</th>
+            </tr>
+        </thead>
+        <tbody id="cuerpo-tabla">
+            </tbody>
+    </table>
+
+    <div class="totales-seccion">
+        <span>TOTALES</span>
+        <span>Débito: <span id="totalDebito">0.00</span></span>
+        <span>Crédito: <span id="totalCredito">0.00</span></span>
+    </div>
+    <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold;"></div>
+
+    <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script>
+    // 1. CONFIGURACIÓN DE SUPABASE
+    const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhS...'; 
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // VARIABLES PARA LA INTELIGENCIA DE REF
+    let historialCodigos = {}; 
+    let ultimoNumeroAsignado = 0;
+
+    function agregarFila() {
+        const tabla = document.getElementById('cuerpo-tabla');
+        const nuevaFila = document.createElement('tr');
+        nuevaFila.innerHTML = `
+            <td contenteditable="true" class="txt-cuenta" oninput="procesarFila(this)"></td>
+            <td class="col-ref"></td>
+            <td contenteditable="true" class="val-debito" oninput="procesarFila(this)">0</td>
+            <td contenteditable="true" class="val-credito" oninput="actualizarTotales()">0</td>
+            <td style="text-align:center"><button class="btn-eliminar" onclick="eliminarFila(this)">✕</button></td>
+        `;
+        tabla.appendChild(nuevaFila);
+    }
+
+    function eliminarFila(btn) {
+        btn.closest('tr').remove();
+        actualizarTotales();
+    }
+
+    // FUNCIÓN PRINCIPAL QUE GESTIONA REF E IVA
+    function procesarFila(elemento) {
+        const filaActual = elemento.closest('tr');
+        const nombre = filaActual.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+        const celdaRef = filaActual.querySelector('.col-ref');
+
+        if (nombre !== "") {
+            // ASIGNACIÓN AUTOMÁTICA DE REF
+            if (historialCodigos[nombre]) {
+                celdaRef.innerText = historialCodigos[nombre];
+            } else {
+                ultimoNumeroAsignado++;
+                historialCodigos[nombre] = ultimoNumeroAsignado;
+                celdaRef.innerText = ultimoNumeroAsignado;
+            }
+
+            // LÓGICA DE IVA (Solo si es 'caja')
+            const montoCaja = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
+            if (nombre === 'caja' && montoCaja > 0) {
+                const neto = montoCaja / 1.16;
+                const iva = montoCaja - neto;
+
+                document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
+                    const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+                    if (n === 'venta') f.querySelector('.val-credito').innerText = neto.toFixed(2);
+                    if (n === 'debito fiscal') f.querySelector('.val-credito').innerText = iva.toFixed(2);
+                });
+            }
+        } else {
+            celdaRef.innerText = "";
         }
-    } else {
-        celdaRef.innerText = "";
+        actualizarTotales();
     }
 
-    // Mantener la lógica del IVA automática para Caja
-    ejecutarCalculoIVA(filaActual, nombre);
-    actualizarTotales();
-}
+    function actualizarTotales() {
+        let d = 0, c = 0;
+        document.querySelectorAll('.val-debito').forEach(t => d += parseFloat(t.innerText) || 0);
+        document.querySelectorAll('.val-credito').forEach(t => c += parseFloat(t.innerText) || 0);
 
-function ejecutarCalculoIVA(filaActual, nombre) {
-    const montoCaja = parseFloat(filaActual.querySelector('.val-debito').innerText) || 0;
-    if (nombre === 'caja' && montoCaja > 0) {
-        const neto = montoCaja / 1.16;
-        const iva = montoCaja - neto;
+        document.getElementById('totalDebito').innerText = d.toFixed(2);
+        document.getElementById('totalCredito').innerText = c.toFixed(2);
 
-        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            if (n === 'venta') f.querySelector('.val-credito').innerText = neto.toFixed(2);
-            if (n === 'debito fiscal') f.querySelector('.val-credito').innerText = iva.toFixed(2);
+        const btn = document.getElementById('btnGuardar');
+        const msg = document.getElementById('mensajeValidacion');
+
+        if (d.toFixed(2) === c.toFixed(2) && d > 0) {
+            btn.disabled = false;
+            msg.innerText = "✓ Asiento cuadrado correctamente.";
+            msg.style.color = "green";
+        } else {
+            btn.disabled = true;
+            msg.innerText = "⚠ El asiento no cuadra.";
+            msg.style.color = "red";
+        }
+    }
+
+    async function guardarAsiento() {
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        const datos = [];
+        const nro = Date.now();
+
+        filas.forEach(f => {
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            const ref = f.querySelector('.col-ref').innerText.trim();
+            const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            if (cuenta !== "") {
+                datos.push({ asiento_id: nro, cuenta, ref, debito: deb, credito: cre });
+            }
         });
+
+        const { error } = await _supabase.from('asientos').insert(datos);
+        if (error) alert("Error: " + error.message);
+        else { alert("¡Asiento guardado exitosamente!"); location.reload(); }
     }
-}
+
+    // Iniciamos con 3 filas vacías
+    agregarFila(); agregarFila(); agregarFila();
+</script>
+</body>
+</html>

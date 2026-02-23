@@ -156,7 +156,6 @@
         const nuevoRif = document.getElementById('empresaRif').innerText;
         const nuevoPer = document.getElementById('periodoActualHeader').innerText;
         
-        // Actualizamos también el periodo en la vista de registro para que coincida
         document.getElementById('periodoAsientoManual').innerText = nuevoPer;
 
         const { error } = await _supabase.from('empresa').update({ 
@@ -202,15 +201,27 @@
         }
     }
 
-    // --- LÓGICA DE REFERENCIAS (REF) INTELIGENTE ---
+    // --- LÓGICA DE REFERENCIAS (REF) MEJORADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toLowerCase();
         if (nombreCuenta.length < 2) return;
 
-        const fila = elemento.closest('tr');
-        const celdaRef = fila.querySelector('.col-ref');
+        const filaActual = elemento.closest('tr');
+        const celdaRef = filaActual.querySelector('.col-ref');
 
-        // 1. Buscar si la cuenta ya existe en asientos anteriores
+        // 1. PRIMERO: Buscar si la cuenta ya se escribió en este mismo asiento (filas actuales en pantalla)
+        const todasLasFilas = document.querySelectorAll('#cuerpo-tabla tr');
+        for (let f of todasLasFilas) {
+            const nombreEnFila = f.querySelector('.txt-cuenta').innerText.trim().toLowerCase();
+            const refEnFila = f.querySelector('.col-ref').innerText;
+            
+            if (f !== filaActual && nombreEnFila === nombreCuenta && refEnFila !== "") {
+                celdaRef.innerText = refEnFila;
+                return; 
+            }
+        }
+
+        // 2. SEGUNDO: Buscar en la BASE DE DATOS
         const { data: existente } = await _supabase
             .from('asientos')
             .select('ref')
@@ -220,13 +231,20 @@
         if (existente && existente.length > 0) {
             celdaRef.innerText = existente[0].ref;
         } else {
-            // 2. Si es nueva, buscar el número máximo actual
-            const { data: todas } = await _supabase.from('asientos').select('ref');
-            let maxRef = 0;
-            if (todas && todas.length > 0) {
-                const numeros = todas.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-                if (numeros.length > 0) maxRef = Math.max(...numeros);
+            // 3. TERCERO: Si es nueva, calcular el siguiente número disponible
+            const { data: todasDB } = await _supabase.from('asientos').select('ref');
+            let refsExistentes = [];
+            
+            if (todasDB) {
+                refsExistentes = todasDB.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
             }
+            
+            todasLasFilas.forEach(f => {
+                const r = parseInt(f.querySelector('.col-ref').innerText);
+                if (!isNaN(r)) refsExistentes.push(r);
+            });
+
+            const maxRef = refsExistentes.length > 0 ? Math.max(...refsExistentes) : 0;
             celdaRef.innerText = maxRef + 1;
         }
     }

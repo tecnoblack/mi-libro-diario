@@ -2,69 +2,66 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>App Contable</title>
+    <title>Comercial A B C - Sistema Contable</title>
     <style>
         :root {
             --azul-pro: #2563eb;
             --azul-oscuro: #1e40af;
             --verde-exito: #059669;
+            --rojo-error: #dc3545;
             --fondo: #f0f2f5;
             --texto: #1e293b;
         }
 
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--fondo); margin: 0; padding: 0; color: var(--texto); }
         
-        /* NAVEGACIÓN */
         .seccion-vista { display: none; padding: 20px; animation: fadeIn 0.3s; }
         .seccion-vista.activa { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* MENÚ PRINCIPAL */
-        .contenedor-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; max-width: 600px; margin: 50px auto; padding: 20px; }
-        .tarjeta-menu { background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: 0.3s; border: 1px solid transparent; }
-        .tarjeta-menu:hover { transform: translateY(-5px); border-color: var(--azul-pro); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        .icono-menu { font-size: 50px; display: block; margin-bottom: 10px; }
+        /* ENCABEZADO ESTILO LIBRO */
+        .header-contable { border: 2px solid var(--azul-pro); text-align: center; padding: 15px; margin-bottom: 25px; border-radius: 8px; background: white; }
+        .header-contable h1 { margin: 0; font-size: 1.5rem; color: var(--azul-oscuro); text-transform: uppercase; }
 
-        /* CONTENEDORES */
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
         
-        /* TABLAS */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background-color: var(--azul-pro); color: white; padding: 12px; text-align: left; font-size: 0.85rem; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; font-size: 0.9rem; }
-        [contenteditable="true"] { outline: none; border-bottom: 1px dashed #ccc; }
-        [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid var(--azul-pro); }
+        
+        .header-asiento { background: #f1f5f9; font-weight: bold; color: var(--azul-pro); }
+        .header-asiento td { border-top: 2px solid var(--azul-pro); padding: 15px 10px; }
 
-        /* BOTONES */
         .btn-flotante {
             position: fixed; bottom: 40px; right: 40px; width: 65px; height: 65px;
             background-color: var(--azul-pro); color: white; border-radius: 50%; border: none;
             font-size: 35px; cursor: pointer; box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
-            display: flex; align-items: center; justify-content: center; transition: 0.3s; z-index: 1000;
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
-        .btn-flotante:hover { transform: scale(1.1); background-color: var(--azul-oscuro); }
+
+        .btn-delete-asiento { background: var(--rojo-error); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; float: right; font-size: 0.75rem; font-weight: bold; }
+        
+        .totales-seccion { background: #1e293b; color: white; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
+        [contenteditable="true"] { outline: none; border-bottom: 1px dashed #ccc; }
+        [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid var(--azul-pro); }
+
         .btn-regresar { background: #64748b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-bottom: 20px; }
         .btn-add { background-color: var(--verde-exito); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         .btn-guardar { background-color: var(--azul-pro); color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
         .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
-
-        /* ESPECIALES */
-        .totales-seccion { background: #1e293b; color: white; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
-        .header-asiento { background: #f1f5f9; font-weight: bold; color: var(--azul-pro); }
-        .col-ref { text-align: center; font-weight: bold; color: var(--azul-pro); }
     </style>
 </head>
 <body>
 
     <div id="vista-menu" class="seccion-vista activa">
-        <h1 style="text-align:center; margin-top: 60px;">App Contable</h1>
-        <div class="contenedor-menu">
-            <div class="tarjeta-menu" onclick="cambiarVista('vista-diario'); consultarLibroDiario();">
-                <span class="icono-menu">📖</span>
+        <h1 style="text-align:center; margin-top: 60px;">Comercial A B C, C.A.</h1>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-diario'); consultarLibroDiario();">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">📖</span>
                 <h3>Libro Diario</h3>
             </div>
-            <div class="tarjeta-menu" onclick="cambiarVista('vista-mayor')">
-                <span class="icono-menu">🏦</span>
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-mayor')">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
                 <h3>Libro Mayor</h3>
             </div>
         </div>
@@ -73,10 +70,13 @@
     <div id="vista-diario" class="seccion-vista">
         <div class="contenedor-principal">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <h2 style="border-bottom: 2px solid var(--azul-pro); padding-bottom: 10px;">Registros del Libro Diario</h2>
+            
+            <div class="header-contable">
+                <h1>COMERCIAL A B C, C.A.</h1>
+                <p>RIF: J-00000000-0 | <b>LIBRO DIARIO</b></p>
+            </div>
             
             <div id="tabla-registros">Cargando registros...</div>
-
             <button class="btn-flotante" onclick="abrirRegistroNuevo()">+</button>
         </div>
     </div>
@@ -122,106 +122,100 @@
         </div>
     </div>
 
-    <div id="vista-mayor" class="seccion-vista">
-        <div class="contenedor-principal">
-            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <h2>Libro Mayor</h2>
-            <p style="text-align: center; color: #64748b; margin-top: 50px;">Sección en mantenimiento...</p>
-        </div>
-    </div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let asignacionesRef = {};
-    let proximoNumero = 1;
+    let mapaReferencias = {}; 
+    let contadorGlobalRef = 1;
 
-    // --- NAVEGACIÓN ---
     function cambiarVista(id) {
         document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
         document.getElementById(id).classList.add('activa');
     }
 
-    function abrirRegistroNuevo() {
-        document.getElementById('cuerpo-tabla').innerHTML = '';
-        document.getElementById('resumenAsiento').value = '';
-        for(let i=0; i<4; i++) agregarFila();
-        actualizarTotales();
-        cambiarVista('vista-registro');
+    // --- LÓGICA DE REFERENCIA (REF) PERSISTENTE ---
+    async function asignarRefPersistente(elemento) {
+        const nombreCuenta = elemento.innerText.trim().toLowerCase();
+        if (!nombreCuenta) return;
+
+        const celdaRef = elemento.closest('tr').querySelector('.col-ref');
+
+        // 1. Revisar memoria de sesión
+        if (mapaReferencias[nombreCuenta]) {
+            celdaRef.innerText = mapaReferencias[nombreCuenta];
+            return;
+        }
+
+        // 2. Consultar Supabase para ver si ya tiene REF asignado
+        const { data } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
+
+        if (data && data.length > 0) {
+            mapaReferencias[nombreCuenta] = data[0].ref;
+            celdaRef.innerText = data[0].ref;
+        } else {
+            // Si es nueva, calcular el siguiente número
+            // Primero aseguramos tener el contador actualizado de la DB
+            const { data: todas } = await _supabase.from('asientos').select('ref');
+            if(todas && todas.length > 0) {
+                const maxRef = Math.max(...todas.map(a => parseInt(a.ref) || 0));
+                contadorGlobalRef = maxRef + 1;
+            }
+            mapaReferencias[nombreCuenta] = contadorGlobalRef;
+            celdaRef.innerText = contadorGlobalRef;
+            contadorGlobalRef++;
+        }
     }
 
-    // --- LÓGICA DE ASIENTOS ---
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
             <td style="color: #666; font-size: 0.85rem; text-align:center;">${new Date().toISOString().split('T')[0]}</td>
-            <td contenteditable="true" class="txt-cuenta" onblur="asignarRef(this)" onkeyup="ejecutarLogicaIVA(this)"></td>
-            <td class="col-ref"></td>
-            <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA(this)">0</td>
-            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA(this)">0</td>
-            <td style="text-align:center"><button style="background:#dc3545; color:white; border:none; padding:5px 8px; cursor:pointer;" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
+            <td contenteditable="true" class="txt-cuenta" onblur="asignarRefPersistente(this)" onkeyup="ejecutarLogicaIVA()"></td>
+            <td class="col-ref" style="text-align:center; font-weight:bold; color:var(--azul-pro);"></td>
+            <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
+            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>
+            <td style="text-align:center"><button style="background:var(--rojo-error); color:white; border:none; padding:5px 8px; cursor:pointer;" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
     }
 
-    function asignarRef(elemento) {
-        const nombre = elemento.innerText.toLowerCase().trim();
-        const celdaRef = elemento.closest('tr').querySelector('.col-ref');
-        if (nombre === "") return;
-        if (!asignacionesRef[nombre]) { asignacionesRef[nombre] = proximoNumero++; }
-        celdaRef.innerText = asignacionesRef[nombre];
-    }
-
-    // --- LÓGICA DE IVA REFORMULADA ---
-    function ejecutarLogicaIVA(elemento) {
+    function ejecutarLogicaIVA() {
         actualizarTotales();
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        
-        let tieneFiscal = false;
-        let filaDinero = null;
-        let montoDinero = 0;
-        let esIngresoACaja = false; // true si es Débito en dinero (Venta)
+        let tieneFiscal = false, filaDinero = null, montoDinero = 0, esIngreso = false;
 
-        // 1. Verificar si existen simultáneamente "fiscal" y "caja/banco"
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             if (cuenta.includes('fiscal')) tieneFiscal = true;
-            
             if (cuenta === 'caja' || cuenta === 'banco') {
                 const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
                 const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-                if (d > 0 || c > 0) {
-                    filaDinero = f;
-                    montoDinero = d > 0 ? d : c;
-                    esIngresoACaja = d > 0;
-                }
+                if (d > 0 || c > 0) { filaDinero = f; montoDinero = d || c; esIngreso = d > 0; }
             }
         });
 
-        // Solo ejecutar cálculos si se cumplen ambas condiciones
         if (!tieneFiscal || !filaDinero || montoDinero === 0) return;
 
         const neto = (montoDinero / 1.16).toFixed(2);
         const iva = (montoDinero - neto).toFixed(2);
 
-        // 2. Asignar montos según el flujo de caja
         filas.forEach(f => {
             const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             const cellD = f.querySelector('.val-debito');
             const cellC = f.querySelector('.val-credito');
-
             if (nombre.includes('fiscal')) {
-                // Si entra dinero (Débito), el IVA es Débito Fiscal (Crédito)
-                // Si sale dinero (Crédito), el IVA es Crédito Fiscal (Débito)
-                if (esIngresoACaja) { cellC.innerText = iva; cellD.innerText = "0"; }
+                if (esIngreso) { cellC.innerText = iva; cellD.innerText = "0"; }
                 else { cellD.innerText = iva; cellC.innerText = "0"; }
             } else if (nombre !== '' && nombre !== 'caja' && nombre !== 'banco') {
-                // Cuentas de Gasto o Venta
-                if (esIngresoACaja) { cellC.innerText = neto; cellD.innerText = "0"; }
+                if (esIngreso) { cellC.innerText = neto; cellD.innerText = "0"; }
                 else { cellD.innerText = neto; cellC.innerText = "0"; }
             }
         });
@@ -248,17 +242,17 @@
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const datos = [];
         const idGrupo = Date.now();
-        const glosaTexto = document.getElementById('resumenAsiento').value;
+        const glosa = document.getElementById('resumenAsiento').value;
         const per = document.getElementById('periodoActual').innerText.trim();
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            if (cuenta !== "") {
+            if (cuenta) {
                 datos.push({ 
                     asiento_id: idGrupo,
-                    descripcion: glosaTexto, 
+                    descripcion: glosa, 
                     cuenta: cuenta,
-                    ref: f.querySelector('.col-ref').innerText.trim() || "1",
+                    ref: f.querySelector('.col-ref').innerText || "1",
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
                     fecha: new Date().toISOString().split('T')[0],
@@ -269,39 +263,45 @@
 
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) alert("Error: " + error.message);
-        else { 
-            alert("¡Asiento guardado!"); 
-            cambiarVista('vista-diario');
-            consultarLibroDiario();
-        }
+        else { alert("¡Asiento guardado!"); cambiarVista('vista-diario'); consultarLibroDiario(); }
     }
 
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
 
-        if (error) { div.innerHTML = "Error al cargar datos."; return; }
+        if (error) return;
 
         let html = '<table><thead><tr><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>';
         let ultimoId = null;
-        let contador = 0;
+        let contador = 1;
 
         data.forEach(f => {
             if (f.asiento_id !== ultimoId) {
-                contador++;
-                html += `<tr class="header-asiento"><td colspan="5">Asiento ${contador} — ${f.descripcion}</td></tr>`;
+                html += `<tr class="header-asiento"><td colspan="5">
+                    ASIENTO ${contador++} — ${f.descripcion}
+                    <button class="btn-delete-asiento" onclick="eliminarAsiento(${f.asiento_id})">Eliminar</button>
+                </td></tr>`;
                 ultimoId = f.asiento_id;
             }
-            html += `<tr>
-                <td>${f.fecha}</td>
-                <td>${f.cuenta}</td>
-                <td align="center" class="col-ref">${f.ref}</td>
-                <td align="right">${f.debito.toFixed(2)}</td>
-                <td align="right">${f.credito.toFixed(2)}</td>
-            </tr>`;
+            html += `<tr><td>${f.fecha}</td><td>${f.cuenta}</td><td align="center">${f.ref}</td><td align="right">${f.debito.toFixed(2)}</td><td align="right">${f.credito.toFixed(2)}</td></tr>`;
         });
-        html += '</tbody></table>';
-        div.innerHTML = html;
+        div.innerHTML = html + '</tbody></table>';
+    }
+
+    async function eliminarAsiento(id) {
+        if (confirm("¿Seguro que deseas eliminar este asiento?")) {
+            const { error } = await _supabase.from('asientos').delete().eq('asiento_id', id);
+            if (!error) consultarLibroDiario();
+        }
+    }
+
+    function abrirRegistroNuevo() {
+        document.getElementById('cuerpo-tabla').innerHTML = '';
+        document.getElementById('resumenAsiento').value = '';
+        for(let i=0; i<4; i++) agregarFila();
+        actualizarTotales();
+        cambiarVista('vista-registro');
     }
 </script>
 </body>

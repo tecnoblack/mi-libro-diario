@@ -141,7 +141,19 @@
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Lógica de identificación de dispositivo
+    const getDeviceId = () => {
+        if (typeof window === 'undefined') return null;
+        return window.navigator.userAgent + window.screen.width; 
+    };
+
+    // Cliente Supabase con Header de Dispositivo
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: {
+            headers: { 'x-device-id': getDeviceId() },
+        },
+    });
 
     async function cargarDatosEmpresa() {
         const { data, error } = await _supabase.from('empresa').select('*').limit(1).single();
@@ -296,7 +308,6 @@
         cambiarVista('vista-diario'); consultarLibroDiario();
     }
 
-    // --- FUNCIÓN FUSIONADA: NUMERACIÓN + TOTALES GENERALES ---
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
@@ -310,7 +321,6 @@
         let totalGeneralCredito = 0;
 
         data.forEach(f => {
-            // Lógica de Numeración Automática
             if (f.asiento_id !== ultimoId) {
                 html += `<tr class="fila-asiento-header">
                     <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
@@ -320,7 +330,6 @@
                 numAsiento++;
             }
 
-            // Filas de cuentas
             html += `<tr>
                 <td class="col-select"></td>
                 <td>${f.fecha}</td>
@@ -330,12 +339,10 @@
                 <td align="right">${f.credito.toFixed(2)}</td>
             </tr>`;
 
-            // Acumulación para Totales Generales
             totalGeneralDebito += f.debito;
             totalGeneralCredito += f.credito;
         });
 
-        // Fila de Totales Generales al final
         if (data.length > 0) {
             html += `<tr class="fila-totales-libro">
                 <td class="col-select"></td>

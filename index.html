@@ -31,6 +31,10 @@
         th { background-color: var(--azul-pro); color: white; padding: 12px; text-align: left; font-size: 0.85rem; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; font-size: 0.9rem; }
         
+        /* ESTILOS NUEVOS PARA ASIENTOS Y TOTALES */
+        .fila-asiento-header { background-color: #f8fafc; color: var(--azul-pro); font-weight: bold; font-size: 0.95rem; }
+        .fila-totales-libro { background-color: #1e293b; color: white; font-weight: bold; }
+
         .btn-accion-azul { 
             background-color: var(--azul-pro); color: white; border: none; padding: 10px 20px; 
             border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-right: 10px;
@@ -124,9 +128,8 @@
             </table>
 
             <div class="totales-seccion">
-                <span>TOTALES</span>
-                <span>Débito: <span id="totalDebito">0.00</span></span>
-                <span>Crédito: <span id="totalCredito">0.00</span></span>
+                <span>TOTAL ASIENTO</span>
+                <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
             </div>
             <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
 
@@ -140,7 +143,6 @@
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // --- CARGA INICIAL DE DATOS DE EMPRESA ---
     async function cargarDatosEmpresa() {
         const { data, error } = await _supabase.from('empresa').select('*').limit(1).single();
         if (data) {
@@ -155,14 +157,8 @@
         const nuevoNombre = document.getElementById('empresaNombre').innerText;
         const nuevoRif = document.getElementById('empresaRif').innerText;
         const nuevoPer = document.getElementById('periodoActualHeader').innerText;
-        
         document.getElementById('periodoAsientoManual').innerText = nuevoPer;
-
-        const { error } = await _supabase.from('empresa').update({ 
-            nombre: nuevoNombre, 
-            rif: nuevoRif, 
-            periodo: nuevoPer 
-        }).neq('nombre', '');
+        await _supabase.from('empresa').update({ nombre: nuevoNombre, rif: nuevoRif, periodo: nuevoPer }).neq('nombre', '');
     }
 
     function cambiarVista(id) {
@@ -189,63 +185,41 @@
 
     async function confirmarEliminacion() {
         const seleccionados = document.querySelectorAll('.check-borrar:checked');
-        if (seleccionados.length === 0) {
-            alert("Seleccione al menos un asiento marcando la casilla.");
-            return;
-        }
-        if (confirm(`¿Eliminar los ${seleccionados.length} asientos seleccionados?`)) {
+        if (seleccionados.length === 0) { alert("Seleccione un asiento."); return; }
+        if (confirm(`¿Eliminar seleccionados?`)) {
             const idsParaBorrar = Array.from(seleccionados).map(cb => cb.value);
-            const { error } = await _supabase.from('asientos').delete().in('asiento_id', idsParaBorrar);
-            if (error) alert("Error: " + error.message);
-            else { consultarLibroDiario(); cancelarModoBorrado(); }
+            await _supabase.from('asientos').delete().in('asiento_id', idsParaBorrar);
+            consultarLibroDiario(); cancelarModoBorrado();
         }
     }
 
-    // --- LÓGICA DE REFERENCIAS (REF) MEJORADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toLowerCase();
         if (nombreCuenta.length < 2) return;
-
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
 
-        // 1. PRIMERO: Buscar si la cuenta ya se escribió en este mismo asiento (filas actuales en pantalla)
         const todasLasFilas = document.querySelectorAll('#cuerpo-tabla tr');
         for (let f of todasLasFilas) {
             const nombreEnFila = f.querySelector('.txt-cuenta').innerText.trim().toLowerCase();
             const refEnFila = f.querySelector('.col-ref').innerText;
-            
             if (f !== filaActual && nombreEnFila === nombreCuenta && refEnFila !== "") {
                 celdaRef.innerText = refEnFila;
                 return; 
             }
         }
 
-        // 2. SEGUNDO: Buscar en la BASE DE DATOS
-        const { data: existente } = await _supabase
-            .from('asientos')
-            .select('ref')
-            .eq('cuenta', nombreCuenta)
-            .limit(1);
-
+        const { data: existente } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
         if (existente && existente.length > 0) {
             celdaRef.innerText = existente[0].ref;
         } else {
-            // 3. TERCERO: Si es nueva, calcular el siguiente número disponible
             const { data: todasDB } = await _supabase.from('asientos').select('ref');
-            let refsExistentes = [];
-            
-            if (todasDB) {
-                refsExistentes = todasDB.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-            }
-            
+            let refsExistentes = (todasDB || []).map(a => parseInt(a.ref)).filter(n => !isNaN(n));
             todasLasFilas.forEach(f => {
                 const r = parseInt(f.querySelector('.col-ref').innerText);
                 if (!isNaN(r)) refsExistentes.push(r);
             });
-
-            const maxRef = refsExistentes.length > 0 ? Math.max(...refsExistentes) : 0;
-            celdaRef.innerText = maxRef + 1;
+            celdaRef.innerText = refsExistentes.length > 0 ? Math.max(...refsExistentes) + 1 : 1;
         }
     }
 
@@ -257,8 +231,7 @@
             <td contenteditable="true" class="txt-cuenta" onblur="asignarRefInteligente(this)" onkeyup="ejecutarLogicaIVA()"></td>
             <td class="col-ref" style="text-align:center; font-weight:bold; color:var(--azul-pro);"></td>
             <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
-            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>
-        `;
+            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>`;
         tabla.appendChild(nuevaFila);
     }
 
@@ -280,14 +253,12 @@
         const iva = (montoDinero - neto).toFixed(2);
         filas.forEach(f => {
             const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            const cellD = f.querySelector('.val-debito');
-            const cellC = f.querySelector('.val-credito');
             if (nombre.includes('fiscal')) {
-                if (esIngreso) { cellC.innerText = iva; cellD.innerText = "0"; }
-                else { cellD.innerText = iva; cellC.innerText = "0"; }
+                if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
+                else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
             } else if (nombre !== '' && nombre !== 'caja' && nombre !== 'banco') {
-                if (esIngreso) { cellC.innerText = neto; cellD.innerText = "0"; }
-                else { cellD.innerText = neto; cellC.innerText = "0"; }
+                if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
+                else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
             }
         });
         actualizarTotales();
@@ -299,61 +270,84 @@
         document.querySelectorAll('.val-credito').forEach(t => cre += parseFloat(t.innerText) || 0);
         document.getElementById('totalDebito').innerText = deb.toFixed(2);
         document.getElementById('totalCredito').innerText = cre.toFixed(2);
-        const btn = document.getElementById('btnGuardar');
-        if (deb > 0 && Math.abs(deb - cre) < 0.01) {
-            btn.disabled = false;
-            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:green;'>✓ Cuadrado</span>";
-        } else {
-            btn.disabled = true;
-            document.getElementById('mensajeValidacion').innerHTML = "<span style='color:red;'>⚠ No cuadra</span>";
-        }
+        const ok = deb > 0 && Math.abs(deb - cre) < 0.01;
+        document.getElementById('btnGuardar').disabled = !ok;
+        document.getElementById('mensajeValidacion').innerHTML = ok ? "<span style='color:green;'>✓ Cuadrado</span>" : "<span style='color:red;'>⚠ No cuadra</span>";
     }
 
     async function guardarAsiento() {
-        const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const idGrupo = Date.now();
         const glosa = document.getElementById('resumenAsiento').value;
         const per = document.getElementById('periodoAsientoManual').innerText.trim();
         const datos = [];
-        filas.forEach(f => {
+        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             if (cuenta) {
                 datos.push({ 
-                    asiento_id: idGrupo,
-                    descripcion: glosa, 
-                    cuenta: cuenta,
+                    asiento_id: idGrupo, descripcion: glosa, cuenta: cuenta,
                     ref: f.querySelector('.col-ref').innerText || "1",
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    fecha: new Date().toISOString().split('T')[0],
-                    periodo: per
+                    fecha: new Date().toISOString().split('T')[0], periodo: per
                 });
             }
         });
-        const { error } = await _supabase.from('asientos').insert(datos);
-        if (error) alert("Error: " + error.message);
-        else { cambiarVista('vista-diario'); consultarLibroDiario(); }
+        await _supabase.from('asientos').insert(datos);
+        cambiarVista('vista-diario'); consultarLibroDiario();
     }
 
+    // --- FUNCIÓN FUSIONADA: NUMERACIÓN + TOTALES GENERALES ---
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
         if (error || !data) return;
+
         let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+        
         let ultimoId = null;
+        let numAsiento = 1;
+        let totalGeneralDebito = 0;
+        let totalGeneralCredito = 0;
+
         data.forEach(f => {
-            const esNuevoBloque = f.asiento_id !== ultimoId;
-            html += `<tr style="${esNuevoBloque ? 'border-top: 2px solid #ccc;' : ''}">
-                <td class="col-select">${esNuevoBloque ? `<input type="checkbox" class="check-borrar" value="${f.asiento_id}">` : ''}</td>
+            // Lógica de Numeración Automática
+            if (f.asiento_id !== ultimoId) {
+                html += `<tr class="fila-asiento-header">
+                    <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
+                    <td colspan="5">Asiento N° ${numAsiento} — ${f.descripcion}</td>
+                </tr>`;
+                ultimoId = f.asiento_id;
+                numAsiento++;
+            }
+
+            // Filas de cuentas
+            html += `<tr>
+                <td class="col-select"></td>
                 <td>${f.fecha}</td>
                 <td>${f.cuenta}</td>
                 <td align="center">${f.ref}</td>
                 <td align="right">${f.debito.toFixed(2)}</td>
                 <td align="right">${f.credito.toFixed(2)}</td>
             </tr>`;
-            ultimoId = f.asiento_id;
+
+            // Acumulación para Totales Generales
+            totalGeneralDebito += f.debito;
+            totalGeneralCredito += f.credito;
         });
-        div.innerHTML = html + '</tbody></table>';
+
+        // Fila de Totales Generales al final
+        if (data.length > 0) {
+            html += `<tr class="fila-totales-libro">
+                <td class="col-select"></td>
+                <td colspan="3" align="center">TOTALES GENERALES DEL LIBRO</td>
+                <td align="right">${totalGeneralDebito.toFixed(2)}</td>
+                <td align="right">${totalGeneralCredito.toFixed(2)}</td>
+            </tr>`;
+        } else {
+            html = "<p style='text-align:center; padding:20px;'>No hay registros en el periodo actual.</p>";
+        }
+
+        div.innerHTML = (data.length > 0) ? html + '</tbody></table>' : html;
     }
 
     function abrirRegistroNuevo() {

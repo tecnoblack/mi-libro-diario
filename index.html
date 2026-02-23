@@ -138,13 +138,21 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
 
-    const getDeviceId = () => window.navigator.userAgent + window.screen.width; 
+    // --- GENERACIÓN DE HUELLA DIGITAL BLINDADA ---
+    function getDeviceId() {
+        let id = localStorage.getItem('contable_device_id');
+        if (!id) {
+            id = 'dev-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+            localStorage.setItem('contable_device_id', id);
+        }
+        return id;
+    }
 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         global: { headers: { 'x-device-id': getDeviceId() } },
     });
 
-    // --- SEGURIDAD Y LOGIN ---
+    // --- SEGURIDAD Y LOGIN BLINDADO ---
     async function iniciarSesion() {
         const email = document.getElementById('login-email').value;
         const pass = document.getElementById('login-pass').value;
@@ -154,9 +162,22 @@
     }
 
     async function verificarPerfil(userId) {
-        const { data: perfil } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        const currentDevice = getDeviceId();
+        const { data: perfil, error } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        
         if (perfil) {
-            if (!perfil.last_device_id) await _supabase.from('perfiles').update({ last_device_id: getDeviceId() }).eq('id', userId);
+            // Si el dispositivo en la DB es NULL, lo registramos ahora mismo
+            if (!perfil.last_device_id) {
+                await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
+            } 
+            // Si ya tiene uno y NO coincide con el actual, BLOQUEO total
+            else if (perfil.last_device_id !== currentDevice) {
+                alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
+                await _supabase.auth.signOut();
+                location.reload();
+                return;
+            }
+
             if (!perfil.suscripcion_activa) {
                 document.getElementById('banner-suscripcion').style.display = 'block';
                 return;
@@ -194,27 +215,39 @@
         }
     }
 
-    // --- COLUMNA REF INTELIGENTE ---
+    // --- COLUMNA REF INTELIGENTE (MEJORADA) ---
     async function asignarRefInteligente(elemento) {
-        const nombreCuenta = elemento.innerText.trim().toLowerCase();
+        const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta.length < 2) return;
+        
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
-        
-        const todasFilas = document.querySelectorAll('#cuerpo-tabla tr');
-        for (let f of todasFilas) {
-            const n = f.querySelector('.txt-cuenta').innerText.trim().toLowerCase();
+
+        // 1. Buscar en el mismo asiento actual
+        const otrasFilas = document.querySelectorAll('#cuerpo-tabla tr');
+        for (let f of otrasFilas) {
+            const n = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
             const r = f.querySelector('.col-ref').innerText;
             if (f !== filaActual && n === nombreCuenta && r !== "") {
-                celdaRef.innerText = r; return;
+                celdaRef.innerText = r;
+                return;
             }
         }
-        const { data: ex } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
-        if (ex && ex.length > 0) celdaRef.innerText = ex[0].ref;
-        else {
-            const { data: db } = await _supabase.from('asientos').select('ref');
-            let refs = (db || []).map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-            celdaRef.innerText = refs.length > 0 ? Math.max(...refs) + 1 : 1;
+
+        // 2. Buscar historial en la nube
+        const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
+
+        if (data && data.length > 0) {
+            celdaRef.innerText = data[0].ref;
+        } else {
+            // 3. Buscar el número más alto global + 1
+            const { data: todos } = await _supabase.from('asientos').select('ref');
+            let max = 0;
+            if (todos) {
+                const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+                max = numeros.length > 0 ? Math.max(...numeros) : 0;
+            }
+            celdaRef.innerText = max + 1;
         }
     }
 
@@ -223,7 +256,7 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="color: #666; font-size: 0.85rem; text-align:center;">${new Date().toISOString().split('T')[0]}</td>
-            <td contenteditable="true" class="txt-cuenta" onblur="asignarRefInteligente(this)" onkeyup="ejecutarLogicaIVA()"></td>
+            <td contenteditable="true" class="txt-cuenta" oninput="asignarRefInteligente(this)" onkeyup="ejecutarLogicaIVA()"></td>
             <td class="col-ref" style="text-align:center; font-weight:bold; color:var(--azul-pro);"></td>
             <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
             <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>`;
@@ -271,39 +304,54 @@
         document.getElementById('mensajeValidacion').innerHTML = ok ? "<span style='color:green;'>✓ Cuadrado</span>" : "<span style='color:red;'>⚠ No cuadra</span>";
     }
 
-    // --- GUARDAR ASIENTO (CORREGIDO) ---
+    // --- GUARDAR ASIENTO BLINDADO ---
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) return alert("Sesión expirada");
+        if (!user) return alert("Inicia sesión nuevamente.");
+
+        const btn = document.getElementById('btnGuardar');
+        btn.disabled = true;
+        btn.innerText = "Guardando...";
 
         const idGrupo = Date.now();
-        const glosa = document.getElementById('resumenAsiento').value;
-        const per = document.getElementById('periodoAsientoManual').innerText.trim();
-        const datos = [];
+        const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         
+        let per = document.getElementById('periodoActualHeader')?.innerText.trim();
+        if (!per) per = "FEBRERO 2026"; 
+
+        const registros = [];
         document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const c = f.querySelector('.txt-cuenta').innerText.trim();
-            if (c) {
-                datos.push({ 
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            if (cuenta !== "") {
+                registros.push({ 
                     asiento_id: idGrupo, 
                     descripcion: glosa, 
-                    cuenta: c, 
+                    cuenta: cuenta, 
                     user_id: user.id,
                     ref: f.querySelector('.col-ref').innerText || "1",
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    fecha: new Date().toISOString().split('T')[0], 
-                    periodo: per 
+                    fecha: new Date().toISOString().split('T')[0],
+                    periodo: per
                 });
             }
         });
+
+        if (registros.length < 2) {
+            alert("El asiento debe tener al menos 2 cuentas.");
+            btn.disabled = false;
+            btn.innerText = "Guardar Asiento";
+            return;
+        }
+
+        const { error } = await _supabase.from('asientos').insert(registros);
         
-        const { error } = await _supabase.from('asientos').insert(datos);
         if (error) {
-            console.error(error);
-            alert("Error al guardar: " + error.message);
+            alert("Error: " + error.message);
+            btn.disabled = false;
+            btn.innerText = "Guardar Asiento";
         } else {
-            alert("¡Asiento guardado con éxito!");
+            alert("✅ Asiento guardado con éxito.");
             cambiarVista('vista-diario');
         }
     }
@@ -330,7 +378,6 @@
             tD += f.debito; tC += f.credito;
         });
         
-        // Fila de totales generales al final
         html += `<tr class="fila-totales-libro"><td colspan="4">TOTAL GENERAL</td><td>${tD.toFixed(2)}</td><td>${tC.toFixed(2)}</td></tr>`;
         div.innerHTML = html + "</tbody></table>";
     }
@@ -342,7 +389,6 @@
         cambiarVista('vista-registro');
     }
 
-    // --- FUNCIONES DE BORRADO ---
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';

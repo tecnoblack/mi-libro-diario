@@ -19,9 +19,10 @@
         .seccion-vista.activa { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* ENCABEZADO ESTILO LIBRO */
+        /* ENCABEZADO DE LA EMPRESA */
         .header-contable { border: 2px solid var(--azul-pro); text-align: center; padding: 15px; margin-bottom: 25px; border-radius: 8px; background: white; }
-        .header-contable h1 { margin: 0; font-size: 1.5rem; color: var(--azul-oscuro); text-transform: uppercase; }
+        .header-contable h1 { margin: 0; font-size: 1.5rem; color: var(--azul-oscuro); text-transform: uppercase; outline: none; }
+        .header-contable p { margin: 5px 0 0; outline: none; }
 
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
         
@@ -29,8 +30,11 @@
         th { background-color: var(--azul-pro); color: white; padding: 12px; text-align: left; font-size: 0.85rem; text-transform: uppercase; }
         td { border: 1px solid #e5e7eb; padding: 10px; font-size: 0.9rem; }
         
-        .header-asiento { background: #f1f5f9; font-weight: bold; color: var(--azul-pro); }
-        .header-asiento td { border-top: 2px solid var(--azul-pro); padding: 15px 10px; }
+        .btn-accion-azul { 
+            background-color: var(--azul-pro); color: white; border: none; padding: 10px 20px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-right: 10px;
+        }
+        .btn-accion-azul:hover { background-color: var(--azul-oscuro); }
 
         .btn-flotante {
             position: fixed; bottom: 40px; right: 40px; width: 65px; height: 65px;
@@ -38,17 +42,15 @@
             font-size: 35px; cursor: pointer; box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
             display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
-
-        .btn-delete-asiento { background: var(--rojo-error); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; float: right; font-size: 0.75rem; font-weight: bold; }
         
         .totales-seccion { background: #1e293b; color: white; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
         [contenteditable="true"] { outline: none; border-bottom: 1px dashed #ccc; }
         [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid var(--azul-pro); }
 
         .btn-regresar { background: #64748b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-bottom: 20px; }
-        .btn-add { background-color: var(--verde-exito); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
-        .btn-guardar { background-color: var(--azul-pro); color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
-        .btn-guardar:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        .col-select { display: none; text-align: center; width: 50px; }
+        .modo-borrar .col-select { display: table-cell; }
     </style>
 </head>
 <body>
@@ -68,12 +70,18 @@
     </div>
 
     <div id="vista-diario" class="seccion-vista">
-        <div class="contenedor-principal">
+        <div class="contenedor-principal" id="contenedor-diario">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
             
             <div class="header-contable">
-                <h1>COMERCIAL A B C, C.A.</h1>
-                <p>RIF: J-00000000-0 | <b>LIBRO DIARIO</b></p>
+                <h1 id="empresaNombre" contenteditable="true" onblur="guardarDatosEmpresa()">COMERCIAL A B C, C.A.</h1>
+                <p>RIF: <span id="empresaRif" contenteditable="true" onblur="guardarDatosEmpresa()">J-00000000-0</span> | <b>LIBRO DIARIO</b></p>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
+                <button id="btnConfirmarBorrado" class="btn-accion-azul" style="display:none; background-color: var(--rojo-error);" onclick="confirmarEliminacion()">Confirmar Eliminación</button>
+                <button id="btnCancelarBorrado" class="btn-regresar" style="display:none; margin-bottom:0;" onclick="cancelarModoBorrado()">Cancelar</button>
             </div>
             
             <div id="tabla-registros">Cargando registros...</div>
@@ -95,17 +103,16 @@
                 <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
             </div>
 
-            <button class="btn-add" onclick="agregarFila()">+ Añadir Cuenta</button>
+            <button class="btn-accion-azul" style="background-color: var(--verde-exito); margin-bottom: 15px;" onclick="agregarFila()">+ Añadir Cuenta</button>
 
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 12%;">FECHA</th>
-                        <th style="width: 38%;">CUENTA</th>
+                        <th style="width: 15%;">FECHA</th>
+                        <th style="width: 45%;">CUENTA</th>
                         <th style="width: 10%;">REF</th>
-                        <th style="width: 20%;">DÉBITO</th>
-                        <th style="width: 20%;">CRÉDITO</th>
-                        <th style="width: 5%;"></th>
+                        <th style="width: 15%;">DÉBITO</th>
+                        <th style="width: 15%;">CRÉDITO</th>
                     </tr>
                 </thead>
                 <tbody id="cuerpo-tabla"></tbody>
@@ -118,7 +125,7 @@
             </div>
             <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
 
-            <button id="btnGuardar" class="btn-guardar" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
+            <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
         </div>
     </div>
 
@@ -131,45 +138,79 @@
     let mapaReferencias = {}; 
     let contadorGlobalRef = 1;
 
+    // --- CARGA INICIAL DE DATOS DE EMPRESA ---
+    async function cargarDatosEmpresa() {
+        const { data, error } = await _supabase.from('empresa').select('*').limit(1).single();
+        if (data) {
+            document.getElementById('empresaNombre').innerText = data.nombre;
+            document.getElementById('empresaRif').innerText = data.rif;
+        }
+    }
+
+    async function guardarDatosEmpresa() {
+        const nuevoNombre = document.getElementById('empresaNombre').innerText;
+        const nuevoRif = document.getElementById('empresaRif').innerText;
+        const { error } = await _supabase.from('empresa').update({ nombre: nuevoNombre, rif: nuevoRif }).neq('nombre', '');
+        if (error) console.error("Error al guardar:", error.message);
+    }
+
     function cambiarVista(id) {
         document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
         document.getElementById(id).classList.add('activa');
+        cancelarModoBorrado();
+        if (id === 'vista-diario') cargarDatosEmpresa();
     }
 
-    // --- LÓGICA DE REFERENCIA (REF) PERSISTENTE ---
+    function activarModoBorrado() {
+        document.getElementById('contenedor-diario').classList.add('modo-borrar');
+        document.getElementById('btnActivarBorrado').style.display = 'none';
+        document.getElementById('btnConfirmarBorrado').style.display = 'inline-block';
+        document.getElementById('btnCancelarBorrado').style.display = 'inline-block';
+    }
+
+    function cancelarModoBorrado() {
+        document.getElementById('contenedor-diario').classList.remove('modo-borrar');
+        document.getElementById('btnActivarBorrado').style.display = 'inline-block';
+        document.getElementById('btnConfirmarBorrado').style.display = 'none';
+        document.getElementById('btnCancelarBorrado').style.display = 'none';
+        document.querySelectorAll('.check-borrar').forEach(c => c.checked = false);
+    }
+
+    async function confirmarEliminacion() {
+        const seleccionados = document.querySelectorAll('.check-borrar:checked');
+        if (seleccionados.length === 0) {
+            alert("Seleccione al menos un asiento marcando la casilla.");
+            return;
+        }
+        if (confirm(`¿Eliminar los ${seleccionados.length} asientos seleccionados?`)) {
+            const idsParaBorrar = Array.from(seleccionados).map(cb => cb.value);
+            const { error } = await _supabase.from('asientos').delete().in('asiento_id', idsParaBorrar);
+            if (error) alert("Error: " + error.message);
+            else { consultarLibroDiario(); cancelarModoBorrado(); }
+        }
+    }
+
     async function asignarRefPersistente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toLowerCase();
         if (!nombreCuenta) return;
-
         const celdaRef = elemento.closest('tr').querySelector('.col-ref');
-
-        // 1. Revisar memoria de sesión
         if (mapaReferencias[nombreCuenta]) {
             celdaRef.innerText = mapaReferencias[nombreCuenta];
             return;
         }
-
-        // 2. Consultar Supabase para ver si ya tiene REF asignado
-        const { data } = await _supabase
-            .from('asientos')
-            .select('ref')
-            .eq('cuenta', nombreCuenta)
-            .limit(1);
-
+        const { data } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
         if (data && data.length > 0) {
             mapaReferencias[nombreCuenta] = data[0].ref;
             celdaRef.innerText = data[0].ref;
         } else {
-            // Si es nueva, calcular el siguiente número
-            // Primero aseguramos tener el contador actualizado de la DB
             const { data: todas } = await _supabase.from('asientos').select('ref');
+            let maxRef = 0;
             if(todas && todas.length > 0) {
-                const maxRef = Math.max(...todas.map(a => parseInt(a.ref) || 0));
-                contadorGlobalRef = maxRef + 1;
+                maxRef = Math.max(...todas.map(a => parseInt(a.ref) || 0));
             }
+            contadorGlobalRef = maxRef + 1;
             mapaReferencias[nombreCuenta] = contadorGlobalRef;
             celdaRef.innerText = contadorGlobalRef;
-            contadorGlobalRef++;
         }
     }
 
@@ -182,7 +223,6 @@
             <td class="col-ref" style="text-align:center; font-weight:bold; color:var(--azul-pro);"></td>
             <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
             <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>
-            <td style="text-align:center"><button style="background:var(--rojo-error); color:white; border:none; padding:5px 8px; cursor:pointer;" onclick="this.closest('tr').remove(); actualizarTotales();">✕</button></td>
         `;
         tabla.appendChild(nuevaFila);
     }
@@ -191,7 +231,6 @@
         actualizarTotales();
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let tieneFiscal = false, filaDinero = null, montoDinero = 0, esIngreso = false;
-
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             if (cuenta.includes('fiscal')) tieneFiscal = true;
@@ -201,12 +240,9 @@
                 if (d > 0 || c > 0) { filaDinero = f; montoDinero = d || c; esIngreso = d > 0; }
             }
         });
-
         if (!tieneFiscal || !filaDinero || montoDinero === 0) return;
-
         const neto = (montoDinero / 1.16).toFixed(2);
         const iva = (montoDinero - neto).toFixed(2);
-
         filas.forEach(f => {
             const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             const cellD = f.querySelector('.val-debito');
@@ -229,7 +265,7 @@
         document.getElementById('totalDebito').innerText = deb.toFixed(2);
         document.getElementById('totalCredito').innerText = cre.toFixed(2);
         const btn = document.getElementById('btnGuardar');
-        if (deb > 0 && deb.toFixed(2) === cre.toFixed(2)) {
+        if (deb > 0 && Math.abs(deb - cre) < 0.01) {
             btn.disabled = false;
             document.getElementById('mensajeValidacion').innerHTML = "<span style='color:green;'>✓ Cuadrado</span>";
         } else {
@@ -240,11 +276,10 @@
 
     async function guardarAsiento() {
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        const datos = [];
         const idGrupo = Date.now();
         const glosa = document.getElementById('resumenAsiento').value;
         const per = document.getElementById('periodoActual').innerText.trim();
-
+        const datos = [];
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             if (cuenta) {
@@ -260,40 +295,30 @@
                 });
             }
         });
-
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) alert("Error: " + error.message);
-        else { alert("¡Asiento guardado!"); cambiarVista('vista-diario'); consultarLibroDiario(); }
+        else { cambiarVista('vista-diario'); consultarLibroDiario(); }
     }
 
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
-
-        if (error) return;
-
-        let html = '<table><thead><tr><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>';
+        if (error || !data) return;
+        let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
         let ultimoId = null;
-        let contador = 1;
-
         data.forEach(f => {
-            if (f.asiento_id !== ultimoId) {
-                html += `<tr class="header-asiento"><td colspan="5">
-                    ASIENTO ${contador++} — ${f.descripcion}
-                    <button class="btn-delete-asiento" onclick="eliminarAsiento(${f.asiento_id})">Eliminar</button>
-                </td></tr>`;
-                ultimoId = f.asiento_id;
-            }
-            html += `<tr><td>${f.fecha}</td><td>${f.cuenta}</td><td align="center">${f.ref}</td><td align="right">${f.debito.toFixed(2)}</td><td align="right">${f.credito.toFixed(2)}</td></tr>`;
+            const esNuevoBloque = f.asiento_id !== ultimoId;
+            html += `<tr style="${esNuevoBloque ? 'border-top: 2px solid #ccc;' : ''}">
+                <td class="col-select">${esNuevoBloque ? `<input type="checkbox" class="check-borrar" value="${f.asiento_id}">` : ''}</td>
+                <td>${f.fecha}</td>
+                <td>${f.cuenta}</td>
+                <td align="center">${f.ref}</td>
+                <td align="right">${f.debito.toFixed(2)}</td>
+                <td align="right">${f.credito.toFixed(2)}</td>
+            </tr>`;
+            ultimoId = f.asiento_id;
         });
         div.innerHTML = html + '</tbody></table>';
-    }
-
-    async function eliminarAsiento(id) {
-        if (confirm("¿Seguro que deseas eliminar este asiento?")) {
-            const { error } = await _supabase.from('asientos').delete().eq('asiento_id', id);
-            if (!error) consultarLibroDiario();
-        }
     }
 
     function abrirRegistroNuevo() {
@@ -303,6 +328,9 @@
         actualizarTotales();
         cambiarVista('vista-registro');
     }
+
+    // Inicialización al cargar la página
+    window.onload = cargarDatosEmpresa;
 </script>
 </body>
 </html>

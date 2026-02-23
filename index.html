@@ -153,7 +153,7 @@
         cambiarVista('vista-registro');
     }
 
-    // --- LÓGICA DE ASIENTOS (TU CÓDIGO) ---
+    // --- LÓGICA DE ASIENTOS ---
     function agregarFila() {
         const tabla = document.getElementById('cuerpo-tabla');
         const nuevaFila = document.createElement('tr');
@@ -176,35 +176,52 @@
         celdaRef.innerText = asignacionesRef[nombre];
     }
 
+    // --- LÓGICA DE IVA REFORMULADA ---
     function ejecutarLogicaIVA(elemento) {
         actualizarTotales();
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        let cuentaDinero = null; let montoTotal = 0; let esDebito = false;
+        
+        let tieneFiscal = false;
+        let filaDinero = null;
+        let montoDinero = 0;
+        let esIngresoACaja = false; // true si es Débito en dinero (Venta)
 
+        // 1. Verificar si existen simultáneamente "fiscal" y "caja/banco"
         filas.forEach(f => {
-            const txt = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            if (txt === 'caja' || txt === 'banco') {
+            const cuenta = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            if (cuenta.includes('fiscal')) tieneFiscal = true;
+            
+            if (cuenta === 'caja' || cuenta === 'banco') {
                 const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
                 const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
                 if (d > 0 || c > 0) {
-                    cuentaDinero = txt; montoTotal = d > 0 ? d : c; esDebito = d > 0;
+                    filaDinero = f;
+                    montoDinero = d > 0 ? d : c;
+                    esIngresoACaja = d > 0;
                 }
             }
         });
 
-        if (!cuentaDinero || montoTotal === 0) return;
-        const neto = (montoTotal / 1.16).toFixed(2);
-        const iva = (montoTotal - neto).toFixed(2);
+        // Solo ejecutar cálculos si se cumplen ambas condiciones
+        if (!tieneFiscal || !filaDinero || montoDinero === 0) return;
 
+        const neto = (montoDinero / 1.16).toFixed(2);
+        const iva = (montoDinero - neto).toFixed(2);
+
+        // 2. Asignar montos según el flujo de caja
         filas.forEach(f => {
             const nombre = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             const cellD = f.querySelector('.val-debito');
             const cellC = f.querySelector('.val-credito');
+
             if (nombre.includes('fiscal')) {
-                if (esDebito) { cellC.innerText = iva; cellD.innerText = "0"; }
+                // Si entra dinero (Débito), el IVA es Débito Fiscal (Crédito)
+                // Si sale dinero (Crédito), el IVA es Crédito Fiscal (Débito)
+                if (esIngresoACaja) { cellC.innerText = iva; cellD.innerText = "0"; }
                 else { cellD.innerText = iva; cellC.innerText = "0"; }
-            } else if (nombre !== '' && nombre !== cuentaDinero && !nombre.includes('fiscal')) {
-                if (esDebito) { cellC.innerText = neto; cellD.innerText = "0"; }
+            } else if (nombre !== '' && nombre !== 'caja' && nombre !== 'banco') {
+                // Cuentas de Gasto o Venta
+                if (esIngresoACaja) { cellC.innerText = neto; cellD.innerText = "0"; }
                 else { cellD.innerText = neto; cellC.innerText = "0"; }
             }
         });
@@ -259,7 +276,6 @@
         }
     }
 
-    // --- CONSULTA (ASIENTO 1, 2, 3...) ---
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
@@ -279,7 +295,7 @@
             html += `<tr>
                 <td>${f.fecha}</td>
                 <td>${f.cuenta}</td>
-                <td align="center">${f.ref}</td>
+                <td align="center" class="col-ref">${f.ref}</td>
                 <td align="right">${f.debito.toFixed(2)}</td>
                 <td align="right">${f.credito.toFixed(2)}</td>
             </tr>`;

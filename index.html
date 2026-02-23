@@ -19,10 +19,11 @@
         .seccion-vista.activa { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* ENCABEZADO DE LA EMPRESA */
-        .header-contable { border: 2px solid var(--azul-pro); text-align: center; padding: 15px; margin-bottom: 25px; border-radius: 8px; background: white; }
-        .header-contable h1 { margin: 0; font-size: 1.5rem; color: var(--azul-oscuro); text-transform: uppercase; outline: none; }
-        .header-contable p { margin: 5px 0 0; outline: none; }
+        /* ENCABEZADO ESTILO PROFESIONAL */
+        .header-contable { border: 1px solid #333; text-align: center; padding: 20px; margin-bottom: 25px; background: white; line-height: 1.6; }
+        .header-contable h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; text-transform: uppercase; color: #000; outline: none; }
+        .header-contable p { margin: 2px 0; font-size: 1.1rem; outline: none; }
+        .header-contable .linea-periodo { border-top: 1px solid #333; margin-top: 10px; padding-top: 5px; text-transform: uppercase; font-weight: bold; }
 
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
         
@@ -75,7 +76,11 @@
             
             <div class="header-contable">
                 <h1 id="empresaNombre" contenteditable="true" onblur="guardarDatosEmpresa()">COMERCIAL A B C, C.A.</h1>
-                <p>RIF: <span id="empresaRif" contenteditable="true" onblur="guardarDatosEmpresa()">J-00000000-0</span> | <b>LIBRO DIARIO</b></p>
+                <p>RIF: <span id="empresaRif" contenteditable="true" onblur="guardarDatosEmpresa()">J-00000000-0</span></p>
+                <p><b>LIBRO DIARIO</b></p>
+                <div class="linea-periodo">
+                    PERÍODO: <span id="periodoActualHeader" contenteditable="true" onblur="guardarDatosEmpresa()">FEBRERO 2026</span>
+                </div>
             </div>
 
             <div style="margin-bottom: 15px;">
@@ -94,7 +99,7 @@
             <button class="btn-regresar" onclick="cambiarVista('vista-diario')">✕ Cancelar</button>
             
             <div style="text-align: center; margin-bottom: 20px;">
-                <h2 id="periodoActual" contenteditable="true" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
+                <h2 id="periodoAsientoManual" contenteditable="true" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
                 <small>Complete los datos del asiento</small>
             </div>
 
@@ -135,23 +140,30 @@
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let mapaReferencias = {}; 
-    let contadorGlobalRef = 1;
-
     // --- CARGA INICIAL DE DATOS DE EMPRESA ---
     async function cargarDatosEmpresa() {
         const { data, error } = await _supabase.from('empresa').select('*').limit(1).single();
         if (data) {
             document.getElementById('empresaNombre').innerText = data.nombre;
             document.getElementById('empresaRif').innerText = data.rif;
+            document.getElementById('periodoActualHeader').innerText = data.periodo || "FEBRERO 2026";
+            document.getElementById('periodoAsientoManual').innerText = data.periodo || "FEBRERO 2026";
         }
     }
 
     async function guardarDatosEmpresa() {
         const nuevoNombre = document.getElementById('empresaNombre').innerText;
         const nuevoRif = document.getElementById('empresaRif').innerText;
-        const { error } = await _supabase.from('empresa').update({ nombre: nuevoNombre, rif: nuevoRif }).neq('nombre', '');
-        if (error) console.error("Error al guardar:", error.message);
+        const nuevoPer = document.getElementById('periodoActualHeader').innerText;
+        
+        // Actualizamos también el periodo en la vista de registro para que coincida
+        document.getElementById('periodoAsientoManual').innerText = nuevoPer;
+
+        const { error } = await _supabase.from('empresa').update({ 
+            nombre: nuevoNombre, 
+            rif: nuevoRif, 
+            periodo: nuevoPer 
+        }).neq('nombre', '');
     }
 
     function cambiarVista(id) {
@@ -190,27 +202,32 @@
         }
     }
 
-    async function asignarRefPersistente(elemento) {
+    // --- LÓGICA DE REFERENCIAS (REF) INTELIGENTE ---
+    async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toLowerCase();
-        if (!nombreCuenta) return;
-        const celdaRef = elemento.closest('tr').querySelector('.col-ref');
-        if (mapaReferencias[nombreCuenta]) {
-            celdaRef.innerText = mapaReferencias[nombreCuenta];
-            return;
-        }
-        const { data } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
-        if (data && data.length > 0) {
-            mapaReferencias[nombreCuenta] = data[0].ref;
-            celdaRef.innerText = data[0].ref;
+        if (nombreCuenta.length < 2) return;
+
+        const fila = elemento.closest('tr');
+        const celdaRef = fila.querySelector('.col-ref');
+
+        // 1. Buscar si la cuenta ya existe en asientos anteriores
+        const { data: existente } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
+
+        if (existente && existente.length > 0) {
+            celdaRef.innerText = existente[0].ref;
         } else {
+            // 2. Si es nueva, buscar el número máximo actual
             const { data: todas } = await _supabase.from('asientos').select('ref');
             let maxRef = 0;
-            if(todas && todas.length > 0) {
-                maxRef = Math.max(...todas.map(a => parseInt(a.ref) || 0));
+            if (todas && todas.length > 0) {
+                const numeros = todas.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+                if (numeros.length > 0) maxRef = Math.max(...numeros);
             }
-            contadorGlobalRef = maxRef + 1;
-            mapaReferencias[nombreCuenta] = contadorGlobalRef;
-            celdaRef.innerText = contadorGlobalRef;
+            celdaRef.innerText = maxRef + 1;
         }
     }
 
@@ -219,7 +236,7 @@
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
             <td style="color: #666; font-size: 0.85rem; text-align:center;">${new Date().toISOString().split('T')[0]}</td>
-            <td contenteditable="true" class="txt-cuenta" onblur="asignarRefPersistente(this)" onkeyup="ejecutarLogicaIVA()"></td>
+            <td contenteditable="true" class="txt-cuenta" onblur="asignarRefInteligente(this)" onkeyup="ejecutarLogicaIVA()"></td>
             <td class="col-ref" style="text-align:center; font-weight:bold; color:var(--azul-pro);"></td>
             <td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
             <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>
@@ -278,7 +295,7 @@
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const idGrupo = Date.now();
         const glosa = document.getElementById('resumenAsiento').value;
-        const per = document.getElementById('periodoActual').innerText.trim();
+        const per = document.getElementById('periodoAsientoManual').innerText.trim();
         const datos = [];
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
@@ -329,7 +346,6 @@
         cambiarVista('vista-registro');
     }
 
-    // Inicialización al cargar la página
     window.onload = cargarDatosEmpresa;
 </script>
 </body>

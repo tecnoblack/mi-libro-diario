@@ -210,7 +210,6 @@
             document.getElementById('periodoActualHeader').innerText = data.periodo || "FEBRERO 2026";
             document.getElementById('periodoAsientoManual').innerText = data.periodo || "FEBRERO 2026";
             
-            // Sincronizar con el mayor
             if(document.getElementById('mayorEmpresaNombre')){
                 document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
                 document.getElementById('mayorEmpresaRif').innerText = data.rif;
@@ -235,15 +234,14 @@
         }
     }
 
-    // --- CÓDIGO DE REF AGREGADO ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
         
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
-
         const otrasFilas = document.querySelectorAll('#cuerpo-tabla tr');
+        
         for (let f of otrasFilas) {
             const n = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
             const r = f.querySelector('.col-ref').innerText;
@@ -254,7 +252,6 @@
         }
 
         const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
-
         if (data && data.length > 0) {
             celdaRef.innerText = data[0].ref;
         } else {
@@ -322,49 +319,33 @@
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return alert("Inicia sesión nuevamente.");
-
         const btn = document.getElementById('btnGuardar');
         btn.disabled = true;
         btn.innerText = "Guardando...";
-
         const idGrupo = Date.now();
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
-
         const registros = [];
         document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             if (cuenta !== "") {
                 registros.push({ 
-                    asiento_id: idGrupo, 
-                    descripcion: glosa, 
-                    cuenta: cuenta, 
-                    user_id: user.id,
+                    asiento_id: idGrupo, descripcion: glosa, cuenta: cuenta, user_id: user.id,
                     ref: f.querySelector('.col-ref').innerText || "1",
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    fecha: new Date().toISOString().split('T')[0],
-                    periodo: per
+                    fecha: new Date().toISOString().split('T')[0], periodo: per
                 });
             }
         });
-
         if (registros.length < 2) {
             alert("El asiento debe tener al menos 2 cuentas.");
-            btn.disabled = false;
-            btn.innerText = "Guardar Asiento";
+            btn.disabled = false; btn.innerText = "Guardar Asiento";
             return;
         }
-
         const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) {
-            alert("Error: " + error.message);
-            btn.disabled = false;
-            btn.innerText = "Guardar Asiento";
-        } else {
-            alert("✅ Asiento guardado con éxito.");
-            cambiarVista('vista-diario');
-        }
+        if (error) { alert("Error: " + error.message); btn.disabled = false; }
+        else { alert("✅ Asiento guardado."); cambiarVista('vista-diario'); }
     }
 
     async function consultarLibroDiario() {
@@ -374,8 +355,10 @@
 
         let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
         let ultimoId = null, num = 1;
+        let tGenDeb = 0, tGenCre = 0;
 
         data.forEach(f => {
+            tGenDeb += (f.debito || 0); tGenCre += (f.credito || 0);
             if (f.asiento_id !== ultimoId) {
                 html += `<tr class="fila-asiento-header">
                     <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
@@ -385,6 +368,20 @@
             }
             html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center;">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
         });
+
+        const dif = Math.abs(tGenDeb - tGenCre);
+        const cuadra = dif < 0.01;
+        const color = cuadra ? "#4ade80" : "#f87171";
+
+        html += `<tr class="fila-totales-libro">
+            <td class="col-select"></td><td colspan="3" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td>
+            <td style="color:${color}">${tGenDeb.toFixed(2)}</td><td style="color:${color}">${tGenCre.toFixed(2)}</td>
+        </tr>`;
+
+        if (!cuadra) {
+            html += `<tr><td colspan="6" style="text-align:center; background:#fee2e2; color:#b91c1c; font-size:0.8rem;">⚠️ ERROR: Desbalance de ${dif.toFixed(2)}</td></tr>`;
+        }
+
         div.innerHTML = html + "</tbody></table>";
     }
 
@@ -408,20 +405,17 @@
         if (confirm("¿Eliminar los asientos seleccionados?")) {
             const ids = Array.from(sel).map(cb => cb.value);
             await _supabase.from('asientos').delete().in('asiento_id', ids);
-            consultarLibroDiario();
-            cancelarModoBorrado();
+            consultarLibroDiario(); cancelarModoBorrado();
         }
     }
 
     function abrirRegistroNuevo() {
         document.getElementById('cuerpo-tabla').innerHTML = '';
         document.getElementById('resumenAsiento').value = '';
-        agregarFila();
-        agregarFila();
+        agregarFila(); agregarFila();
         cambiarVista('vista-registro');
     }
 
-    // --- FUNCIONES MAYOR ---
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const unicas = [...new Set(data.map(i => i.cuenta))].sort();

@@ -211,7 +211,6 @@
         const n = document.getElementById('empresaNombre').innerText;
         const r = document.getElementById('empresaRif').innerText;
         const p = document.getElementById('periodoActualHeader').innerText;
-        // Esta es la función de la captura de pantalla 256-261
         await _supabase.from('empresa').update({ nombre: n, rif: r, periodo: p }).neq('nombre', '');
     }
 
@@ -224,12 +223,14 @@
         }
     }
 
+    // --- FUNCIÓN DE REF INDEPENDIENTE INTEGRADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
         
+        // Busca específicamente la referencia de ESTA cuenta
         const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
         if (data && data.length > 0) {
             celdaRef.innerText = data[0].ref;
@@ -259,28 +260,36 @@
         actualizarTotales();
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
+        
         filas.forEach(f => {
             const c = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             if (c.includes('fiscal')) tieneFiscal = true;
-            if (c === 'caja' || c === 'banco') {
+            if (c === 'caja' || c === 'banco' || c === 'caja chica') {
                 const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
                 const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
                 if (d > 0 || cr > 0) { filaDinero = f; monto = d || cr; esIngreso = d > 0; }
             }
         });
+
         if (!tieneFiscal || !filaDinero || monto === 0) return;
+
         const neto = (monto / 1.16).toFixed(2);
         const iva = (monto - neto).toFixed(2);
+
         filas.forEach(f => {
             const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+            const inputCuenta = f.querySelector('.txt-cuenta');
+
             if (n.includes('fiscal')) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(f.querySelector('.txt-cuenta'));
-            } else if (n !== '' && n !== 'caja' && n !== 'banco') {
+                // Forzamos actualización de REF individual
+                asignarRefInteligente(inputCuenta);
+            } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(f.querySelector('.txt-cuenta'));
+                // Forzamos actualización de REF individual
+                asignarRefInteligente(inputCuenta);
             }
         });
         actualizarTotales();
@@ -330,43 +339,34 @@
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
         const registros = [];
+        const asiento_uid = Date.now();
+        
         document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            if (cuenta !== "") {
+            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            const r = f.querySelector('.col-ref').innerText.trim();
+            
+            if (cuenta !== "" && (d > 0 || c > 0)) {
                 registros.push({ 
-                    asiento_id: Date.now(), descripcion: glosa, cuenta: cuenta, user_id: user.id,
-                    ref: f.querySelector('.col-ref').innerText || "1",
-                    debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
-                    credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    fecha: new Date().toISOString().split('T')[0], periodo: per
+                    asiento_id: asiento_uid, 
+                    descripcion: glosa, 
+                    cuenta: cuenta, 
+                    user_id: user.id,
+                    ref: r,
+                    debito: d,
+                    credito: c,
+                    fecha: new Date().toISOString().split('T')[0]
                 });
             }
         });
-        await _supabase.from('asientos').insert(registros);
-        cambiarVista('vista-diario');
-    }
 
-    async function cargarCuentasSelect() {
-        const { data } = await _supabase.from('asientos').select('cuenta');
-        const select = document.getElementById('select-cuenta-mayor');
-        select.innerHTML = '<option value="">Seleccione cuenta...</option>';
-        const unicas = [...new Set(data?.map(i => i.cuenta) || [])];
-        unicas.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+        const { error } = await _supabase.from('asientos').insert(registros);
+        if (error) alert("Error al guardar: " + error.message);
+        else cambiarVista('vista-diario');
     }
-
-    async function generarMayor() {
-        const cuenta = document.getElementById('select-cuenta-mayor').value;
-        if (!cuenta) return;
-        const { data } = await _supabase.from('asientos').select('*').eq('cuenta', cuenta).order('fecha');
-        let saldo = 0;
-        let html = `<div class="info-mayor-header"><div class="cuenta-ref-row"><span>CUENTA: ${cuenta}</span><span>REF: ${data[0]?.ref || '-'}</span></div><table><thead><tr><th>FECHA</th><th>DESCRIPCIÓN</th><th>DEBE</th><th>HABER</th><th>SALDO</th></tr></thead><tbody>`;
-        data.forEach(f => {
-            saldo += (f.debito - f.credito);
-            html += `<tr><td>${f.fecha}</td><td>${f.descripcion}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td><td><b>${saldo.toFixed(2)}</b></td></tr>`;
-        });
-        document.getElementById('resultado-mayor').innerHTML = html + "</tbody></table></div>";
-    }
-
+    
+    // Funciones de borrado
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';
@@ -382,12 +382,13 @@
     }
 
     async function confirmarEliminacion() {
-        const sel = document.querySelectorAll('.check-borrar:checked');
-        if (sel.length === 0) return alert("Seleccione un asiento");
-        const ids = Array.from(sel).map(cb => cb.value);
-        await _supabase.from('asientos').delete().in('asiento_id', ids);
-        consultarLibroDiario();
-        cancelarModoBorrado();
+        const ids = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
+        if (ids.length === 0) return alert("Selecciona al menos un asiento.");
+        if (confirm("¿Eliminar los asientos seleccionados?")) {
+            await _supabase.from('asientos').delete().in('asiento_id', ids);
+            cancelarModoBorrado();
+            consultarLibroDiario();
+        }
     }
 </script>
 </body>

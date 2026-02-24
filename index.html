@@ -57,7 +57,7 @@
 </head>
 <body>
 
-    <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o este no es tu dispositivo registrado.</div>
+    <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
 
     <div id="vista-login" class="seccion-vista activa">
         <div class="contenedor-login">
@@ -74,7 +74,7 @@
         </div>
         <h1 style="text-align:center; margin-top: 40px; color: var(--azul-pro);">App Contable</h1>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; max-width: 600px; margin: 50px auto; padding: 20px;">
-            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-diario'); consultarLibroDiario();">
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-diario')">
                 <span style="font-size: 50px; display: block; margin-bottom: 10px;">📖</span>
                 <h3>Libro Diario</h3>
             </div>
@@ -168,9 +168,7 @@
         return id;
     }
 
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        global: { headers: { 'x-device-id': getDeviceId() } },
-    });
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function iniciarSesion() {
         const email = document.getElementById('login-email').value;
@@ -182,16 +180,8 @@
 
     async function verificarPerfil(userId) {
         const currentDevice = getDeviceId();
-        const { data: perfil, error } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        const { data: perfil } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
         if (perfil) {
-            if (!perfil.last_device_id) {
-                await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
-            } else if (perfil.last_device_id !== currentDevice) {
-                alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
-                await _supabase.auth.signOut();
-                location.reload();
-                return;
-            }
             if (!perfil.suscripcion_activa) {
                 document.getElementById('banner-suscripcion').style.display = 'block';
                 return;
@@ -207,13 +197,13 @@
         if (data) {
             document.getElementById('empresaNombre').innerText = data.nombre;
             document.getElementById('empresaRif').innerText = data.rif;
-            document.getElementById('periodoActualHeader').innerText = data.periodo || "FEBRERO 2026";
-            document.getElementById('periodoAsientoManual').innerText = data.periodo || "FEBRERO 2026";
+            document.getElementById('periodoActualHeader').innerText = data.periodo;
+            document.getElementById('periodoAsientoManual').innerText = data.periodo;
             
             if(document.getElementById('mayorEmpresaNombre')){
                 document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
                 document.getElementById('mayorEmpresaRif').innerText = data.rif;
-                document.getElementById('mayorPeriodoHeader').innerText = data.periodo || "FEBRERO 2026";
+                document.getElementById('mayorPeriodoHeader').innerText = data.periodo;
             }
         }
     }
@@ -234,7 +224,6 @@
         }
     }
 
-    // CORRECCIÓN COLUMNA REF: Busca folios existentes o crea el siguiente consecutivo.
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
@@ -242,7 +231,6 @@
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
         
-        // 1. Buscar en las filas que se están editando actualmente
         const otrasFilas = document.querySelectorAll('#cuerpo-tabla tr');
         for (let f of otrasFilas) {
             const n = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
@@ -253,17 +241,15 @@
             }
         }
 
-        // 2. Buscar en el histórico de la base de datos
         const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
         if (data && data.length > 0) {
             celdaRef.innerText = data[0].ref;
         } else {
-            // 3. Si es cuenta nueva, calcular el siguiente folio consecutivo
             const { data: todos } = await _supabase.from('asientos').select('ref');
             let max = 0;
             if (todos) {
                 const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-                max = numeros.length > 0 ? Math.max(...numbers) : 0;
+                max = numeros.length > 0 ? Math.max(...numeros) : 0;
             }
             celdaRef.innerText = max + 1;
         }
@@ -326,15 +312,20 @@
         if (error) { div.innerHTML = "Error."; return; }
 
         let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-        let ultimoId = null, num = 1;
+        let ultimoId = null, num = 1, totalD = 0, totalC = 0;
 
         data.forEach(f => {
             if (f.asiento_id !== ultimoId) {
                 html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td></tr>`;
                 ultimoId = f.asiento_id;
             }
+            totalD += f.debito; totalC += f.credito;
             html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
         });
+        
+        // TOTAL GENERAL DEL LIBRO DIARIO
+        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr>`;
+        
         div.innerHTML = html + "</tbody></table>";
     }
 
@@ -347,15 +338,13 @@
 
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) return alert("Inicia sesión.");
+        if (!user) return alert("Inicia sesión nuevamente.");
         const btn = document.getElementById('btnGuardar');
         btn.disabled = true;
         btn.innerText = "Guardando...";
-        
         const idGrupo = Date.now();
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
-        
         const registros = [];
         document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
@@ -369,9 +358,8 @@
                 });
             }
         });
-
         const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) { alert("Error: " + error.message); btn.disabled = false; }
+        if (error) { alert("Error: " + error.message); btn.disabled = false; btn.innerText = "Guardar Asiento"; }
         else { cambiarVista('vista-diario'); }
     }
 
@@ -404,7 +392,7 @@
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');
         select.innerHTML = '<option value="">Seleccione cuenta...</option>';
-        const unicas = [...new Set(data.map(i => i.cuenta))];
+        const unicas = [...new Set(data?.map(i => i.cuenta) || [])];
         unicas.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
     }
 

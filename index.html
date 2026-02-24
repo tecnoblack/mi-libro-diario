@@ -19,31 +19,40 @@
         .seccion-vista.activa { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Estilos Generales */
+        /* Login Styles */
         .contenedor-login { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
         .input-login { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
 
+        /* Encabezado Corporativo */
         .header-contable { border: 2px solid #333; text-align: center; padding: 20px; margin-bottom: 25px; background: white; line-height: 1.6; }
         .header-contable h1 { margin: 0; font-size: 1.8rem; letter-spacing: 2px; text-transform: uppercase; color: #000; outline: none; }
         .header-contable p { margin: 2px 0; font-size: 1.1rem; outline: none; }
         .header-contable .linea-periodo { border-top: 2px solid #333; margin-top: 10px; padding-top: 5px; text-transform: uppercase; font-weight: bold; }
 
         .contenedor-principal { max-width: 1050px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
+        
+        /* Tablas */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #333; }
         th { background-color: var(--azul-pro); color: white; padding: 12px; text-align: center; font-size: 0.85rem; text-transform: uppercase; border: 1px solid #333; }
         td { border: 1px solid #333; padding: 10px; font-size: 0.9rem; }
         
         .fila-asiento-header { background-color: #f8fafc; color: var(--azul-pro); font-weight: bold; font-size: 0.95rem; }
+        .fila-totales-libro { background-color: #1e293b; color: white; font-weight: bold; }
+
+        /* Botones */
         .btn-accion-azul { background-color: var(--azul-pro); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-right: 10px; }
         .btn-accion-azul:hover { background-color: var(--azul-oscuro); }
         .btn-flotante { position: fixed; bottom: 40px; right: 40px; width: 65px; height: 65px; background-color: var(--azul-pro); color: white; border-radius: 50%; border: none; font-size: 35px; cursor: pointer; box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .btn-regresar { background: #64748b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-bottom: 20px; }
         
         .totales-seccion { background: #1e293b; color: white; padding: 15px; border-radius: 4px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 10px; }
+        
         [contenteditable="true"] { outline: none; border-bottom: 1px dashed #ccc; }
         [contenteditable="true"]:focus { background: #fffde7; border-bottom: 2px solid var(--azul-pro); }
-        .btn-regresar { background: #64748b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-bottom: 20px; }
 
-        /* Estilo para tabla de Mayor */
+        #banner-suscripcion { background: #fee2e2; color: #b91c1c; padding: 10px; text-align: center; font-weight: bold; display: none; }
+        
+        /* Estilo específico para el cuadro del Mayor */
         .info-mayor-header { border: 2px solid #333; padding: 10px; margin-top:20px; background: white; }
         .cuenta-ref-row { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
     </style>
@@ -139,6 +148,7 @@
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // --- SESIÓN ---
     async function iniciarSesion() {
         const email = document.getElementById('login-email').value;
         const pass = document.getElementById('login-pass').value;
@@ -153,6 +163,7 @@
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
+    // --- ENCABEZADOS ---
     async function cargarEncabezados() {
         const { data } = await _supabase.from('empresa').select('*').limit(1).single();
         if (data) {
@@ -170,6 +181,7 @@
         cargarEncabezados();
     }
 
+    // --- NAVEGACIÓN ---
     function cambiarVista(id) {
         document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
         document.getElementById(id).classList.add('activa');
@@ -178,6 +190,7 @@
         if (id === 'vista-mayor') cargarCuentasSelect();
     }
 
+    // --- LIBRO MAYOR ---
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const unicas = [...new Set(data.map(i => i.cuenta))].sort();
@@ -222,20 +235,22 @@
         document.getElementById('resultado-mayor').innerHTML = html + "</tbody></table></div>";
     }
 
+    // --- LIBRO DIARIO ---
     async function consultarLibroDiario() {
         const { data } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
-        let html = `<table style="border: 1px solid #333;"><thead><tr><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+        let html = `<table><thead><tr><th>FECHA</th><th>CUENTA</th><th>REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
         let lastId = null;
         data.forEach(f => {
             if (f.asiento_id !== lastId) {
                 html += `<tr class="fila-asiento-header"><td colspan="5">Asiento: ${f.descripcion}</td></tr>`;
                 lastId = f.asiento_id;
             }
-            html += `<tr><td style="border: 1px solid #333;">${f.fecha}</td><td style="border: 1px solid #333;">${f.cuenta}</td><td style="border: 1px solid #333; text-align:center;">${f.ref}</td><td style="border: 1px solid #333; text-align:right;">${f.debito.toFixed(2)}</td><td style="border: 1px solid #333; text-align:right;">${f.credito.toFixed(2)}</td></tr>`;
+            html += `<tr><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center;">${f.ref}</td><td style="text-align:right;">${f.debito.toFixed(2)}</td><td style="text-align:right;">${f.credito.toFixed(2)}</td></tr>`;
         });
         document.getElementById('tabla-registros').innerHTML = html + "</tbody></table>";
     }
 
+    // --- REGISTRO ---
     function agregarFila() {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${new Date().toISOString().split('T')[0]}</td>

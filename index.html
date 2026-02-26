@@ -223,18 +223,33 @@
         }
     }
 
-    // --- FUNCIÓN DE REF INDEPENDIENTE INTEGRADA ---
+    // --- LÓGICA DE LA COLUMNA REF INTEGRADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
         
-        // Busca específicamente la referencia de ESTA cuenta
+        // 1. Buscar si la cuenta ya tiene una REF en el historial de la base de datos
         const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
+        
         if (data && data.length > 0) {
             celdaRef.innerText = data[0].ref;
         } else {
+            // 2. Si no existe, buscar en las filas del asiento actual (por si se repite la cuenta)
+            const filasActuales = document.querySelectorAll('#cuerpo-tabla tr');
+            for (let f of filasActuales) {
+                if (f !== filaActual) {
+                    const nombreF = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
+                    const refF = f.querySelector('.col-ref').innerText;
+                    if (nombreF === nombreCuenta && refF !== "") {
+                        celdaRef.innerText = refF;
+                        return;
+                    }
+                }
+            }
+
+            // 3. Si es totalmente nueva, calcular el siguiente número correlativo global
             const { data: todos } = await _supabase.from('asientos').select('ref');
             let max = 0;
             if (todos) {
@@ -283,12 +298,10 @@
             if (n.includes('fiscal')) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
-                // Forzamos actualización de REF individual
                 asignarRefInteligente(inputCuenta);
             } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
-                // Forzamos actualización de REF individual
                 asignarRefInteligente(inputCuenta);
             }
         });
@@ -341,32 +354,37 @@
         const registros = [];
         const asiento_uid = Date.now();
         
-        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
-            const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            const r = f.querySelector('.col-ref').innerText.trim();
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        filas.forEach(fila => {
+            const cuenta = fila.querySelector('.txt-cuenta').innerText.trim();
+            const ref = fila.querySelector('.col-ref').innerText.trim();
+            const debito = parseFloat(fila.querySelector('.val-debito').innerText) || 0;
+            const credito = parseFloat(fila.querySelector('.val-credito').innerText) || 0;
             
-            if (cuenta !== "" && (d > 0 || c > 0)) {
-                registros.push({ 
-                    asiento_id: asiento_uid, 
-                    descripcion: glosa, 
-                    cuenta: cuenta, 
-                    user_id: user.id,
-                    ref: r,
-                    debito: d,
-                    credito: c,
-                    fecha: new Date().toISOString().split('T')[0]
+            if (cuenta !== "" && (debito > 0 || credito > 0)) {
+                registros.push({
+                    asiento_id: asiento_uid,
+                    fecha: new Date().toISOString().split('T')[0],
+                    cuenta: cuenta,
+                    ref: ref,
+                    debito: debito,
+                    credito: credito,
+                    descripcion: glosa,
+                    periodo: per,
+                    user_id: user.id
                 });
             }
         });
 
         const { error } = await _supabase.from('asientos').insert(registros);
         if (error) alert("Error al guardar: " + error.message);
-        else cambiarVista('vista-diario');
+        else {
+            alert("Asiento guardado con éxito");
+            cambiarVista('vista-diario');
+        }
     }
-    
-    // Funciones de borrado
+
+    // Funciones de eliminación
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';
@@ -382,14 +400,88 @@
     }
 
     async function confirmarEliminacion() {
-        const ids = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
-        if (ids.length === 0) return alert("Selecciona al menos un asiento.");
-        if (confirm("¿Eliminar los asientos seleccionados?")) {
-            await _supabase.from('asientos').delete().in('asiento_id', ids);
-            cancelarModoBorrado();
-            consultarLibroDiario();
+        const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
+        if (seleccionados.length === 0) {
+            alert("Selecciona al menos un asiento");
+            return;
+        }
+        if (confirm("¿Estás seguro de eliminar los asientos seleccionados?")) {
+            const { error } = await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
+            if (error) alert("Error: " + error.message);
+            else {
+                cancelarModoBorrado();
+                consultarLibroDiario();
+            }
         }
     }
+
+    // Lógica Libro Mayor
+    async function cargarCuentasSelect() {
+        const { data } = await _supabase.from('asientos').select('cuenta');
+        const select = document.getElementById('select-cuenta-mayor');
+        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
+        if (data) {
+            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
+            unicas.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.innerText = c;
+                select.appendChild(opt);
+            });
+        }
+    }
+
+    async function generarMayor() {
+        const cuenta = document.getElementById('select-cuenta-mayor').value;
+        if (!cuenta) return;
+        
+        const { data } = await _supabase.from('asientos').select('*').ilike('cuenta', cuenta).order('fecha', {ascending: true});
+        const div = document.getElementById('resultado-mayor');
+        
+        if (!data || data.length === 0) {
+            div.innerHTML = "<p>Sin movimientos.</p>";
+            return;
+        }
+
+        let saldo = 0;
+        let html = `
+            <div class="info-mayor-header">
+                <div class="cuenta-ref-row">
+                    <span>CUENTA: ${cuenta}</span>
+                    <span>REF: ${data[0].ref}</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>FECHA</th>
+                            <th>EXPLICACIÓN</th>
+                            <th>DEBE</th>
+                            <th>HABER</th>
+                            <th>SALDO</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        data.forEach(m => {
+            saldo += (m.debito - m.credito);
+            html += `
+                <tr>
+                    <td>${m.fecha}</td>
+                    <td>${m.descripcion}</td>
+                    <td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
+                    <td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
+                    <td style="font-weight:bold;">${saldo.toFixed(2)}</td>
+                </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        div.innerHTML = html;
+    }
+
+    // Inicialización al cargar
+    window.onload = () => {
+        const id = getDeviceId();
+        console.log("Device ID:", id);
+    };
 </script>
 </body>
 </html>

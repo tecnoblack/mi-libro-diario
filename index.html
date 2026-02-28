@@ -403,53 +403,59 @@
         select.innerHTML = unicas.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-// Busca donde empiece así:
 async function generarMayor() {
     const cuentaSel = document.getElementById('select-cuenta-mayor').value;
     const divRes = document.getElementById('resultado-mayor');
-    if(!cuentaSel) return;
+    if (!cuentaSel) return;
+
+    // 1. Obtener los movimientos de la cuenta
+    const { data: movs, error } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSel).order('fecha', { ascending: true });
+    if (error || !movs?.length) { divRes.innerHTML = "<p>Sin datos para esta cuenta.</p>"; return; }
+
+    // 2. Crear el mapa para que el Asiento sea #1, #2, etc.
+    const { data: todos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
+    const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
+    const mapaCorr = {}; 
+    idsUnicos.forEach((id, i) => { if (id) mapaCorr[id] = i + 1; });
+
+    // 3. Construir la tabla con ASIENTO a la derecha de EXPLICACIÓN
+    let html = `<div class="info-mayor-header">
+        <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
+        <table class="tabla-mayor">
+            <thead>
+                <tr>
+                    <th>FECHA</th>
+                    <th>EXPLICACIÓN</th>
+                    <th style="text-align:center;">ASIENTO</th>
+                    <th>DÉBITO</th>
+                    <th>CRÉDITO</th>
+                    <th>SALDO</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    let saldo = 0;
+    movs.forEach(m => {
+        saldo += (m.debito - m.credito);
+        const numAsiento = mapaCorr[m.asiento_id] || "S/N";
+
+        html += `<tr>
+            <td>${m.fecha}</td>
+            <td>${m.descripcion}</td>
+            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
+            <td>${m.debito.toFixed(2)}</td>
+            <td>${m.credito.toFixed(2)}</td>
+            <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
+        </tr>`;
+    });
+
+    const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
+    html += `</tbody></table><div style="text-align:right; margin-top:15px; font-weight:bold;">
+        SALDO: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipo}</span>
+    </div></div>`;
     
-    // ... aquí sigue el código de Supabase ...
-    // --- COMIENZA EL BLOQUE A PEGAR ---
-        let html = `<div class="info-mayor-header">
-            <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
-            <table class="tabla-mayor">
-                <thead>
-                    <tr>
-                        <th>FECHA</th>
-                        <th>EXPLICACIÓN</th>
-                        <th style="text-align:center;">ASIENTO</th>
-                        <th>DÉBITO</th>
-                        <th>CRÉDITO</th>
-                        <th>SALDO</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-        let saldo = 0;
-        movs.forEach(m => {
-            saldo += (m.debito - m.credito);
-            // Obtenemos el número del mapa correlativo
-            const numAsiento = mapaCorr[m.asiento_id] || "S/N";
-
-            html += `<tr>
-                <td>${m.fecha}</td>
-                <td>${m.descripcion}</td>
-                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-                <td>${m.debito.toFixed(2)}</td>
-                <td>${m.credito.toFixed(2)}</td>
-                <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
-            </tr>`;
-        });
-        // --- TERMINA EL BLOQUE A PEGAR ---
-
-    function abrirRegistroNuevo() {
-        document.getElementById('cuerpo-tabla').innerHTML = '';
-        document.getElementById('resumenAsiento').value = '';
-        agregarFila();
-        agregarFila();
-        cambiarVista('vista-registro');
-    }
+    divRes.innerHTML = html;
+}
 
     // Funciones de Borrado
     function activarModoBorrado() {

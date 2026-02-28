@@ -217,11 +217,13 @@
     }
 
     async function asignarRefInteligente(elemento) {
-        const nombreCuenta = elemento.innerText.trim().toUpperCase();
+        const nombreCuenta = elemento.innerText.trim();
         if (nombreCuenta === "") return;
         const filaActual = elemento.closest('tr');
         const celdaRefActual = filaActual.querySelector('.col-ref');
-        const { data: historial } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
+        
+        // Cambiado ilike por eq para evitar error de función
+        const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
         if (historial && historial.length > 0) {
             celdaRefActual.innerText = historial[0].ref;
             return;
@@ -235,7 +237,7 @@
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let maxEnPantalla = 0, refPropia = null;
         filas.forEach(f => {
-            const nFila = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
+            const nFila = f.querySelector('.txt-cuenta').innerText.trim();
             const rFila = parseInt(f.querySelector('.col-ref').innerText);
             if (!isNaN(rFila)) {
                 maxEnPantalla = Math.max(maxEnPantalla, rFila);
@@ -378,7 +380,7 @@
         if(!select) return;
         select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
         if (data && data.length > 0) {
-            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
+            const unicas = [...new Set(data.map(i => i.cuenta))].sort();
             unicas.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c; opt.innerText = c;
@@ -406,9 +408,10 @@
             const mapaCorrelativo = {};
             idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
 
+            // CAMBIO AQUÍ: Usamos .eq en lugar de .ilike para máxima compatibilidad
             const { data, error } = await _supabase
                 .from('asientos')
-                .ilike('cuenta', nombreCuenta)
+                .eq('cuenta', nombreCuenta)
                 .order('fecha', { ascending: true });
 
             if (error) throw error;

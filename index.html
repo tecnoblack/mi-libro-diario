@@ -156,11 +156,18 @@
         </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // Inicialización robusta
+    let _supabase;
+    try {
+        _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch (e) {
+        alert("Error al conectar con el servidor. Recarga la página.");
+    }
 
     async function iniciarSesion() {
         const email = document.getElementById('login-email').value;
@@ -204,7 +211,7 @@
         const n = document.getElementById('empresaNombre').innerText;
         const r = document.getElementById('empresaRif').innerText;
         const p = document.getElementById('periodoActualHeader').innerText;
-        await _supabase.from('empresa').update({ nombre: n, rif: r, periodo: p }).neq('nombre', '');
+        await _supabase.from('empresa').update({ nombre: n, rif: r, periodo: p }).neq('nombre', 'TEMP_NADA');
     }
 
     function cambiarVista(id) {
@@ -222,7 +229,6 @@
         const filaActual = elemento.closest('tr');
         const celdaRefActual = filaActual.querySelector('.col-ref');
         
-        // Cambiado ilike por eq para evitar error de función
         const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
         if (historial && historial.length > 0) {
             celdaRefActual.innerText = historial[0].ref;
@@ -408,10 +414,11 @@
             const mapaCorrelativo = {};
             idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
 
-            // CAMBIO AQUÍ: Usamos .eq en lugar de .ilike para máxima compatibilidad
+            // CONSULTA SIMPLIFICADA PARA EVITAR ERRORES DE LIBRERÍA
             const { data, error } = await _supabase
                 .from('asientos')
-                .eq('cuenta', nombreCuenta)
+                .select('*')
+                .match({ cuenta: nombreCuenta })
                 .order('fecha', { ascending: true });
 
             if (error) throw error;
@@ -470,8 +477,7 @@
             html += `</tbody></table></div></div>`;
             div.innerHTML = html;
         } catch (err) {
-            console.error("Error:", err);
-            div.innerHTML = `<p style='color:red; text-align:center;'>Error técnico: ${err.message || 'Error desconocido'}</p>`;
+            div.innerHTML = `<p style='color:red; text-align:center;'>Error técnico: ${err.message || 'Error de conexión'}</p>`;
         }
     }
 </script>

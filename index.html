@@ -51,6 +51,9 @@
         /* Estilos Mayor */
         .info-mayor-header { border: 2px solid #333; padding: 10px; margin-top: 20px; background: white; }
         .cuenta-ref-row { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
+        .tag-saldo { font-weight: bold; font-size: 0.75rem; padding: 2px 5px; border-radius: 4px; }
+        .deudor-color { color: var(--verde-exito); }
+        .acreedor-color { color: var(--rojo-error); }
 
         #banner-suscripcion { background: #fee2e2; color: #b91c1c; padding: 10px; text-align: center; font-weight: bold; display: none; }
     </style>
@@ -218,24 +221,19 @@
         if (nombreCuenta === "") return;
         const filaActual = elemento.closest('tr');
         const celdaRefActual = filaActual.querySelector('.col-ref');
-        
         const { data: historial } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
         if (historial && historial.length > 0) {
             celdaRefActual.innerText = historial[0].ref;
             return;
         }
-
         const { data: todos } = await _supabase.from('asientos').select('ref');
         let maxGlobal = 0;
         if (todos) {
             const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
             maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
         }
-
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        let maxEnPantalla = 0;
-        let refPropia = null;
-
+        let maxEnPantalla = 0, refPropia = null;
         filas.forEach(f => {
             const nFila = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
             const rFila = parseInt(f.querySelector('.col-ref').innerText);
@@ -244,12 +242,7 @@
                 if (nFila === nombreCuenta) refPropia = rFila;
             }
         });
-
-        if (refPropia) {
-            celdaRefActual.innerText = refPropia;
-        } else {
-            celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
-        }
+        celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
     }
 
     function agregarFila() {
@@ -267,32 +260,27 @@
         actualizarTotales();
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
-        
         filas.forEach(f => {
             const c = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             if (c.includes('fiscal')) tieneFiscal = true;
-            if (c === 'caja' || c === 'banco' || c === 'caja chica') {
+            if (['caja', 'banco', 'caja chica'].some(p => c.includes(p))) {
                 const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
                 const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
                 if (d > 0 || cr > 0) { filaDinero = f; monto = d || cr; esIngreso = d > 0; }
             }
         });
-
         if (!tieneFiscal || !filaDinero || monto === 0) return;
-        const neto = (monto / 1.16).toFixed(2);
-        const iva = (monto - neto).toFixed(2);
-
+        const neto = (monto / 1.16).toFixed(2), iva = (monto - neto).toFixed(2);
         filas.forEach(f => {
             const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            const inputCuenta = f.querySelector('.txt-cuenta');
             if (n.includes('fiscal')) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(inputCuenta);
-            } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
+                asignarRefInteligente(f.querySelector('.txt-cuenta'));
+            } else if (n !== '' && !['caja', 'banco', 'caja chica'].some(p => n.includes(p))) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(inputCuenta);
+                asignarRefInteligente(f.querySelector('.txt-cuenta'));
             }
         });
         actualizarTotales();
@@ -337,23 +325,19 @@
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
-        let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
+        const per = document.getElementById('periodoActualHeader').innerText;
         const registros = [];
         const asiento_uid = Date.now();
-        const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        filas.forEach(f => {
+        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
             const cta = f.querySelector('.txt-cuenta').innerText.trim();
-            const ref = f.querySelector('.col-ref').innerText.trim();
-            const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
-            const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            if (cta !== "") {
+            if (cta) {
                 registros.push({
                     asiento_id: asiento_uid,
-                    fecha: new Date().toISOString().split('T')[0],
+                    fecha: f.cells[0].innerText,
                     cuenta: cta,
-                    ref: ref,
-                    debito: deb,
-                    credito: cre,
+                    ref: f.querySelector('.col-ref').innerText,
+                    debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
+                    credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
                     descripcion: glosa,
                     periodo: per,
                     user_id: user.id
@@ -362,7 +346,7 @@
         });
         const { error } = await _supabase.from('asientos').insert(registros);
         if (error) alert("Error: " + error.message);
-        else { alert("Guardado!"); cambiarVista('vista-diario'); }
+        else { alert("¡Guardado!"); cambiarVista('vista-diario'); }
     }
 
     async function cargarCuentasSelect() {
@@ -386,14 +370,13 @@
         if (error) return;
         
         const div = document.getElementById('resultado-mayor');
-        let saldo = 0;
-        // Obtenemos el REF del primer registro encontrado para esa cuenta
-        const codigoRef = data.length > 0 ? data[0].ref : "";
+        let saldoAcumulado = 0;
+        const refCodigo = data.length > 0 ? data[0].ref : "";
 
         let html = `<div class="info-mayor-header">
             <div class="cuenta-ref-row">
                 <span>CUENTA: ${nombreCuenta}</span>
-                <span>CÓDIGO: ${codigoRef}</span>
+                <span>CÓDIGO (REF): ${refCodigo}</span>
             </div>
             <table>
                 <thead>
@@ -404,20 +387,27 @@
                         <th>DEBE</th>
                         <th>HABER</th>
                         <th>SALDO</th>
+                        <th>TIPO</th>
                     </tr>
                 </thead>
                 <tbody>`;
         
-        data.forEach((m, index) => {
-            saldo += (m.debito - m.credito);
-            // El número de asiento visual se calcula o se usa el ID
+        let asientoContador = 1;
+        data.forEach(m => {
+            saldoAcumulado += (m.debito - m.credito);
+            const valorSaldoAbsoluto = Math.abs(saldoAcumulado).toFixed(2);
+            const esDeudor = saldoAcumulado >= 0;
+            const tipoTexto = esDeudor ? "DEUDOR" : "ACREEDOR";
+            const colorClase = esDeudor ? "deudor-color" : "acreedor-color";
+
             html += `<tr>
                 <td>${m.fecha}</td>
                 <td>${m.descripcion}</td>
-                <td style="text-align:center;">${index + 1}</td>
+                <td style="text-align:center;">${asientoContador++}</td>
                 <td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
                 <td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
-                <td style="font-weight:bold;">${saldo.toFixed(2)}</td>
+                <td style="font-weight:bold;">${valorSaldoAbsoluto}</td>
+                <td class="tag-saldo ${colorClase}">${tipoTexto}</td>
             </tr>`;
         });
 

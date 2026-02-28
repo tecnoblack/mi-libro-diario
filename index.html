@@ -51,9 +51,10 @@
         /* Estilos Mayor */
         .info-mayor-header { border: 2px solid #333; padding: 10px; margin-top: 20px; background: white; }
         .cuenta-ref-row { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
-        .tag-saldo { font-weight: bold; font-size: 0.75rem; padding: 2px 5px; border-radius: 4px; }
-        .deudor-color { color: var(--verde-exito); }
-        .acreedor-color { color: var(--rojo-error); }
+        .tabla-mayor { width: 100%; border-collapse: collapse; min-width: 750px; }
+        .tag-tipo { font-weight: bold; font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; display: inline-block; text-align: center; width: 80px; }
+        .tipo-deudor { background: #dcfce7; color: #166534; border: 1px solid #166534; }
+        .tipo-acreedor { background: #fee2e2; color: #991b1b; border: 1px solid #991b1b; }
 
         #banner-suscripcion { background: #fee2e2; color: #b91c1c; padding: 10px; text-align: center; font-weight: bold; display: none; }
     </style>
@@ -117,10 +118,10 @@
                 <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">FEBRERO 2026</span></div>
             </div>
             <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
-                <select id="select-cuenta-mayor" style="padding:12px; width:260px; border:1px solid #ccc; border-radius:6px;"></select>
+                <select id="select-cuenta-mayor" style="padding:12px; width:260px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
                 <button class="btn-accion-azul" onclick="generarMayor()">Consultar</button>
             </div>
-            <div id="resultado-mayor"></div>
+            <div id="resultado-mayor" style="overflow-x: auto;"></div>
         </div>
     </div>
 
@@ -263,7 +264,7 @@
         filas.forEach(f => {
             const c = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             if (c.includes('fiscal')) tieneFiscal = true;
-            if (['caja', 'banco', 'caja chica'].some(p => c.includes(p))) {
+            if (c === 'caja' || c === 'banco' || c === 'caja chica') {
                 const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
                 const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
                 if (d > 0 || cr > 0) { filaDinero = f; monto = d || cr; esIngreso = d > 0; }
@@ -277,7 +278,7 @@
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
                 asignarRefInteligente(f.querySelector('.txt-cuenta'));
-            } else if (n !== '' && !['caja', 'banco', 'caja chica'].some(p => n.includes(p))) {
+            } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
                 asignarRefInteligente(f.querySelector('.txt-cuenta'));
@@ -324,7 +325,7 @@
 
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
+        const glosa = document.getElementById('resumenAsiento').value || "Sin descripción";
         const per = document.getElementById('periodoActualHeader').innerText;
         const registros = [];
         const asiento_uid = Date.now();
@@ -349,72 +350,6 @@
         else { alert("¡Guardado!"); cambiarVista('vista-diario'); }
     }
 
-    async function cargarCuentasSelect() {
-        const { data } = await _supabase.from('asientos').select('cuenta');
-        const select = document.getElementById('select-cuenta-mayor');
-        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
-        if (data) {
-            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
-            unicas.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c; opt.innerText = c;
-                select.appendChild(opt);
-            });
-        }
-    }
-
-    async function generarMayor() {
-        const nombreCuenta = document.getElementById('select-cuenta-mayor').value;
-        if (!nombreCuenta) return;
-        const { data, error } = await _supabase.from('asientos').select('*').ilike('cuenta', nombreCuenta).order('asiento_id', { ascending: true });
-        if (error) return;
-        
-        const div = document.getElementById('resultado-mayor');
-        let saldoAcumulado = 0;
-        const refCodigo = data.length > 0 ? data[0].ref : "";
-
-        let html = `<div class="info-mayor-header">
-            <div class="cuenta-ref-row">
-                <span>CUENTA: ${nombreCuenta}</span>
-                <span>CÓDIGO (REF): ${refCodigo}</span>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>FECHA</th>
-                        <th>EXPLICACIÓN</th>
-                        <th>ASIENTO</th>
-                        <th>DEBE</th>
-                        <th>HABER</th>
-                        <th>SALDO</th>
-                        <th>TIPO</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-        
-        let asientoContador = 1;
-        data.forEach(m => {
-            saldoAcumulado += (m.debito - m.credito);
-            const valorSaldoAbsoluto = Math.abs(saldoAcumulado).toFixed(2);
-            const esDeudor = saldoAcumulado >= 0;
-            const tipoTexto = esDeudor ? "DEUDOR" : "ACREEDOR";
-            const colorClase = esDeudor ? "deudor-color" : "acreedor-color";
-
-            html += `<tr>
-                <td>${m.fecha}</td>
-                <td>${m.descripcion}</td>
-                <td style="text-align:center;">${asientoContador++}</td>
-                <td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
-                <td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
-                <td style="font-weight:bold;">${valorSaldoAbsoluto}</td>
-                <td class="tag-saldo ${colorClase}">${tipoTexto}</td>
-            </tr>`;
-        });
-
-        html += `</tbody></table></div>`;
-        div.innerHTML = html;
-    }
-
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';
@@ -431,11 +366,100 @@
 
     async function confirmarEliminacion() {
         const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
-        if (seleccionados.length === 0) return alert("Selecciona al menos un asiento");
+        if (seleccionados.length === 0) return alert("Seleccione asientos");
         if (confirm("¿Eliminar seleccionados?")) {
             await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
             cancelarModoBorrado(); consultarLibroDiario();
         }
+    }
+
+    // --- FUNCIONES DEL LIBRO MAYOR ---
+    async function cargarCuentasSelect() {
+        const { data } = await _supabase.from('asientos').select('cuenta');
+        const select = document.getElementById('select-cuenta-mayor');
+        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
+        if (data) {
+            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
+            unicas.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.innerText = c;
+                select.appendChild(opt);
+            });
+        }
+    }
+
+    async function generarMayor() {
+        const nombreCuenta = document.getElementById('select-cuenta-mayor').value;
+        if (!nombreCuenta) return alert("Seleccione una cuenta");
+
+        // 1. Obtener TODOS los asientos para calcular el correlativo (1, 2, 3...)
+        const { data: todos, error: errT } = await _supabase
+            .from('asientos')
+            .select('asiento_id')
+            .order('asiento_id', { ascending: true });
+
+        if (errT) return;
+
+        const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
+        const mapaCorrelativo = {};
+        idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
+
+        // 2. Obtener movimientos de la cuenta
+        const { data, error } = await _supabase
+            .from('asientos')
+            .ilike('cuenta', nombreCuenta)
+            .order('asiento_id', { ascending: true });
+
+        if (error) return;
+
+        const div = document.getElementById('resultado-mayor');
+        let saldoAcumulado = 0;
+        const refCodigo = data.length > 0 ? data[0].ref : "S/R";
+
+        let html = `
+            <div class="info-mayor-header">
+                <div class="cuenta-ref-row">
+                    <span>CUENTA: ${nombreCuenta}</span>
+                    <span>REF: ${refCodigo}</span>
+                </div>
+                <table class="tabla-mayor">
+                    <thead>
+                        <tr>
+                            <th style="width:15%">FECHA</th>
+                            <th style="width:35%">EXPLICACIÓN</th>
+                            <th style="width:10%">ASIENTO</th>
+                            <th style="width:13%">DEBE</th>
+                            <th style="width:13%">HABER</th>
+                            <th style="width:14%">SALDO</th>
+                            <th style="width:10%">TIPO</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        data.forEach((m) => {
+            saldoAcumulado += (m.debito - m.credito);
+            const saldoAbsoluto = Math.abs(saldoAcumulado).toFixed(2);
+            const esDeudor = saldoAcumulado >= 0;
+            const nAsiento = mapaCorrelativo[m.asiento_id] || "-";
+
+            html += `
+                <tr>
+                    <td>${m.fecha}</td>
+                    <td style="font-size: 0.8rem;">${m.descripcion}</td>
+                    <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${nAsiento}</td>
+                    <td style="text-align:right;">${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
+                    <td style="text-align:right;">${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
+                    <td style="text-align:right; font-weight:bold;">${saldoAbsoluto}</td>
+                    <td style="text-align:center;">
+                        <span class="tag-tipo ${esDeudor ? 'tipo-deudor' : 'tipo-acreedor'}">
+                            ${esDeudor ? 'DEUDOR' : 'ACREEDOR'}
+                        </span>
+                    </td>
+                </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        div.innerHTML = html;
     }
 </script>
 </body>

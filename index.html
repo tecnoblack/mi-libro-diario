@@ -50,7 +50,7 @@
         .info-mayor-header { border: 2px solid #333; padding: 10px; margin-top: 20px; background: white; }
         .cuenta-ref-row { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
         .tabla-mayor { width: 100%; border-collapse: collapse; min-width: 750px; }
-        .tag-tipo { font-weight: bold; font-size: 0.8rem; padding: 6px 12px; border-radius: 4px; display: inline-block; text-align: center; min-width: 100px; }
+        .tag-tipo { font-weight: bold; font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; display: inline-block; text-align: center; width: 80px; }
         .tipo-deudor { background: #dcfce7; color: #166534; border: 1px solid #166534; }
         .tipo-acreedor { background: #fee2e2; color: #991b1b; border: 1px solid #991b1b; }
 
@@ -161,6 +161,7 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     
+    // --- LÓGICA DE SEGURIDAD (DISPOSITIVO ÚNICO) ---
     function getDeviceId() {
         let id = localStorage.getItem('contable_device_id');
         if (!id) {
@@ -190,6 +191,7 @@
     async function verificarPerfil(userId) {
         const currentDevice = getDeviceId();
         const { data: perfil, error } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        
         if (perfil) {
             if (!perfil.last_device_id) {
                 await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
@@ -199,6 +201,7 @@
                 location.reload();
                 return;
             }
+
             if (!perfil.suscripcion_activa) {
                 document.getElementById('banner-suscripcion').style.display = 'block';
                 return;
@@ -209,6 +212,7 @@
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
+    // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
         const { data } = await _supabase.from('empresa').select('*').limit(1).single();
         if (data) {
@@ -216,6 +220,7 @@
             document.getElementById('empresaRif').innerText = data.rif;
             document.getElementById('periodoActualHeader').innerText = data.periodo;
             document.getElementById('periodoAsientoManual').innerText = data.periodo;
+            
             const mNombre = document.getElementById('mayorEmpresaNombre');
             if(mNombre) {
                 mNombre.innerText = data.nombre;
@@ -235,87 +240,10 @@
     function cambiarVista(id) {
         document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
         document.getElementById(id).classList.add('activa');
-        if (id === 'vista-diario') { cargarDatosEmpresa(); consultarLibroDiario(); }
-        if (id === 'vista-mayor') { cargarDatosEmpresa(); cargarCuentasSelect(); }
-    }
-
-    async function consultarLibroDiario() {
-        const div = document.getElementById('tabla-registros');
-        const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
-        if (error) { div.innerHTML = "Error."; return; }
-        let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-        let ultimoId = null, num = 1, totalD = 0, totalC = 0;
-        data.forEach(f => {
-            if (f.asiento_id !== ultimoId) {
-                html += `<tr class="fila-asiento-header">
-                    <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
-                    <td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td>
-                </tr>`;
-                ultimoId = f.asiento_id;
-            }
-            totalD += f.debito; totalC += f.credito;
-            html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
-        });
-        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
-        div.innerHTML = html;
-    }
-
-    async function cargarCuentasSelect() {
-        const { data } = await _supabase.from('asientos').select('cuenta');
-        const unicas = [...new Set(data.map(i => i.cuenta))].sort();
-        const select = document.getElementById('select-cuenta-mayor');
-        select.innerHTML = unicas.map(c => `<option value="${c}">${c}</option>`).join('');
-    }
-
-    async function generarMayor() {
-        const cuentaSeleccionada = document.getElementById('select-cuenta-mayor').value;
-        const { data: movimientos } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSeleccionada).order('fecha', { ascending: true }).order('created_at', { ascending: true });
-        const { data: todosLosAsientos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
-        
-        const idsUnicos = [...new Set(todosLosAsientos.map(a => a.asiento_id))];
-        const mapaCorrelativo = {};
-        idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
-
-        let html = `<div class="info-mayor-header">
-            <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSeleccionada}</span><span>REF: ${movimientos[0]?.ref || ''}</span></div>
-            <table class="tabla-mayor">
-                <thead>
-                    <tr>
-                        <th style="width: 100px;">FECHA</th>
-                        <th>EXPLICACIÓN</th>
-                        <th style="width: 80px; text-align:center;">ASIENTO</th>
-                        <th style="width: 110px;">DÉBITO</th>
-                        <th style="width: 110px;">CRÉDITO</th>
-                        <th style="width: 110px;">SALDO</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-        let saldoAcumulado = 0, totalDebito = 0, totalCredito = 0;
-        movimientos.forEach(f => {
-            totalDebito += f.debito; totalCredito += f.credito;
-            saldoAcumulado += (f.debito - f.credito);
-            html += `<tr>
-                <td>${f.fecha}</td>
-                <td>${f.descripcion}</td>
-                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${mapaCorrelativo[f.asiento_id]}</td>
-                <td>${f.debito.toFixed(2)}</td>
-                <td>${f.credito.toFixed(2)}</td>
-                <td style="font-weight:bold;">${Math.abs(saldoAcumulado).toFixed(2)}</td>
-            </tr>`;
-        });
-
-        const tipoSaldo = saldoAcumulado >= 0 ? 'DEUDOR' : 'ACREEDOR';
-        html += `<tr class="fila-totales-libro">
-                <td colspan="3" style="text-align:right; padding-right:15px;">TOTALES</td>
-                <td>${totalDebito.toFixed(2)}</td>
-                <td>${totalCredito.toFixed(2)}</td>
-                <td>${Math.abs(saldoAcumulado).toFixed(2)}</td>
-            </tr></tbody></table>
-            <div style="text-align: right; margin-top: 15px; font-weight: bold;">
-                SALDO: <span class="tag-tipo ${saldoAcumulado >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipoSaldo}</span>
-            </div></div>`;
-        document.getElementById('resultado-mayor').innerHTML = html;
+        if (id === 'vista-diario') {
+            cargarDatosEmpresa();
+            consultarLibroDiario();
+        }
     }
 
     async function asignarRefInteligente(elemento) {
@@ -323,12 +251,29 @@
         if (nombreCuenta === "") return;
         const filaActual = elemento.closest('tr');
         const celdaRefActual = filaActual.querySelector('.col-ref');
+        
         const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
-        if (historial && historial.length > 0) { celdaRefActual.innerText = historial[0].ref; return; }
+        if (historial && historial.length > 0) {
+            celdaRefActual.innerText = historial[0].ref;
+            return;
+        }
         const { data: todos } = await _supabase.from('asientos').select('ref');
         let maxGlobal = 0;
-        if (todos) { const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n)); maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0; }
-        celdaRefActual.innerText = maxGlobal + 1;
+        if (todos) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
+        }
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        let maxEnPantalla = 0, refPropia = null;
+        filas.forEach(f => {
+            const nFila = f.querySelector('.txt-cuenta').innerText.trim();
+            const rFila = parseInt(f.querySelector('.col-ref').innerText);
+            if (!isNaN(rFila)) {
+                maxEnPantalla = Math.max(maxEnPantalla, rFila);
+                if (nFila === nombreCuenta) refPropia = rFila;
+            }
+        });
+        celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
     }
 
     function agregarFila() {
@@ -362,9 +307,11 @@
             if (n.includes('fiscal')) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
+                asignarRefInteligente(f.querySelector('.txt-cuenta'));
             } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
+                asignarRefInteligente(f.querySelector('.txt-cuenta'));
             }
         });
         actualizarTotales();
@@ -381,11 +328,97 @@
         document.getElementById('mensajeValidacion').innerHTML = ok ? "<span style='color:green;'>✓ Cuadrado</span>" : "<span style='color:red;'>⚠ No cuadra</span>";
     }
 
+    async function consultarLibroDiario() {
+        const div = document.getElementById('tabla-registros');
+        const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
+        if (error) { div.innerHTML = "Error."; return; }
+        let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+        let ultimoId = null, num = 1, totalD = 0, totalC = 0;
+        data.forEach(f => {
+            if (f.asiento_id !== ultimoId) {
+                html += `<tr class="fila-asiento-header">
+                    <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
+                    <td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td>
+                </tr>`;
+                ultimoId = f.asiento_id;
+            }
+            totalD += f.debito; totalC += f.credito;
+            html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
+        });
+        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
+        div.innerHTML = html;
+    }
+
+    async function cargarCuentasSelect() {
+        const { data } = await _supabase.from('asientos').select('cuenta');
+        const unicas = [...new Set(data.map(i => i.cuenta))].sort();
+        const select = document.getElementById('select-cuenta-mayor');
+        select.innerHTML = unicas.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    async function generarMayor() {
+        const cuentaSeleccionada = document.getElementById('select-cuenta-mayor').value;
+        const divResultado = document.getElementById('resultado-mayor');
+        
+        const { data: movimientos, error } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSeleccionada).order('fecha', { ascending: true });
+        if (error || !movimientos.length) {
+            divResultado.innerHTML = "<p style='text-align:center; padding:20px;'>No hay registros.</p>";
+            return;
+        }
+
+        const { data: todosAsientos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
+        const idsUnicos = [...new Set(todosAsientos.map(a => a.asiento_id))];
+        const mapaCorrelativo = {};
+        idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
+
+        let html = `<div class="info-mayor-header">
+            <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSeleccionada}</span><span>REF: ${movimientos[0].ref}</span></div>
+            <table class="tabla-mayor">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">FECHA</th>
+                        <th>EXPLICACIÓN</th>
+                        <th style="width: 80px; text-align:center;">ASIENTO</th>
+                        <th style="width: 110px;">DÉBITO</th>
+                        <th style="width: 110px;">CRÉDITO</th>
+                        <th style="width: 110px;">SALDO</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        let saldo = 0, totalD = 0, totalC = 0;
+        movimientos.forEach(m => {
+            totalD += m.debito; totalC += m.credito;
+            saldo += (m.debito - m.credito);
+            html += `<tr>
+                <td>${m.fecha}</td>
+                <td>${m.descripcion}</td>
+                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${mapaCorrelativo[m.asiento_id]}</td>
+                <td>${m.debito.toFixed(2)}</td>
+                <td>${m.credito.toFixed(2)}</td>
+                <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
+            </tr>`;
+        });
+
+        const tipoSaldo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
+        html += `<tr class="fila-totales-libro">
+                <td colspan="3" style="text-align:right; padding-right:15px;">TOTALES</td>
+                <td>${totalD.toFixed(2)}</td>
+                <td>${totalC.toFixed(2)}</td>
+                <td>${Math.abs(saldo).toFixed(2)}</td>
+            </tr></tbody></table>
+            <div style="text-align: right; margin-top: 15px; font-weight: bold;">
+                SALDO FINAL: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipoSaldo}</span>
+            </div></div>`;
+        divResultado.innerHTML = html;
+    }
+
     async function guardarAsiento() {
         const glosa = document.getElementById('resumenAsiento').value || "Sin descripción";
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         const { data: maxId } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: false }).limit(1);
         const nuevoId = (maxId?.[0]?.asiento_id || 0) + 1;
+        
         const registros = Array.from(filas).map(f => ({
             asiento_id: nuevoId,
             fecha: f.cells[0].innerText,
@@ -395,6 +428,7 @@
             credito: parseFloat(f.cells[4].innerText) || 0,
             descripcion: glosa
         }));
+
         await _supabase.from('asientos').insert(registros);
         cambiarVista('vista-diario');
     }

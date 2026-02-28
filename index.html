@@ -161,10 +161,21 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
     
-    // Inicialización robusta
+    // --- LÓGICA DE SEGURIDAD (DISPOSITIVO ÚNICO) ---
+    function getDeviceId() {
+        let id = localStorage.getItem('contable_device_id');
+        if (!id) {
+            id = 'dev-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+            localStorage.setItem('contable_device_id', id);
+        }
+        return id;
+    }
+
     let _supabase;
     try {
-        _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            global: { headers: { 'x-device-id': getDeviceId() } },
+        });
     } catch (e) {
         alert("Error al conectar con el servidor. Recarga la página.");
     }
@@ -178,8 +189,21 @@
     }
 
     async function verificarPerfil(userId) {
-        const { data: perfil } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        const currentDevice = getDeviceId();
+        const { data: perfil, error } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
+        
         if (perfil) {
+            // Control de Dispositivo
+            if (!perfil.last_device_id) {
+                await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
+            } else if (perfil.last_device_id !== currentDevice) {
+                alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
+                await _supabase.auth.signOut();
+                location.reload();
+                return;
+            }
+
+            // Control de Suscripción
             if (!perfil.suscripcion_activa) {
                 document.getElementById('banner-suscripcion').style.display = 'block';
                 return;
@@ -190,6 +214,7 @@
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
+    // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
         const { data } = await _supabase.from('empresa').select('*').limit(1).single();
         if (data) {
@@ -323,40 +348,97 @@
         div.innerHTML = html;
     }
 
-    function abrirRegistroNuevo() {
-        cambiarVista('vista-registro');
-        document.getElementById('cuerpo-tabla').innerHTML = '';
-        document.getElementById('resumenAsiento').value = '';
-        agregarFila(); agregarFila();
-    }
-
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        const glosa = document.getElementById('resumenAsiento').value || "Sin descripción";
-        const per = document.getElementById('periodoActualHeader').innerText;
+        if (!user) return alert("Inicia sesión nuevamente.");
+
+        const btn = document.getElementById('btnGuardar');
+        btn.disabled = true;
+        btn.innerText = "Guardando...";
+
+        const idGrupo = Date.now();
+        const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
+        let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
+
         const registros = [];
-        const asiento_uid = Date.now();
         document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const cta = f.querySelector('.txt-cuenta').innerText.trim();
-            if (cta) {
-                registros.push({
-                    asiento_id: asiento_uid,
-                    fecha: f.cells[0].innerText,
-                    cuenta: cta,
-                    ref: f.querySelector('.col-ref').innerText,
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            if (cuenta !== "") {
+                registros.push({ 
+                    asiento_id: idGrupo, 
+                    descripcion: glosa, 
+                    cuenta: cuenta, 
+                    user_id: user.id,
+                    ref: f.querySelector('.col-ref').innerText || "1",
                     debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
                     credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    descripcion: glosa,
-                    periodo: per,
-                    user_id: user.id
+                    fecha: new Date().toISOString().split('T')[0],
+                    periodo: per
                 });
             }
         });
+
+        if (registros.length < 2) {
+            alert("El asiento debe tener al menos 2 cuentas.");
+            btn.disabled = false;
+            btn.innerText = "Guardar Asiento";
+            return;
+        }
+
         const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) alert("Error: " + error.message);
-        else { alert("¡Guardado!"); cambiarVista('vista-diario'); }
+        if (error) {
+            alert("Error: " + error.message);
+            btn.disabled = false;
+            btn.innerText = "Guardar Asiento";
+        } else {
+            alert("✅ Asiento guardado con éxito.");
+            cambiarVista('vista-diario');
+        }
     }
 
+    async function cargarCuentasSelect() {
+        const { data } = await _supabase.from('asientos').select('cuenta');
+        const select = document.getElementById('select-cuenta-mayor');
+        const unicas = [...new Set(data.map(a => a.cuenta))];
+        select.innerHTML = unicas.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    async function generarMayor() {
+        const cuenta = document.getElementById('select-cuenta-mayor').value;
+        const { data } = await _supabase.from('asientos').select('*').eq('cuenta', cuenta).order('fecha', { ascending: true });
+        
+        let saldo = 0, totalD = 0, totalC = 0;
+        let html = `
+            <div class="info-mayor-header">
+                <div class="cuenta-ref-row"><span>CUENTA: ${cuenta}</span><span>REF: ${data[0]?.ref || ''}</span></div>
+                <table class="tabla-mayor">
+                    <thead><tr><th>FECHA</th><th>EXPLICACIÓN</th><th>DÉBITO</th><th>CRÉDITO</th><th>SALDO</th></tr></thead>
+                    <tbody>`;
+        
+        data.forEach(r => {
+            saldo += (r.debito - r.credito);
+            totalD += r.debito; totalC += r.credito;
+            html += `<tr><td>${r.fecha}</td><td>${r.descripcion}</td><td>${r.debito.toFixed(2)}</td><td>${r.credito.toFixed(2)}</td><td>${Math.abs(saldo).toFixed(2)}</td></tr>`;
+        });
+
+        const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
+        html += `
+                    <tr class="fila-totales-libro"><td colspan="2">TOTALES</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td><td>${Math.abs(saldo).toFixed(2)}</td></tr>
+                </tbody></table>
+                <div style="margin-top:10px; text-align:right;">SALDO: <span class="tag-tipo tipo-${tipo.toLowerCase()}">${tipo}</span></div>
+            </div>`;
+        document.getElementById('resultado-mayor').innerHTML = html;
+    }
+
+    function abrirRegistroNuevo() {
+        document.getElementById('cuerpo-tabla').innerHTML = '';
+        document.getElementById('resumenAsiento').value = '';
+        agregarFila();
+        agregarFila();
+        cambiarVista('vista-registro');
+    }
+
+    // Funciones de Borrado
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';
@@ -372,112 +454,12 @@
     }
 
     async function confirmarEliminacion() {
-        const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
-        if (seleccionados.length === 0) return alert("Seleccione asientos");
-        if (confirm("¿Eliminar seleccionados?")) {
-            await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
-            cancelarModoBorrado(); consultarLibroDiario();
-        }
-    }
-
-    async function cargarCuentasSelect() {
-        const { data } = await _supabase.from('asientos').select('cuenta');
-        const select = document.getElementById('select-cuenta-mayor');
-        if(!select) return;
-        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
-        if (data && data.length > 0) {
-            const unicas = [...new Set(data.map(i => i.cuenta))].sort();
-            unicas.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c; opt.innerText = c;
-                select.appendChild(opt);
-            });
-        }
-    }
-
-    async function generarMayor() {
-        const div = document.getElementById('resultado-mayor');
-        try {
-            const sel = document.getElementById('select-cuenta-mayor');
-            const nombreCuenta = sel.value;
-            if (!nombreCuenta) return alert("Seleccione una cuenta");
-
-            div.innerHTML = "<p style='text-align:center;'>Cargando datos...</p>";
-
-            const { data: todos, error: errT } = await _supabase
-                .from('asientos')
-                .select('asiento_id')
-                .order('asiento_id', { ascending: true });
-
-            if (errT) throw errT;
-            const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
-            const mapaCorrelativo = {};
-            idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
-
-            // CONSULTA SIMPLIFICADA PARA EVITAR ERRORES DE LIBRERÍA
-            const { data, error } = await _supabase
-                .from('asientos')
-                .select('*')
-                .match({ cuenta: nombreCuenta })
-                .order('fecha', { ascending: true });
-
-            if (error) throw error;
-            if (!data || data.length === 0) {
-                div.innerHTML = "<p style='text-align:center; color:red;'>No hay movimientos para esta cuenta.</p>";
-                return;
-            }
-
-            let saldoAcumulado = 0;
-            const refCodigo = data[0].ref || "S/R";
-
-            let html = `
-                <div class="info-mayor-header">
-                    <div class="cuenta-ref-row">
-                        <span>CUENTA: ${nombreCuenta}</span>
-                        <span>REF: ${refCodigo}</span>
-                    </div>
-                    <div style="overflow-x:auto;">
-                    <table class="tabla-mayor">
-                        <thead>
-                            <tr>
-                                <th>FECHA</th>
-                                <th>EXPLICACIÓN</th>
-                                <th>ASIENTO</th>
-                                <th>DEBE</th>
-                                <th>HABER</th>
-                                <th>SALDO</th>
-                                <th>TIPO</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-            data.forEach((m) => {
-                const debe = parseFloat(m.debito) || 0;
-                const haber = parseFloat(m.credito) || 0;
-                saldoAcumulado += (debe - haber);
-                const saldoAbs = Math.abs(saldoAcumulado).toLocaleString('de-DE', {minimumFractionDigits: 2});
-                const esDeudor = saldoAcumulado >= 0;
-                const nAs = mapaCorrelativo[m.asiento_id] || "-";
-
-                html += `
-                    <tr>
-                        <td>${m.fecha}</td>
-                        <td style="font-size: 0.8rem;">${m.descripcion || 'Sin descripción'}</td>
-                        <td style="text-align:center; font-weight:bold;">${nAs}</td>
-                        <td style="text-align:right;">${debe > 0 ? debe.toLocaleString('de-DE', {minimumFractionDigits: 2}) : ''}</td>
-                        <td style="text-align:right;">${haber > 0 ? haber.toLocaleString('de-DE', {minimumFractionDigits: 2}) : ''}</td>
-                        <td style="text-align:right; font-weight:bold;">${saldoAbs}</td>
-                        <td style="text-align:center;">
-                            <span class="tag-tipo ${esDeudor ? 'tipo-deudor' : 'tipo-acreedor'}">
-                                ${esDeudor ? 'DEUDOR' : 'ACREEDOR'}
-                            </span>
-                        </td>
-                    </tr>`;
-            });
-            html += `</tbody></table></div></div>`;
-            div.innerHTML = html;
-        } catch (err) {
-            div.innerHTML = `<p style='color:red; text-align:center;'>Error técnico: ${err.message || 'Error de conexión'}</p>`;
+        const ids = Array.from(document.querySelectorAll('.check-borrar:checked')).map(c => c.value);
+        if (ids.length === 0) return alert("Selecciona al menos un asiento.");
+        if (confirm(`¿Eliminar ${ids.length} asientos seleccionados?`)) {
+            const { error } = await _supabase.from('asientos').delete().in('asiento_id', ids);
+            if (error) alert(error.message);
+            else { alert("Eliminado."); cancelarModoBorrado(); consultarLibroDiario(); }
         }
     }
 </script>

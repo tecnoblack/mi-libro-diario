@@ -403,32 +403,45 @@
         select.innerHTML = unicas.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-    async function generarMayor() {
-        const cuenta = document.getElementById('select-cuenta-mayor').value;
-        const { data } = await _supabase.from('asientos').select('*').eq('cuenta', cuenta).order('fecha', { ascending: true });
-        
-        let saldo = 0, totalD = 0, totalC = 0;
-        let html = `
-            <div class="info-mayor-header">
-                <div class="cuenta-ref-row"><span>CUENTA: ${cuenta}</span><span>REF: ${data[0]?.ref || ''}</span></div>
-                <table class="tabla-mayor">
-                    <thead><tr><th>FECHA</th><th>EXPLICACIÓN</th><th>DÉBITO</th><th>CRÉDITO</th><th>SALDO</th></tr></thead>
-                    <tbody>`;
-        
-        data.forEach(r => {
-            saldo += (r.debito - r.credito);
-            totalD += r.debito; totalC += r.credito;
-            html += `<tr><td>${r.fecha}</td><td>${r.descripcion}</td><td>${r.debito.toFixed(2)}</td><td>${r.credito.toFixed(2)}</td><td>${Math.abs(saldo).toFixed(2)}</td></tr>`;
-        });
+// Busca donde empiece así:
+async function generarMayor() {
+    const cuentaSel = document.getElementById('select-cuenta-mayor').value;
+    const divRes = document.getElementById('resultado-mayor');
+    if(!cuentaSel) return;
+    
+    // ... aquí sigue el código de Supabase ...
+    // --- COMIENZA EL BLOQUE A PEGAR ---
+        let html = `<div class="info-mayor-header">
+            <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
+            <table class="tabla-mayor">
+                <thead>
+                    <tr>
+                        <th>FECHA</th>
+                        <th>EXPLICACIÓN</th>
+                        <th style="text-align:center;">ASIENTO</th>
+                        <th>DÉBITO</th>
+                        <th>CRÉDITO</th>
+                        <th>SALDO</th>
+                    </tr>
+                </thead>
+                <tbody>`;
 
-        const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
-        html += `
-                    <tr class="fila-totales-libro"><td colspan="2">TOTALES</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td><td>${Math.abs(saldo).toFixed(2)}</td></tr>
-                </tbody></table>
-                <div style="margin-top:10px; text-align:right;">SALDO: <span class="tag-tipo tipo-${tipo.toLowerCase()}">${tipo}</span></div>
-            </div>`;
-        document.getElementById('resultado-mayor').innerHTML = html;
-    }
+        let saldo = 0;
+        movs.forEach(m => {
+            saldo += (m.debito - m.credito);
+            // Obtenemos el número del mapa correlativo
+            const numAsiento = mapaCorr[m.asiento_id] || "S/N";
+
+            html += `<tr>
+                <td>${m.fecha}</td>
+                <td>${m.descripcion}</td>
+                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
+                <td>${m.debito.toFixed(2)}</td>
+                <td>${m.credito.toFixed(2)}</td>
+                <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
+            </tr>`;
+        });
+        // --- TERMINA EL BLOQUE A PEGAR ---
 
     function abrirRegistroNuevo() {
         document.getElementById('cuerpo-tabla').innerHTML = '';

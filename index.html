@@ -158,16 +158,6 @@
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
-
-    function getDeviceId() {
-        let id = localStorage.getItem('contable_device_id');
-        if (!id) {
-            id = 'dev-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
-            localStorage.setItem('contable_device_id', id);
-        }
-        return id;
-    }
-
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function iniciarSesion() {
@@ -223,22 +213,18 @@
         }
     }
 
-    // --- LÓGICA DE REF MEJORADA E INTEGRADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
-        
         const filaActual = elemento.closest('tr');
         const celdaRefActual = filaActual.querySelector('.col-ref');
         
-        // 1. Verificar si la cuenta ya existe en la base de datos
         const { data: historial } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
         if (historial && historial.length > 0) {
             celdaRefActual.innerText = historial[0].ref;
             return;
         }
 
-        // 2. Calcular máximo global actual en la base de datos
         const { data: todos } = await _supabase.from('asientos').select('ref');
         let maxGlobal = 0;
         if (todos) {
@@ -246,7 +232,6 @@
             maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
         }
 
-        // 3. Revisar filas en pantalla para no duplicar números de cuentas nuevas distintas
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
         let maxEnPantalla = 0;
         let refPropia = null;
@@ -294,14 +279,12 @@
         });
 
         if (!tieneFiscal || !filaDinero || monto === 0) return;
-
         const neto = (monto / 1.16).toFixed(2);
         const iva = (monto - neto).toFixed(2);
 
         filas.forEach(f => {
             const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
             const inputCuenta = f.querySelector('.txt-cuenta');
-
             if (n.includes('fiscal')) {
                 if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
                 else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
@@ -330,10 +313,8 @@
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
         if (error) { div.innerHTML = "Error."; return; }
-
         let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
         let ultimoId = null, num = 1, totalD = 0, totalC = 0;
-
         data.forEach(f => {
             if (f.asiento_id !== ultimoId) {
                 html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td></tr>`;
@@ -342,9 +323,8 @@
             totalD += f.debito; totalC += f.credito;
             html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
         });
-        
-        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr>`;
-        div.innerHTML = html + "</tbody></table>";
+        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
+        div.innerHTML = html;
     }
 
     function abrirRegistroNuevo() {
@@ -356,44 +336,93 @@
 
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) return alert("Debes iniciar sesión");
-
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
         const registros = [];
         const asiento_uid = Date.now();
-        
         const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        filas.forEach(fila => {
-            const cuenta = fila.querySelector('.txt-cuenta').innerText.trim();
-            const ref = fila.querySelector('.col-ref').innerText.trim();
-            const d = parseFloat(fila.querySelector('.val-debito').innerText) || 0;
-            const c = parseFloat(fila.querySelector('.val-credito').innerText) || 0;
-
-            if (cuenta !== "" && (d > 0 || c > 0)) {
+        filas.forEach(f => {
+            const cta = f.querySelector('.txt-cuenta').innerText.trim();
+            const ref = f.querySelector('.col-ref').innerText.trim();
+            const deb = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const cre = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            if (cta !== "") {
                 registros.push({
                     asiento_id: asiento_uid,
                     fecha: new Date().toISOString().split('T')[0],
-                    cuenta: cuenta,
+                    cuenta: cta,
                     ref: ref,
-                    debito: d,
-                    credito: c,
+                    debito: deb,
+                    credito: cre,
                     descripcion: glosa,
                     periodo: per,
                     user_id: user.id
                 });
             }
         });
-
-        if (registros.length === 0) return alert("El asiento está vacío");
-
         const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) {
-            alert("Error al guardar: " + error.message);
-        } else {
-            alert("Asiento guardado correctamente");
-            cambiarVista('vista-diario');
+        if (error) alert("Error: " + error.message);
+        else { alert("Guardado!"); cambiarVista('vista-diario'); }
+    }
+
+    async function cargarCuentasSelect() {
+        const { data } = await _supabase.from('asientos').select('cuenta');
+        const select = document.getElementById('select-cuenta-mayor');
+        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
+        if (data) {
+            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
+            unicas.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.innerText = c;
+                select.appendChild(opt);
+            });
         }
+    }
+
+    async function generarMayor() {
+        const nombreCuenta = document.getElementById('select-cuenta-mayor').value;
+        if (!nombreCuenta) return;
+        const { data, error } = await _supabase.from('asientos').select('*').ilike('cuenta', nombreCuenta).order('asiento_id', { ascending: true });
+        if (error) return;
+        
+        const div = document.getElementById('resultado-mayor');
+        let saldo = 0;
+        // Obtenemos el REF del primer registro encontrado para esa cuenta
+        const codigoRef = data.length > 0 ? data[0].ref : "";
+
+        let html = `<div class="info-mayor-header">
+            <div class="cuenta-ref-row">
+                <span>CUENTA: ${nombreCuenta}</span>
+                <span>CÓDIGO: ${codigoRef}</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>FECHA</th>
+                        <th>EXPLICACIÓN</th>
+                        <th>ASIENTO</th>
+                        <th>DEBE</th>
+                        <th>HABER</th>
+                        <th>SALDO</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        data.forEach((m, index) => {
+            saldo += (m.debito - m.credito);
+            // El número de asiento visual se calcula o se usa el ID
+            html += `<tr>
+                <td>${m.fecha}</td>
+                <td>${m.descripcion}</td>
+                <td style="text-align:center;">${index + 1}</td>
+                <td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
+                <td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
+                <td style="font-weight:bold;">${saldo.toFixed(2)}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        div.innerHTML = html;
     }
 
     function activarModoBorrado() {
@@ -413,43 +442,10 @@
     async function confirmarEliminacion() {
         const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
         if (seleccionados.length === 0) return alert("Selecciona al menos un asiento");
-        
-        if (confirm("¿Estás seguro de eliminar los asientos seleccionados?")) {
-            const { error } = await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
-            if (error) alert("Error: " + error.message);
-            else { cancelarModoBorrado(); consultarLibroDiario(); }
+        if (confirm("¿Eliminar seleccionados?")) {
+            await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
+            cancelarModoBorrado(); consultarLibroDiario();
         }
-    }
-
-    async function cargarCuentasSelect() {
-        const { data } = await _supabase.from('asientos').select('cuenta');
-        const select = document.getElementById('select-cuenta-mayor');
-        select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
-        if (data) {
-            const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
-            unicas.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c; opt.innerText = c;
-                select.appendChild(opt);
-            });
-        }
-    }
-
-    async function generarMayor() {
-        const cuenta = document.getElementById('select-cuenta-mayor').value;
-        if (!cuenta) return;
-        const { data } = await _supabase.from('asientos').select('*').ilike('cuenta', cuenta).order('fecha', {ascending: true});
-        const div = document.getElementById('resultado-mayor');
-        if (!data || data.length === 0) { div.innerHTML = "<p>Sin movimientos.</p>"; return; }
-
-        let saldo = 0;
-        let html = `<div class="info-mayor-header"><div class="cuenta-ref-row"><span>CUENTA: ${cuenta}</span><span>REF: ${data[0].ref}</span></div><table><thead><tr><th>FECHA</th><th>EXPLICACIÓN</th><th>DEBE</th><th>HABER</th><th>SALDO</th></tr></thead><tbody>`;
-        data.forEach(m => {
-            saldo += (m.debito - m.credito);
-            html += `<tr><td>${m.fecha}</td><td>${m.descripcion}</td><td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td><td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td><td style="font-weight:bold;">${saldo.toFixed(2)}</td></tr>`;
-        });
-        html += `</tbody></table></div>`;
-        div.innerHTML = html;
     }
 </script>
 </body>

@@ -19,7 +19,6 @@
         .seccion-vista.activa { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Login Styles */
         .contenedor-login { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
         .input-login { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
 
@@ -118,8 +117,8 @@
                 <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">FEBRERO 2026</span></div>
             </div>
             <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
-                <select id="select-cuenta-mayor" style="padding:12px; width:260px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
-                <button class="btn-accion-azul" onclick="generarMayor()">Consultar</button>
+                <select id="select-cuenta-mayor" style="padding:12px; width:100%; max-width:300px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
+                <button class="btn-accion-azul" onclick="generarMayor()" style="margin-top: 10px;">Consultar</button>
             </div>
             <div id="resultado-mayor" style="overflow-x: auto;"></div>
         </div>
@@ -192,7 +191,6 @@
             document.getElementById('empresaRif').innerText = data.rif;
             document.getElementById('periodoActualHeader').innerText = data.periodo;
             document.getElementById('periodoAsientoManual').innerText = data.periodo;
-            
             if(document.getElementById('mayorEmpresaNombre')){
                 document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
                 document.getElementById('mayorEmpresaRif').innerText = data.rif;
@@ -373,7 +371,6 @@
         }
     }
 
-    // --- FUNCIONES DEL LIBRO MAYOR ---
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');
@@ -392,19 +389,16 @@
         const nombreCuenta = document.getElementById('select-cuenta-mayor').value;
         if (!nombreCuenta) return alert("Seleccione una cuenta");
 
-        // 1. Obtener TODOS los asientos para calcular el correlativo (1, 2, 3...)
         const { data: todos, error: errT } = await _supabase
             .from('asientos')
             .select('asiento_id')
             .order('asiento_id', { ascending: true });
 
         if (errT) return;
-
         const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
         const mapaCorrelativo = {};
         idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
 
-        // 2. Obtener movimientos de la cuenta
         const { data, error } = await _supabase
             .from('asientos')
             .ilike('cuenta', nombreCuenta)
@@ -457,7 +451,6 @@
                     </td>
                 </tr>`;
         });
-
         html += `</tbody></table></div>`;
         div.innerHTML = html;
     }

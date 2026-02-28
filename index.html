@@ -223,52 +223,47 @@
         }
     }
 
-    // --- LÓGICA DE LA COLUMNA REF REPARADA E INTEGRADA ---
+    // --- LÓGICA DE REF MEJORADA E INTEGRADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
         
         const filaActual = elemento.closest('tr');
-        const celdaRef = filaActual.querySelector('.col-ref');
+        const celdaRefActual = filaActual.querySelector('.col-ref');
         
-        // 1. Verificar si la cuenta ya tiene una REF asignada en el historial de Supabase
-        const { data: historial } = await _supabase
-            .from('asientos')
-            .select('ref')
-            .ilike('cuenta', nombreCuenta)
-            .limit(1);
-
+        // 1. Verificar si la cuenta ya existe en la base de datos
+        const { data: historial } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
         if (historial && historial.length > 0) {
-            celdaRef.innerText = historial[0].ref;
+            celdaRefActual.innerText = historial[0].ref;
+            return;
+        }
+
+        // 2. Calcular máximo global actual en la base de datos
+        const { data: todos } = await _supabase.from('asientos').select('ref');
+        let maxGlobal = 0;
+        if (todos) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
+        }
+
+        // 3. Revisar filas en pantalla para no duplicar números de cuentas nuevas distintas
+        const filas = document.querySelectorAll('#cuerpo-tabla tr');
+        let maxEnPantalla = 0;
+        let refPropia = null;
+
+        filas.forEach(f => {
+            const nFila = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
+            const rFila = parseInt(f.querySelector('.col-ref').innerText);
+            if (!isNaN(rFila)) {
+                maxEnPantalla = Math.max(maxEnPantalla, rFila);
+                if (nFila === nombreCuenta) refPropia = rFila;
+            }
+        });
+
+        if (refPropia) {
+            celdaRefActual.innerText = refPropia;
         } else {
-            // 2. Si es nueva, calcular el máximo global de la base de datos
-            const { data: todos } = await _supabase.from('asientos').select('ref');
-            let maxRefGlobal = 0;
-            if (todos && todos.length > 0) {
-                const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-                maxRefGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-            }
-
-            // 3. Revisar si en el formulario actual ya se asignó una REF a esta cuenta
-            const filasEnPantalla = document.querySelectorAll('#cuerpo-tabla tr');
-            let maxRefPantalla = 0;
-            let refYaAsignadaEnPantalla = null;
-
-            filasEnPantalla.forEach(f => {
-                const cNombre = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
-                const cRef = parseInt(f.querySelector('.col-ref').innerText);
-                
-                if (!isNaN(cRef)) {
-                    maxRefPantalla = Math.max(maxRefPantalla, cRef);
-                    if (cNombre === nombreCuenta) refYaAsignadaEnPantalla = cRef;
-                }
-            });
-
-            if (refYaAsignadaEnPantalla) {
-                celdaRef.innerText = refYaAsignadaEnPantalla;
-            } else {
-                celdaRef.innerText = Math.max(maxRefGlobal, maxRefPantalla) + 1;
-            }
+            celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
         }
     }
 
@@ -361,8 +356,8 @@
 
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) { alert("Sesión expirada"); return; }
-        
+        if (!user) return alert("Debes iniciar sesión");
+
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
         const registros = [];
@@ -372,17 +367,17 @@
         filas.forEach(fila => {
             const cuenta = fila.querySelector('.txt-cuenta').innerText.trim();
             const ref = fila.querySelector('.col-ref').innerText.trim();
-            const debito = parseFloat(fila.querySelector('.val-debito').innerText) || 0;
-            const credito = parseFloat(fila.querySelector('.val-credito').innerText) || 0;
-            
-            if (cuenta !== "" && (debito > 0 || credito > 0)) {
+            const d = parseFloat(fila.querySelector('.val-debito').innerText) || 0;
+            const c = parseFloat(fila.querySelector('.val-credito').innerText) || 0;
+
+            if (cuenta !== "" && (d > 0 || c > 0)) {
                 registros.push({
                     asiento_id: asiento_uid,
                     fecha: new Date().toISOString().split('T')[0],
                     cuenta: cuenta,
                     ref: ref,
-                    debito: debito,
-                    credito: credito,
+                    debito: d,
+                    credito: c,
                     descripcion: glosa,
                     periodo: per,
                     user_id: user.id
@@ -390,12 +385,13 @@
             }
         });
 
-        if (registros.length === 0) return;
+        if (registros.length === 0) return alert("El asiento está vacío");
 
         const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) alert("Error al guardar: " + error.message);
-        else {
-            alert("Asiento guardado con éxito");
+        if (error) {
+            alert("Error al guardar: " + error.message);
+        } else {
+            alert("Asiento guardado correctamente");
             cambiarVista('vista-diario');
         }
     }
@@ -416,7 +412,8 @@
 
     async function confirmarEliminacion() {
         const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
-        if (seleccionados.length === 0) { alert("Selecciona al menos un asiento"); return; }
+        if (seleccionados.length === 0) return alert("Selecciona al menos un asiento");
+        
         if (confirm("¿Estás seguro de eliminar los asientos seleccionados?")) {
             const { error } = await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
             if (error) alert("Error: " + error.message);

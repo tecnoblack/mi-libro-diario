@@ -118,7 +118,7 @@
             </div>
             <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
                 <select id="select-cuenta-mayor" style="padding:12px; width:100%; max-width:300px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
-                <button class="btn-accion-azul" onclick="generarMayor()" style="margin-top: 10px;">Consultar</button>
+                <button type="button" class="btn-accion-azul" onclick="generarMayor()" style="margin-top: 10px;">Consultar</button>
             </div>
             <div id="resultado-mayor" style="overflow-x: auto;"></div>
         </div>
@@ -191,8 +191,10 @@
             document.getElementById('empresaRif').innerText = data.rif;
             document.getElementById('periodoActualHeader').innerText = data.periodo;
             document.getElementById('periodoAsientoManual').innerText = data.periodo;
-            if(document.getElementById('mayorEmpresaNombre')){
-                document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
+            
+            const mNombre = document.getElementById('mayorEmpresaNombre');
+            if(mNombre) {
+                mNombre.innerText = data.nombre;
                 document.getElementById('mayorEmpresaRif').innerText = data.rif;
                 document.getElementById('mayorPeriodoHeader').innerText = data.periodo;
             }
@@ -371,11 +373,13 @@
         }
     }
 
+    // --- LIBRO MAYOR ---
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');
+        if(!select) return;
         select.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>';
-        if (data) {
+        if (data && data.length > 0) {
             const unicas = [...new Set(data.map(i => i.cuenta.toUpperCase()))].sort();
             unicas.forEach(c => {
                 const opt = document.createElement('option');
@@ -386,73 +390,83 @@
     }
 
     async function generarMayor() {
-        const nombreCuenta = document.getElementById('select-cuenta-mayor').value;
-        if (!nombreCuenta) return alert("Seleccione una cuenta");
+        try {
+            const sel = document.getElementById('select-cuenta-mayor');
+            const nombreCuenta = sel.value;
+            if (!nombreCuenta) return alert("Seleccione una cuenta");
 
-        const { data: todos, error: errT } = await _supabase
-            .from('asientos')
-            .select('asiento_id')
-            .order('asiento_id', { ascending: true });
+            // 1. Obtener correlativos
+            const { data: todos, error: errT } = await _supabase
+                .from('asientos')
+                .select('asiento_id')
+                .order('asiento_id', { ascending: true });
 
-        if (errT) return;
-        const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
-        const mapaCorrelativo = {};
-        idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
+            if (errT) throw errT;
+            
+            const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
+            const mapaCorrelativo = {};
+            idsUnicos.forEach((id, index) => { mapaCorrelativo[id] = index + 1; });
 
-        const { data, error } = await _supabase
-            .from('asientos')
-            .ilike('cuenta', nombreCuenta)
-            .order('asiento_id', { ascending: true });
+            // 2. Obtener datos de la cuenta
+            const { data, error } = await _supabase
+                .from('asientos')
+                .ilike('cuenta', nombreCuenta)
+                .order('asiento_id', { ascending: true });
 
-        if (error) return;
+            if (error) throw error;
 
-        const div = document.getElementById('resultado-mayor');
-        let saldoAcumulado = 0;
-        const refCodigo = data.length > 0 ? data[0].ref : "S/R";
+            const div = document.getElementById('resultado-mayor');
+            let saldoAcumulado = 0;
+            const refCodigo = data.length > 0 ? data[0].ref : "S/R";
 
-        let html = `
-            <div class="info-mayor-header">
-                <div class="cuenta-ref-row">
-                    <span>CUENTA: ${nombreCuenta}</span>
-                    <span>REF: ${refCodigo}</span>
-                </div>
-                <table class="tabla-mayor">
-                    <thead>
-                        <tr>
-                            <th style="width:15%">FECHA</th>
-                            <th style="width:35%">EXPLICACIÓN</th>
-                            <th style="width:10%">ASIENTO</th>
-                            <th style="width:13%">DEBE</th>
-                            <th style="width:13%">HABER</th>
-                            <th style="width:14%">SALDO</th>
-                            <th style="width:10%">TIPO</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
+            let html = `
+                <div class="info-mayor-header">
+                    <div class="cuenta-ref-row">
+                        <span>CUENTA: ${nombreCuenta}</span>
+                        <span>REF: ${refCodigo}</span>
+                    </div>
+                    <table class="tabla-mayor">
+                        <thead>
+                            <tr>
+                                <th style="width:15%">FECHA</th>
+                                <th style="width:35%">EXPLICACIÓN</th>
+                                <th style="width:10%">ASIENTO</th>
+                                <th style="width:13%">DEBE</th>
+                                <th style="width:13%">HABER</th>
+                                <th style="width:14%">SALDO</th>
+                                <th style="width:10%">TIPO</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
 
-        data.forEach((m) => {
-            saldoAcumulado += (m.debito - m.credito);
-            const saldoAbsoluto = Math.abs(saldoAcumulado).toFixed(2);
-            const esDeudor = saldoAcumulado >= 0;
-            const nAsiento = mapaCorrelativo[m.asiento_id] || "-";
+            data.forEach((m) => {
+                saldoAcumulado += (m.debito - m.credito);
+                const saldoAbs = Math.abs(saldoAcumulado).toFixed(2);
+                const esDeudor = saldoAcumulado >= 0;
+                const nAs = mapaCorrelativo[m.asiento_id] || "-";
 
-            html += `
-                <tr>
-                    <td>${m.fecha}</td>
-                    <td style="font-size: 0.8rem;">${m.descripcion}</td>
-                    <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${nAsiento}</td>
-                    <td style="text-align:right;">${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
-                    <td style="text-align:right;">${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
-                    <td style="text-align:right; font-weight:bold;">${saldoAbsoluto}</td>
-                    <td style="text-align:center;">
-                        <span class="tag-tipo ${esDeudor ? 'tipo-deudor' : 'tipo-acreedor'}">
-                            ${esDeudor ? 'DEUDOR' : 'ACREEDOR'}
-                        </span>
-                    </td>
-                </tr>`;
-        });
-        html += `</tbody></table></div>`;
-        div.innerHTML = html;
+                html += `
+                    <tr>
+                        <td>${m.fecha}</td>
+                        <td style="font-size: 0.8rem;">${m.descripcion}</td>
+                        <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${nAs}</td>
+                        <td style="text-align:right;">${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
+                        <td style="text-align:right;">${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
+                        <td style="text-align:right; font-weight:bold;">${saldoAbs}</td>
+                        <td style="text-align:center;">
+                            <span class="tag-tipo ${esDeudor ? 'tipo-deudor' : 'tipo-acreedor'}">
+                                ${esDeudor ? 'DEUDOR' : 'ACREEDOR'}
+                            </span>
+                        </td>
+                    </tr>`;
+            });
+            html += `</tbody></table></div>`;
+            div.innerHTML = html;
+
+        } catch (err) {
+            console.error("Error en Mayor:", err);
+            alert("No se pudo generar el reporte. Verifique la conexión.");
+        }
     }
 </script>
 </body>

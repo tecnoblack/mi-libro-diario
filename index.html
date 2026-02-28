@@ -481,6 +481,20 @@ async function generarMayor() {
             else { alert("Eliminado."); cancelarModoBorrado(); consultarLibroDiario(); }
         }
     }
+    function abrirRegistroNuevo() {
+    // 1. Cambiamos a la vista de formulario
+    cambiarVista('vista-registro');
+    
+    // 2. Limpiamos el contenido previo para que no se duplique
+    document.getElementById('cuerpo-tabla').innerHTML = '';
+    document.getElementById('resumenAsiento').value = '';
+    
+    // 3. Reseteamos los totales
+    actualizarTotales();
+    
+    // 4. Agregamos la primera fila vacía para empezar a escribir
+    agregarFila();
+    }
 </script>
 </body>
 </html>

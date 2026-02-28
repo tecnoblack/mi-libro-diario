@@ -223,40 +223,52 @@
         }
     }
 
-    // --- LÓGICA DE LA COLUMNA REF INTEGRADA ---
+    // --- LÓGICA DE LA COLUMNA REF REPARADA E INTEGRADA ---
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim().toUpperCase();
         if (nombreCuenta === "") return;
+        
         const filaActual = elemento.closest('tr');
         const celdaRef = filaActual.querySelector('.col-ref');
         
-        // 1. Buscar si la cuenta ya tiene una REF en el historial de la base de datos
-        const { data } = await _supabase.from('asientos').select('ref').ilike('cuenta', nombreCuenta).limit(1);
-        
-        if (data && data.length > 0) {
-            celdaRef.innerText = data[0].ref;
+        // 1. Verificar si la cuenta ya tiene una REF asignada en el historial de Supabase
+        const { data: historial } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .ilike('cuenta', nombreCuenta)
+            .limit(1);
+
+        if (historial && historial.length > 0) {
+            celdaRef.innerText = historial[0].ref;
         } else {
-            // 2. Si no existe, buscar en las filas del asiento actual (por si se repite la cuenta)
-            const filasActuales = document.querySelectorAll('#cuerpo-tabla tr');
-            for (let f of filasActuales) {
-                if (f !== filaActual) {
-                    const nombreF = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
-                    const refF = f.querySelector('.col-ref').innerText;
-                    if (nombreF === nombreCuenta && refF !== "") {
-                        celdaRef.innerText = refF;
-                        return;
-                    }
-                }
+            // 2. Si es nueva, calcular el máximo global de la base de datos
+            const { data: todos } = await _supabase.from('asientos').select('ref');
+            let maxRefGlobal = 0;
+            if (todos && todos.length > 0) {
+                const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+                maxRefGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
             }
 
-            // 3. Si es totalmente nueva, calcular el siguiente número correlativo global
-            const { data: todos } = await _supabase.from('asientos').select('ref');
-            let max = 0;
-            if (todos) {
-                const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-                max = numeros.length > 0 ? Math.max(...numeros) : 0;
+            // 3. Revisar si en el formulario actual ya se asignó una REF a esta cuenta
+            const filasEnPantalla = document.querySelectorAll('#cuerpo-tabla tr');
+            let maxRefPantalla = 0;
+            let refYaAsignadaEnPantalla = null;
+
+            filasEnPantalla.forEach(f => {
+                const cNombre = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
+                const cRef = parseInt(f.querySelector('.col-ref').innerText);
+                
+                if (!isNaN(cRef)) {
+                    maxRefPantalla = Math.max(maxRefPantalla, cRef);
+                    if (cNombre === nombreCuenta) refYaAsignadaEnPantalla = cRef;
+                }
+            });
+
+            if (refYaAsignadaEnPantalla) {
+                celdaRef.innerText = refYaAsignadaEnPantalla;
+            } else {
+                celdaRef.innerText = Math.max(maxRefGlobal, maxRefPantalla) + 1;
             }
-            celdaRef.innerText = max + 1;
         }
     }
 
@@ -349,6 +361,8 @@
 
     async function guardarAsiento() {
         const { data: { user } } = await _supabase.auth.getUser();
+        if (!user) { alert("Sesión expirada"); return; }
+        
         const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
         let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
         const registros = [];
@@ -376,6 +390,8 @@
             }
         });
 
+        if (registros.length === 0) return;
+
         const { error } = await _supabase.from('asientos').insert(registros);
         if (error) alert("Error al guardar: " + error.message);
         else {
@@ -384,7 +400,6 @@
         }
     }
 
-    // Funciones de eliminación
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
         document.getElementById('btnActivarBorrado').style.display = 'none';
@@ -401,21 +416,14 @@
 
     async function confirmarEliminacion() {
         const seleccionados = Array.from(document.querySelectorAll('.check-borrar:checked')).map(cb => cb.value);
-        if (seleccionados.length === 0) {
-            alert("Selecciona al menos un asiento");
-            return;
-        }
+        if (seleccionados.length === 0) { alert("Selecciona al menos un asiento"); return; }
         if (confirm("¿Estás seguro de eliminar los asientos seleccionados?")) {
             const { error } = await _supabase.from('asientos').delete().in('asiento_id', seleccionados);
             if (error) alert("Error: " + error.message);
-            else {
-                cancelarModoBorrado();
-                consultarLibroDiario();
-            }
+            else { cancelarModoBorrado(); consultarLibroDiario(); }
         }
     }
 
-    // Lógica Libro Mayor
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');
@@ -433,55 +441,19 @@
     async function generarMayor() {
         const cuenta = document.getElementById('select-cuenta-mayor').value;
         if (!cuenta) return;
-        
         const { data } = await _supabase.from('asientos').select('*').ilike('cuenta', cuenta).order('fecha', {ascending: true});
         const div = document.getElementById('resultado-mayor');
-        
-        if (!data || data.length === 0) {
-            div.innerHTML = "<p>Sin movimientos.</p>";
-            return;
-        }
+        if (!data || data.length === 0) { div.innerHTML = "<p>Sin movimientos.</p>"; return; }
 
         let saldo = 0;
-        let html = `
-            <div class="info-mayor-header">
-                <div class="cuenta-ref-row">
-                    <span>CUENTA: ${cuenta}</span>
-                    <span>REF: ${data[0].ref}</span>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>FECHA</th>
-                            <th>EXPLICACIÓN</th>
-                            <th>DEBE</th>
-                            <th>HABER</th>
-                            <th>SALDO</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
+        let html = `<div class="info-mayor-header"><div class="cuenta-ref-row"><span>CUENTA: ${cuenta}</span><span>REF: ${data[0].ref}</span></div><table><thead><tr><th>FECHA</th><th>EXPLICACIÓN</th><th>DEBE</th><th>HABER</th><th>SALDO</th></tr></thead><tbody>`;
         data.forEach(m => {
             saldo += (m.debito - m.credito);
-            html += `
-                <tr>
-                    <td>${m.fecha}</td>
-                    <td>${m.descripcion}</td>
-                    <td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td>
-                    <td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td>
-                    <td style="font-weight:bold;">${saldo.toFixed(2)}</td>
-                </tr>`;
+            html += `<tr><td>${m.fecha}</td><td>${m.descripcion}</td><td>${m.debito > 0 ? m.debito.toFixed(2) : ''}</td><td>${m.credito > 0 ? m.credito.toFixed(2) : ''}</td><td style="font-weight:bold;">${saldo.toFixed(2)}</td></tr>`;
         });
-
         html += `</tbody></table></div>`;
         div.innerHTML = html;
     }
-
-    // Inicialización al cargar
-    window.onload = () => {
-        const id = getDeviceId();
-        console.log("Device ID:", id);
-    };
 </script>
 </body>
 </html>

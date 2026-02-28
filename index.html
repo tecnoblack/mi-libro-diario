@@ -213,8 +213,9 @@
             document.getElementById('periodoActualHeader').innerText = data.periodo;
             document.getElementById('periodoAsientoManual').innerText = data.periodo;
             
-            if(document.getElementById('mayorEmpresaNombre')){
-                document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
+            const mNombre = document.getElementById('mayorEmpresaNombre');
+            if(mNombre) {
+                mNombre.innerText = data.nombre;
                 document.getElementById('mayorEmpresaRif').innerText = data.rif;
                 document.getElementById('mayorPeriodoHeader').innerText = data.periodo;
             }
@@ -353,22 +354,27 @@
         const { data: movs } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSel).order('fecha', { ascending: true });
         if (!movs?.length) { divRes.innerHTML = "<p>Sin datos.</p>"; return; }
 
+        // CORRECCIÓN ASENTOS: Creamos un mapa para convertir IDs largos en números simples 1, 2, 3...
         const { data: todos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
         const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
-        const mapaCorr = {}; idsUnicos.forEach((id, i) => mapaCorr[id] = i + 1);
+        const mapaCorr = {}; 
+        idsUnicos.forEach((id, i) => mapaCorr[id] = i + 1);
 
         let html = `<div class="info-mayor-header">
             <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref}</span></div>
             <table class="tabla-mayor">
-                <thead><tr><th>FECHA</th><th>EXPLICACIÓN</th><th style="text-align:center;">ASIENTO</th><th>DÉBITO</th><th>CRÉDITO</th><th>SALDO</th></tr></thead><tbody>`;
+                <thead><tr><th>FECHA</th><th style="text-align:center;">ASIENTO</th><th>EXPLICACIÓN</th><th>DÉBITO</th><th>CRÉDITO</th><th>SALDO</th></tr></thead><tbody>`;
 
         let saldo = 0;
         movs.forEach(m => {
             saldo += (m.debito - m.credito);
+            const numAsiento = mapaCorr[m.asiento_id] || "S/N"; // CORRECCIÓN DEFINITIVA
             html += `<tr>
-                <td>${m.fecha}</td><td>${m.descripcion}</td>
-                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${mapaCorr[m.asiento_id]}</td>
-                <td>${m.debito.toFixed(2)}</td><td>${m.credito.toFixed(2)}</td>
+                <td>${m.fecha}</td>
+                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
+                <td>${m.descripcion}</td>
+                <td>${m.debito.toFixed(2)}</td>
+                <td>${m.credito.toFixed(2)}</td>
                 <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
             </tr>`;
         });

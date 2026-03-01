@@ -600,16 +600,7 @@ async function ejecutarCierre() {
         }
     }
 }
-    // --- FUNCIONES DE CIERRE Y PERIODOS ---
-function abrirModalCierre() {
-    // Aquí podrías crear un div modal dinámico o usar uno existente
-    const fechaFin = prompt("Introduce el nombre del periodo a cerrar (Ej: FEBRERO 2026):");
-    if (fechaFin) {
-        const confirmar = confirm(`¿Estás seguro de asignar el periodo "${fechaFin}"?\n\nEsto archivará los movimientos actuales.`);
-        if (confirmar) {
-            ejecutarCierreOficial(fechaFin);
-        }
-    }
+
     async function ejecutarCierreOficial(nombrePeriodo) {
     try {
         // 1. Guardamos el periodo en la base de datos (tabla empresa)

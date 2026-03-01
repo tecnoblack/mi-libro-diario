@@ -654,6 +654,19 @@ function cambiarSubVistaHistorial(tipo) {
         // Aquí llamarías a una función similar a generarMayor() pero con datos históricos
     }
 }
+    <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:30px; border-radius:12px; width:90%; max-width:400px; text-align:center;">
+        <h3 style="color:var(--azul-pro);">Nuevo Periodo Contable</h3>
+        <p>Escribe el nombre del periodo (Ej: MARZO 2026)</p>
+        <input type="text" id="nuevo-periodo-nombre" placeholder="MARZO 2026" style="width:100%; padding:12px; margin-bottom:20px; border:1px solid #ccc; border-radius:6px; text-transform:uppercase;">
+        <div style="display:flex; gap:10px;">
+            <button class="btn-regresar" onclick="cerrarModalPeriodo()" style="flex:1; margin-bottom:0;">Cancelar</button>
+            <button class="btn-accion-azul" onclick="procesarAsignacionPeriodo()" style="flex:1;">Asignar</button>
+        </div>
+    </div>
+</div>
+        }
+    }
 </script>
 </body>
 </html>

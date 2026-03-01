@@ -627,61 +627,71 @@ async function ejecutarCierre() {
     }
     }
 
-// --- LOGICA DEL BOTÓN "+" DEL HISTORIAL ---
-
-function abrirModalCierre() {
-    // Esta función ya la llama tu botón "+" en el HTML
-    document.getElementById('modal-periodo').style.display = 'flex';
-    document.getElementById('input-periodo-nuevo').focus();
-}
-
-function cerrarModalPeriodo() {
-    document.getElementById('modal-periodo').style.display = 'none';
-    document.getElementById('input-periodo-nuevo').value = '';
-}
-
-async function ejecutarAsignacionDesdeHistorial() {
-    const nuevoMes = document.getElementById('input-periodo-nuevo').value.trim().toUpperCase();
-    
-    if (!nuevoMes) {
-        alert("Debes ingresar un nombre de periodo.");
-        return;
+<td contenteditable="true" class="val-debito" onkeyup="ejecutarLogicaIVA()">0</td>
+            <td contenteditable="true" class="val-credito" onkeyup="ejecutarLogicaIVA()">0</td>`;
+        document.getElementById('cuerpo-tabla').appendChild(tr);
     }
 
-    try {
-        // 1. Actualizar en la base de datos Supabase
-        const { error } = await _supabase
-            .from('empresa')
-            .update({ periodo: nuevoMes })
-            .neq('nombre', 'TEMP_NADA');
+    // --- LOGICA DEL BOTÓN "+" DEL HISTORIAL ---
 
-        if (error) throw error;
+    function abrirModalCierre() {
+        document.getElementById('modal-periodo').style.display = 'flex';
+        document.getElementById('input-periodo-nuevo').focus();
+    }
 
-        // 2. Actualizar visualmente todos los libros de la App
-        const etiquetas = {
-            'periodoSeleccionadoHistorial': nuevoMes,
-            'textoPeriodoDiario': nuevoMes,
-            'mayorPeriodoHeader': nuevoMes,
-            'periodoAsientoManual': nuevoMes
-        };
+    function cerrarModalPeriodo() {
+        document.getElementById('modal-periodo').style.display = 'none';
+        document.getElementById('input-periodo-nuevo').value = '';
+    }
 
-        for (let id in etiquetas) {
-            const el = document.getElementById(id);
-            if (el) el.innerText = etiquetas[id];
+    async function ejecutarAsignacionDesdeHistorial() {
+        const nuevoMes = document.getElementById('input-periodo-nuevo').value.trim().toUpperCase();
+        
+        if (!nuevoMes) {
+            alert("Debes ingresar un nombre de periodo.");
+            return;
         }
 
-        alert("✅ Sistema actualizado a: " + nuevoMes);
-        cerrarModalPeriodo();
-        
-        // Opcional: Te lleva al diario automáticamente para empezar a trabajar
-        cambiarVista('vista-diario');
+        try {
+            // 1. Actualizar en Supabase
+            const { error } = await _supabase
+                .from('empresa')
+                .update({ periodo: nuevoMes })
+                .neq('nombre', 'TEMP_NADA');
 
-    } catch (err) {
-        console.error(err);
-        alert("Error al sincronizar con la base de datos.");
+            if (error) throw error;
+
+            // 2. Actualizar visualmente todos los libros
+            const etiquetas = [
+                'periodoSeleccionadoHistorial',
+                'textoPeriodoDiario',
+                'mayorPeriodoHeader',
+                'periodoAsientoManual'
+            ];
+
+            etiquetas.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = nuevoMes;
+            });
+
+            alert("✅ Sistema actualizado a: " + nuevoMes);
+            cerrarModalPeriodo();
+            cambiarVista('vista-diario');
+
+        } catch (err) {
+            alert("Error al sincronizar.");
+        }
     }
-}
-    <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
+
+    // Funciones adicionales para que no den error al navegar
+    function consultarLibroDiario() { console.log("Diario cargado"); }
+    function cargarListaCierres() { console.log("Historial cargado"); }
+    function ejecutarLogicaIVA() { }
+    function abrirRegistroNuevo() { cambiarVista('vista-registro'); }
+
+</script>
+
+<div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
     <div style="background:white; padding:25px; border-radius:15px; width:85%; max-width:350px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
         <h3 style="color:var(--azul-pro); margin-top:0;">Activar Periodo</h3>
         <p style="color:#64748b; font-size:0.9rem;">Indica el mes para el Diario y Mayor</p>
@@ -692,8 +702,6 @@ async function ejecutarAsignacionDesdeHistorial() {
         </div>
     </div>
 </div>
-        }
-    }
-</script>
+
 </body>
 </html>

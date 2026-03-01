@@ -164,25 +164,42 @@
             <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
         </div>
     </div>
-<div id="vista-historial-detalle" class="seccion-vista">
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Volver al Menú</button>
-        <h2 id="tituloHistorial" style="text-align:center; color:var(--azul-pro);">HISTORIAL: FEBRERO 2026</h2>
-        
-        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-            <button class="btn-accion-azul" onclick="verSubSeccion('historial-diario')" style="flex:1;">Ver Libro Diario</button>
-            <button class="btn-accion-azul" onclick="verSubSeccion('historial-mayor')" style="flex:1;">Ver Libro Mayor</button>
-        </div>
-
-        <div id="historial-diario" class="sub-seccion-historial">
-            <div id="tabla-historial-diario">Cargando datos históricos...</div>
-        </div>
-
-        <div id="historial-mayor" class="sub-seccion-historial" style="display:none;">
-            <div id="tabla-historial-mayor">Cargando datos históricos...</div>
+<div id="vista-historial" class="seccion-vista">
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Volver al Menú</button>
+            <h2 style="text-align:center; color:var(--azul-pro);">📁 ARCHIVO DE CIERRES</h2>
+            <p style="text-align:center; color:#64748b;">Selecciona un periodo para consultar sus libros.</p>
+            
+            <div id="lista-meses-historial" style="display: grid; gap: 15px; margin-top: 20px;">
+                <div style="background:white; padding:20px; border-radius:10px; border-left:5px solid var(--azul-pro); display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 5px rgba(0,0,0,0.05); cursor:pointer;" onclick="verDetallePeriodo('FEBRERO 2026')">
+                    <span style="font-weight:bold;">📅 FEBRERO 2026</span>
+                    <span style="color:var(--azul-pro); font-size:0.8rem;">Ver registros →</span>
+                </div>
+            </div>
         </div>
     </div>
-</div>
+
+    <div id="vista-historial-detalle" class="seccion-vista">
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-historial')">← Volver a la lista</button>
+            <h2 id="tituloHistorialMes" style="text-align:center; color:var(--azul-pro); text-transform:uppercase;">HISTORIAL</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('diario')" style="flex:1;">📖 Libro Diario</button>
+                <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('mayor')" style="flex:1; background-color:#64748b;">🏦 Libro Mayor</button>
+            </div>
+
+            <div id="cont-historial-diario">
+                <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">REGISTROS DEL LIBRO DIARIO</div>
+                <div id="tabla-historial-diario"></div>
+            </div>
+
+            <div id="cont-historial-mayor" style="display:none;">
+                <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">MOVIMIENTOS DEL LIBRO MAYOR</div>
+                <div id="tabla-historial-mayor"></div>
+            </div>
+        </div>
+    </div>
     
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>

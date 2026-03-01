@@ -94,7 +94,13 @@
                 <h1 id="empresaNombre" contenteditable="true" onblur="guardarDatosEmpresa()">COMERCIAL A B C, C.A.</h1>
                 <p>RIF: <span id="empresaRif" contenteditable="true" onblur="guardarDatosEmpresa()">J-00000000-0</span></p>
                 <p><b>LIBRO DIARIO</b></p>
-                <div class="linea-periodo">PERÍODO: <span id="periodoActualHeader" contenteditable="true" onblur="guardarDatosEmpresa()">FEBRERO 2026</span></div>
+<div class="contenedor-periodo" style="background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:20px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <span style="font-size: 0.75rem; color: #64748b; font-weight: bold; text-transform: uppercase; display: block;">Período Contable Activo:</span>
+        <h3 id="textoPeriodoActual" style="margin:0; color:var(--azul-oscuro);">Seleccione periodo con el botón (+)</h3>
+    </div>
+    <button onclick="abrirModalCierre()" title="Nuevo Periodo" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:45px; height:45px; cursor:pointer; font-size:24px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display:flex; align-items:center; justify-content:center;">+</button>
+</div>
             </div>
             <div style="margin-bottom: 15px;">
                 <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
@@ -113,7 +119,7 @@
                 <h1 id="mayorEmpresaNombre">COMERCIAL A B C, C.A.</h1>
                 <p>RIF: <span id="mayorEmpresaRif">J-00000000-0</span></p>
                 <p><b>LIBRO MAYOR</b></p>
-                <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">FEBRERO 2026</span></div>
+                <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">Esperando selección...</span></div>
             </div>
             <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
                 <select id="select-cuenta-mayor" style="padding:12px; width:100%; max-width:300px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
@@ -155,7 +161,24 @@
             <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
         </div>
     </div>
-
+<div id="modalCierre" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:3000; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
+    <div style="background:white; padding:30px; border-radius:15px; max-width:400px; width:90%; box-shadow: 0 20px 25px rgba(0,0,0,0.2);">
+        <h3 style="margin-top:0; color:var(--azul-pro);">Nuevo Período Contable</h3>
+        <div style="margin-bottom:15px;">
+            <label style="display:block; font-weight:bold; margin-bottom:5px;">Desde:</label>
+            <input type="date" id="cierreDesde" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div style="margin-bottom:25px;">
+            <label style="display:block; font-weight:bold; margin-bottom:5px;">Hasta:</label>
+            <input type="date" id="cierreHasta" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-accion-azul" onclick="ejecutarCierre()" style="flex:2;">Confirmar y Archivar</button>
+            <button onclick="cerrarModalCierre()" style="flex:1; background:#f1f5f9; color:#475569; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Cancelar</button>
+        </div>
+    </div>
+</div>
+    
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 

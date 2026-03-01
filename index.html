@@ -627,31 +627,58 @@ async function ejecutarCierre() {
     }
     }
 
-// --- FUNCIONES DEL HISTORIAL ---
-function cargarListaCierres() {
-    console.log("Cargando historial...");
-    // Aquí podrías hacer un select a una tabla de 'cierres'
-    // Por ahora el HTML ya tiene un ejemplo de FEBRERO 2026
+// --- LOGICA DEL BOTÓN "+" DEL HISTORIAL ---
+
+function abrirModalCierre() {
+    // Esta función ya la llama tu botón "+" en el HTML
+    document.getElementById('modal-periodo').style.display = 'flex';
+    document.getElementById('input-periodo-nuevo').focus();
 }
 
-function verDetallePeriodo(mes) {
-    document.getElementById('tituloHistorialMes').innerText = "HISTORIAL: " + mes;
-    cambiarVista('vista-historial-detalle');
-    // Por defecto mostramos el diario
-    cambiarSubVistaHistorial('diario');
+function cerrarModalPeriodo() {
+    document.getElementById('modal-periodo').style.display = 'none';
+    document.getElementById('input-periodo-nuevo').value = '';
 }
 
-function cambiarSubVistaHistorial(tipo) {
-    const contDiario = document.getElementById('cont-historial-diario');
-    const contMayor = document.getElementById('cont-historial-mayor');
+async function ejecutarAsignacionDesdeHistorial() {
+    const nuevoMes = document.getElementById('input-periodo-nuevo').value.trim().toUpperCase();
     
-    if (tipo === 'diario') {
-        contDiario.style.display = 'block';
-        contMayor.style.display = 'none';
-    } else {
-        contDiario.style.display = 'none';
-        contMayor.style.display = 'block';
-        // Aquí llamarías a una función similar a generarMayor() pero con datos históricos
+    if (!nuevoMes) {
+        alert("Debes ingresar un nombre de periodo.");
+        return;
+    }
+
+    try {
+        // 1. Actualizar en la base de datos Supabase
+        const { error } = await _supabase
+            .from('empresa')
+            .update({ periodo: nuevoMes })
+            .neq('nombre', 'TEMP_NADA');
+
+        if (error) throw error;
+
+        // 2. Actualizar visualmente todos los libros de la App
+        const etiquetas = {
+            'periodoSeleccionadoHistorial': nuevoMes,
+            'textoPeriodoDiario': nuevoMes,
+            'mayorPeriodoHeader': nuevoMes,
+            'periodoAsientoManual': nuevoMes
+        };
+
+        for (let id in etiquetas) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = etiquetas[id];
+        }
+
+        alert("✅ Sistema actualizado a: " + nuevoMes);
+        cerrarModalPeriodo();
+        
+        // Opcional: Te lleva al diario automáticamente para empezar a trabajar
+        cambiarVista('vista-diario');
+
+    } catch (err) {
+        console.error(err);
+        alert("Error al sincronizar con la base de datos.");
     }
 }
     <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

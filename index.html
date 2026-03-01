@@ -164,20 +164,22 @@
             <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()" disabled>Guardar Asiento</button>
         </div>
     </div>
-<div id="modalCierre" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:3000; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
-    <div style="background:white; padding:30px; border-radius:15px; max-width:400px; width:90%; box-shadow: 0 20px 25px rgba(0,0,0,0.2);">
-        <h3 style="margin-top:0; color:var(--azul-pro);">Nuevo Período Contable</h3>
-        <div style="margin-bottom:15px;">
-            <label style="display:block; font-weight:bold; margin-bottom:5px;">Desde:</label>
-            <input type="date" id="cierreDesde" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+<div id="vista-historial-detalle" class="seccion-vista">
+    <div class="contenedor-principal">
+        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Volver al Menú</button>
+        <h2 id="tituloHistorial" style="text-align:center; color:var(--azul-pro);">HISTORIAL: FEBRERO 2026</h2>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="btn-accion-azul" onclick="verSubSeccion('historial-diario')" style="flex:1;">Ver Libro Diario</button>
+            <button class="btn-accion-azul" onclick="verSubSeccion('historial-mayor')" style="flex:1;">Ver Libro Mayor</button>
         </div>
-        <div style="margin-bottom:25px;">
-            <label style="display:block; font-weight:bold; margin-bottom:5px;">Hasta:</label>
-            <input type="date" id="cierreHasta" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+
+        <div id="historial-diario" class="sub-seccion-historial">
+            <div id="tabla-historial-diario">Cargando datos históricos...</div>
         </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn-accion-azul" onclick="ejecutarCierre()" style="flex:2;">Confirmar y Archivar</button>
-            <button onclick="cerrarModalCierre()" style="flex:1; background:#f1f5f9; color:#475569; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Cancelar</button>
+
+        <div id="historial-mayor" class="sub-seccion-historial" style="display:none;">
+            <div id="tabla-historial-mayor">Cargando datos históricos...</div>
         </div>
     </div>
 </div>
@@ -521,6 +523,59 @@ async function generarMayor() {
     // 4. Agregamos la primera fila vacía para empezar a escribir
     agregarFila();
     }
+    // Función para abrir el modal del calendario
+function abrirModalCierre() {
+    document.getElementById('modalCierre').style.display = 'flex';
+}
+
+function cerrarModalCierre() {
+    document.getElementById('modalCierre').style.display = 'none';
+}
+
+// Lógica principal para asignar el periodo
+async function ejecutarCierre() {
+    const desde = document.getElementById('cierreDesde').value;
+    const hasta = document.getElementById('cierreHasta').value;
+
+    if (!desde || !hasta) {
+        alert("Por favor, selecciona ambas fechas.");
+        return;
+    }
+
+    // Formateamos el nombre del periodo (Ej: FEB 2026)
+    const opciones = { month: 'short', year: 'numeric' };
+    const nombrePeriodo = new Date(hasta).toLocaleDateString('es-ES', opciones).toUpperCase();
+
+    // MENSAJE DE SEGURIDAD
+    const confirmar = confirm(`¿Estás seguro de asignar el periodo "${nombrePeriodo}" (${desde} al ${hasta})? \n\nEsto actualizará los encabezados de todo el sistema.`);
+
+    if (confirmar) {
+        try {
+            // 1. Actualizamos la tabla 'empresa' en Supabase para que el cambio sea global
+            const { error } = await _supabase
+                .from('empresa')
+                .update({ periodo: nombrePeriodo })
+                .neq('nombre', 'TEMP_NADA');
+
+            if (error) throw error;
+
+            // 2. Actualizamos la vista de inmediato
+            document.getElementById('textoPeriodoActual').innerText = nombrePeriodo;
+            if(document.getElementById('mayorPeriodoHeader')) {
+                document.getElementById('mayorPeriodoHeader').innerText = nombrePeriodo;
+            }
+
+            alert("Periodo asignado exitosamente.");
+            cerrarModalCierre();
+            
+            // Recargamos para que todos los datos se refresquen desde la base de datos
+            location.reload();
+
+        } catch (err) {
+            alert("Error al guardar: " + err.message);
+        }
+    }
+}
 </script>
 </body>
 </html>

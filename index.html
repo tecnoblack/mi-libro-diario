@@ -285,11 +285,18 @@
     }
 
     function cambiarVista(id) {
-        document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
-        document.getElementById(id).classList.add('activa');
-        if (id === 'vista-diario') {
-            cargarDatosEmpresa();
-            consultarLibroDiario();
+    document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
+    const vista = document.getElementById(id);
+    if (vista) {
+        vista.classList.add('activa');
+    }
+    
+    // Si entramos al diario o al historial, disparamos sus cargas
+    if (id === 'vista-diario') {
+        cargarDatosEmpresa();
+        consultarLibroDiario();
+    } else if (id === 'vista-historial') {
+        cargarListaCierres(); // Esta función hará que aparezcan los meses
         }
     }
 
@@ -591,6 +598,53 @@ async function ejecutarCierre() {
         } catch (err) {
             alert("Error al guardar: " + err.message);
         }
+    }
+}
+    // --- FUNCIONES DE CIERRE Y PERIODOS ---
+function abrirModalCierre() {
+    // Aquí podrías crear un div modal dinámico o usar uno existente
+    const fechaFin = prompt("Introduce el nombre del periodo a cerrar (Ej: FEBRERO 2026):");
+    if (fechaFin) {
+        const confirmar = confirm(`¿Estás seguro de asignar el periodo "${fechaFin}"?\n\nEsto archivará los movimientos actuales.`);
+        if (confirmar) {
+            ejecutarCierreOficial(fechaFin);
+        }
+    }
+}
+
+async function ejecutarCierreOficial(nombrePeriodo) {
+    // Aquí irá la lógica para mover datos en Supabase
+    // Por ahora actualizamos el encabezado
+    await _supabase.from('empresa').update({ periodo: nombrePeriodo }).neq('nombre', 'TEMP_NADA');
+    alert("Periodo actualizado a: " + nombrePeriodo);
+    location.reload();
+}
+
+// --- FUNCIONES DEL HISTORIAL ---
+function cargarListaCierres() {
+    console.log("Cargando historial...");
+    // Aquí podrías hacer un select a una tabla de 'cierres'
+    // Por ahora el HTML ya tiene un ejemplo de FEBRERO 2026
+}
+
+function verDetallePeriodo(mes) {
+    document.getElementById('tituloHistorialMes').innerText = "HISTORIAL: " + mes;
+    cambiarVista('vista-historial-detalle');
+    // Por defecto mostramos el diario
+    cambiarSubVistaHistorial('diario');
+}
+
+function cambiarSubVistaHistorial(tipo) {
+    const contDiario = document.getElementById('cont-historial-diario');
+    const contMayor = document.getElementById('cont-historial-mayor');
+    
+    if (tipo === 'diario') {
+        contDiario.style.display = 'block';
+        contMayor.style.display = 'none';
+    } else {
+        contDiario.style.display = 'none';
+        contMayor.style.display = 'block';
+        // Aquí llamarías a una función similar a generarMayor() pero con datos históricos
     }
 }
 </script>

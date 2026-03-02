@@ -260,22 +260,27 @@
 
     // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
-        const { data } = await _supabase.from('empresa').select('*').limit(1).single();
-        if (data) {
-            // Usamos IDs que SÍ existen en tu HTML
-            if(document.getElementById('empresaNombre')) document.getElementById('empresaNombre').innerText = data.nombre;
-            if(document.getElementById('empresaRif')) document.getElementById('empresaRif').innerText = data.rif;
-            if(document.getElementById('textoPeriodoDiario')) document.getElementById('textoPeriodoDiario').innerText = data.periodo;
-            if(document.getElementById('periodoAsientoManual')) document.getElementById('periodoAsientoManual').innerText = data.periodo;
-            
-            const mNombre = document.getElementById('mayorEmpresaNombre');
-            if(mNombre) {
-                mNombre.innerText = data.nombre;
-                document.getElementById('mayorEmpresaRif').innerText = data.rif;
-                document.getElementById('mayorPeriodoHeader').innerText = data.periodo;
+        try {
+            const { data, error } = await _supabase
+                .from('empresa')
+                .select('*')
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
+                const periodo = data.periodo || 'ENERO 2025';
+                const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerText = periodo;
+                });
             }
+        } catch (err) {
+            console.error("Error al cargar empresa:", err);
         }
-    }
+    } // <-- ESTA LLAVE CIERRA LA FUNCIÓN CORRECTAMENTE
 
     async function guardarDatosEmpresa() {
         const n = document.getElementById('empresaNombre').innerText;

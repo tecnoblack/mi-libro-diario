@@ -233,28 +233,43 @@
     }
 
     async function verificarPerfil(userId) {
-        const currentDevice = getDeviceId();
-        const { data: perfil, error } = await _supabase.from('perfiles').select('*').eq('id', userId).single();
-        
-        if (perfil) {
-            // Control de Dispositivo
-            if (!perfil.last_device_id) {
-                await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
-            } else if (perfil.last_device_id !== currentDevice) {
-                alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
-                await _supabase.auth.signOut();
-                location.reload();
-                return;
-            }
-
-            // Control de Suscripción
-            if (!perfil.suscripcion_activa) {
-                document.getElementById('banner-suscripcion').style.display = 'block';
-                return;
-            }
-            cambiarVista('vista-menu');
-        }
+    const currentDevice = getDeviceId();
+    const { data: perfil, error } = await _supabase
+        .from('perfiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+    
+    if (error) {
+        alert("Error al verificar perfil: " + error.message);
+        return;
     }
+    
+    if (!perfil) {
+        alert("El usuario no tiene perfil. Contacta al administrador.");
+        await _supabase.auth.signOut();
+        return;
+    }
+    
+    // Control de Dispositivo
+    if (!perfil.last_device_id) {
+        await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
+    } else if (perfil.last_device_id !== currentDevice) {
+        alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
+        await _supabase.auth.signOut();
+        location.reload();
+        return;
+    }
+    
+    // Control de Suscripción
+    if (!perfil.suscripcion_activa) {
+        document.getElementById('banner-suscripcion').style.display = 'block';
+        return;
+    }
+    
+    cambiarVista('vista-menu');
+    }
+    
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 

@@ -553,21 +553,23 @@ async function generarMayor() {
             else { alert("Eliminado."); cancelarModoBorrado(); consultarLibroDiario(); }
         }
     }
-    function abrirRegistroNuevo() {
-    // 1. Cambiamos a la vista de formulario
-    cambiarVista('vista-registro');
     
-    // 2. Limpiamos el contenido previo para que no se duplique
-    document.getElementById('cuerpo-tabla').innerHTML = '';
-    document.getElementById('resumenAsiento').value = '';
-    
-    // 3. Reseteamos los totales
-    actualizarTotales();
-    
-    // 4. Agregamos la primera fila vacía para empezar a escribir
-    agregarFila();
+function abrirRegistroNuevo() {
+        // 1. Cambiamos a la vista de formulario
+        cambiarVista('vista-registro');
         
-async function ejecutarAsignacionDesdeHistorial() {
+        // 2. Limpiamos el contenido previo
+        document.getElementById('cuerpo-tabla').innerHTML = '';
+        document.getElementById('resumenAsiento').value = '';
+        
+        // 3. Reseteamos los totales
+        actualizarTotales();
+        
+        // 4. Agregamos la primera fila vacía
+        agregarFila();
+    }
+
+    async function ejecutarAsignacionDesdeHistorial() {
         const nuevoMes = document.getElementById('input-periodo-nuevo').value.trim().toUpperCase();
         if (!nuevoMes) {
             alert("Por favor, ingresa un nombre para el periodo.");
@@ -594,10 +596,6 @@ async function ejecutarAsignacionDesdeHistorial() {
             console.error(err);
             alert("Error al sincronizar.");
         }
-    } 
-
-    function abrirRegistroNuevo() { 
-        cambiarVista('vista-registro'); 
     }
 
 </script>

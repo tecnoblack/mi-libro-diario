@@ -652,7 +652,7 @@ async function cargarConfiguracionInicial() {
 // Ejecutar la carga cuando la página esté lista
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
-    async function cerrarMesActual() {
+async function cerrarMesActual() {
     const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
 
     if (periodo === "---" || !periodo || periodo === "ESPERANDO SELECCIÓN...") {
@@ -660,78 +660,72 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
         return;
     }
 
-    const confirmar = confirm(`¿Estás seguro de cerrar ${periodo}?\n\nEsto archivará los asientos actuales y limpiará el libro para el nuevo mes.`);
-    
-    if (!confirmar) return;
+    if (!confirm(`¿Estás seguro de cerrar ${periodo}? Los asientos se archivarán y el diario quedará en blanco.`)) return;
 
     try {
-        // 1. Guardar el registro del cierre en la tabla histórica
+        // 1. Guardar el registro de cierre
         const { error: errorInsert } = await _supabase
             .from('cierres_historicos')
             .insert([{ 
                 nombre_periodo: periodo, 
-                fecha_cierre: new Date().toISOString().split('T')[0] 
+                fecha_cierre: new Date().toISOString() 
             }]);
-
         if (errorInsert) throw errorInsert;
 
-        // 2. ACTUALIZACIÓN CRUCIAL: "Limpiar" los asientos
-        // En lugar de borrarlos, los marcamos como 'ARCHIVADO' 
-        // para que no salgan en el libro diario actual pero sí existan en la base de datos.
+        // 2. EL PASO QUE FALTA: "Archivar" los asientos para que no salgan en el Diario/Mayor
+        // Cambiamos el nombre del periodo en los asientos para que dejen de coincidir con el actual
         const { error: errorUpdateAsientos } = await _supabase
             .from('asientos')
-            .update({ periodo: 'ARCHIVADO_' + periodo }) // Les cambiamos el nombre del periodo
+            .update({ periodo: 'HISTORIAL_' + periodo }) 
             .eq('periodo', periodo);
-
         if (errorUpdateAsientos) throw errorUpdateAsientos;
 
-        // 3. Resetear el periodo actual en la tabla empresa
+        // 3. Resetear el periodo de la empresa a blanco
         const { error: errorEmpresa } = await _supabase
             .from('empresa')
             .update({ periodo_actual: '---' })
             .eq('id', 1);
-
         if (errorEmpresa) throw errorEmpresa;
 
-        alert("✅ Periodo archivado. El Libro Diario ahora está listo para el nuevo mes.");
+        alert("✅ Mes cerrado. Los libros ahora están en blanco para el nuevo periodo.");
         location.reload(); 
 
     } catch (err) {
-        console.error("Error completo:", err);
-        alert("Hubo un problema: " + err.message);
+        alert("Error en el cierre: " + err.message);
     }
-        }
+}
 
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
     if (!contenedor) return;
+
+    // LIMPIAMOS EL CONTENEDOR ANTES DE CARGAR
+    contenedor.innerHTML = ''; 
 
     const { data, error } = await _supabase
         .from('cierres_historicos')
         .select('*')
         .order('fecha_cierre', { ascending: false });
 
-    if (error) {
-        console.error("Error al cargar historial:", error);
+    if (error || !data.length) {
+        contenedor.innerHTML = "<p style='text-align:center; color:#64748b;'>No hay cierres archivados.</p>";
         return;
     }
 
-    if (data.length === 0) {
-        contenedor.innerHTML = "<p style='text-align:center; color:#64748b;'>No hay cierres archivados aún.</p>";
-        return;
-    }
-
-    // Dibujamos cada cierre en el historial
-    contenedor.innerHTML = data.map(cierre => `
-        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid var(--verde-exito); box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+    // Dibujamos las etiquetas (una por cada cierre real en la base de datos)
+    data.forEach(cierre => {
+        const div = document.createElement('div');
+        div.style = "background: white; padding: 15px; border-radius: 10px; border-left: 5px solid var(--verde-exito); box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;";
+        div.innerHTML = `
             <div>
-                <strong style="display: block; color: var(--azul-pro);">${cierre.nombre_periodo}</strong>
-                <small style="color: #64748b;">Cerrado el: ${cierre.fecha_cierre}</small>
+                <strong style="color: var(--azul-pro);">${cierre.nombre_periodo}</strong>
+                <small style="display:block; color: #64748b;">${new Date(cierre.fecha_cierre).toLocaleDateString()}</small>
             </div>
-            <button onclick="verDetalleCierre('${cierre.nombre_periodo}')" style="background: none; border: 1px solid var(--azul-pro); color: var(--azul-pro); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">Ver Reporte</button>
-        </div>
-    `).join('');
-}
+            <button onclick="verDetalleCierre('${cierre.nombre_periodo}')" style="background: none; border: 1px solid var(--azul-pro); color: var(--azul-pro); padding: 5px 10px; border-radius: 5px; cursor: pointer;">Ver Reporte</button>
+        `;
+        contenedor.appendChild(div);
+    });
+    }
     
         </script>
     

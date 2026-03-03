@@ -162,6 +162,16 @@
     </div>
 
 <div id="vista-historial" class="seccion-vista">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+    <div>
+        <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
+        <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
+    </div>
+    <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s;">
+        <span>🔒</span> Finalizar y Cerrar Mes
+    </button>
+    </div>
+    
     <div class="contenedor-principal">
         <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
         
@@ -613,6 +623,73 @@ async function generarMayor() {
         } catch (err) {
             console.error("Error:", err);
             alert("Error al sincronizar con la tabla empresa: " + err.message);
+        }
+    }
+
+    // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
+async function cargarConfiguracionInicial() {
+    try {
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('periodo_actual')
+            .eq('id', 1)
+            .single();
+
+        if (data && data.periodo_actual) {
+            // Esto actualiza los textos de la interfaz automáticamente
+            const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
+            IDs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = data.periodo_actual;
+            });
+            console.log("Periodo cargado:", data.periodo_actual);
+        }
+    } catch (err) {
+        console.error("Error al cargar configuración:", err);
+    }
+}
+
+// Ejecutar la carga cuando la página esté lista
+document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
+
+    async function cerrarMesActual() {
+        // Obtenemos el nombre del periodo que está en la pantalla
+        const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
+
+        if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
+            alert("⚠️ No hay un periodo activo para cerrar.");
+            return;
+        }
+
+        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?\n\nSe guardará en el historial y se limpiará el periodo actual.`);
+        
+        if (!confirmar) return;
+
+        try {
+            // 1. Guardar en la tabla Cierres históricos
+            const { error: errorInsert } = await _supabase
+                .from('Cierres históricos')
+                .insert([{ 
+                    periodo: periodo, 
+                    fecha_cierre: new Date().toISOString().split('T')[0] 
+                }]);
+
+            if (errorInsert) throw errorInsert;
+
+            // 2. Limpiar el periodo en la tabla empresa
+            const { error: errorEmpresa } = await _supabase
+                .from('empresa')
+                .update({ periodo_actual: '---' })
+                .eq('id', 1);
+
+            if (errorEmpresa) throw errorEmpresa;
+
+            alert("✅ ¡Periodo cerrado correctamente!");
+            location.reload(); // Recarga para ver los cambios
+
+        } catch (err) {
+            console.error("Error:", err);
+            alert("Hubo un problema: " + err.message);
         }
     }
 

@@ -653,46 +653,86 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
     async function cerrarMesActual() {
-        // 1. Obtenemos el mes que está en la pantalla
-        const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
+    const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
 
-        if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
-            alert("⚠️ No hay un periodo activo para cerrar.");
-            return;
-        }
-
-        if (!confirm(`¿Estás seguro de cerrar el mes ${periodo}?`)) return;
-
-        try {
-            // 2. Insertar usando los nombres EXACTOS de tus columnas
-            const { error: errorInsert } = await _supabase
-                .from('cierres_historicos')
-                .insert([
-                    { 
-                        nombre_periodo: periodo, // Cambiado de 'periodo' a 'nombre_periodo'
-                        fecha_cierre: new Date().toISOString().split('T')[0] 
-                        // id se genera solo y usuario_id puede quedar nulo por ahora
-                    }
-                ]);
-
-            if (errorInsert) throw errorInsert;
-
-            // 3. Limpiar el periodo en la tabla empresa
-            const { error: errorEmpresa } = await _supabase
-                .from('empresa')
-                .update({ periodo_actual: '---' })
-                .eq('id', 1);
-
-            if (errorEmpresa) throw errorEmpresa;
-
-            alert("✅ ¡Cierre guardado con éxito en el historial!");
-            location.reload(); 
-
-        } catch (err) {
-            console.error("Error detallado:", err);
-            alert("Hubo un problema: " + err.message);
-        }
+    if (periodo === "---" || !periodo || periodo === "ESPERANDO SELECCIÓN...") {
+        alert("⚠️ No hay un periodo activo para cerrar.");
+        return;
     }
+
+    const confirmar = confirm(`¿Estás seguro de cerrar ${periodo}?\n\nEsto archivará los asientos actuales y limpiará el libro para el nuevo mes.`);
+    
+    if (!confirmar) return;
+
+    try {
+        // 1. Guardar el registro del cierre en la tabla histórica
+        const { error: errorInsert } = await _supabase
+            .from('cierres_historicos')
+            .insert([{ 
+                nombre_periodo: periodo, 
+                fecha_cierre: new Date().toISOString().split('T')[0] 
+            }]);
+
+        if (errorInsert) throw errorInsert;
+
+        // 2. ACTUALIZACIÓN CRUCIAL: "Limpiar" los asientos
+        // En lugar de borrarlos, los marcamos como 'ARCHIVADO' 
+        // para que no salgan en el libro diario actual pero sí existan en la base de datos.
+        const { error: errorUpdateAsientos } = await _supabase
+            .from('asientos')
+            .update({ periodo: 'ARCHIVADO_' + periodo }) // Les cambiamos el nombre del periodo
+            .eq('periodo', periodo);
+
+        if (errorUpdateAsientos) throw errorUpdateAsientos;
+
+        // 3. Resetear el periodo actual en la tabla empresa
+        const { error: errorEmpresa } = await _supabase
+            .from('empresa')
+            .update({ periodo_actual: '---' })
+            .eq('id', 1);
+
+        if (errorEmpresa) throw errorEmpresa;
+
+        alert("✅ Periodo archivado. El Libro Diario ahora está listo para el nuevo mes.");
+        location.reload(); 
+
+    } catch (err) {
+        console.error("Error completo:", err);
+        alert("Hubo un problema: " + err.message);
+    }
+        }
+
+async function cargarListaCierres() {
+    const contenedor = document.getElementById('lista-meses-historial');
+    if (!contenedor) return;
+
+    const { data, error } = await _supabase
+        .from('cierres_historicos')
+        .select('*')
+        .order('fecha_cierre', { ascending: false });
+
+    if (error) {
+        console.error("Error al cargar historial:", error);
+        return;
+    }
+
+    if (data.length === 0) {
+        contenedor.innerHTML = "<p style='text-align:center; color:#64748b;'>No hay cierres archivados aún.</p>";
+        return;
+    }
+
+    // Dibujamos cada cierre en el historial
+    contenedor.innerHTML = data.map(cierre => `
+        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid var(--verde-exito); box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong style="display: block; color: var(--azul-pro);">${cierre.nombre_periodo}</strong>
+                <small style="color: #64748b;">Cerrado el: ${cierre.fecha_cierre}</small>
+            </div>
+            <button onclick="verDetalleCierre('${cierre.nombre_periodo}')" style="background: none; border: 1px solid var(--azul-pro); color: var(--azul-pro); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">Ver Reporte</button>
+        </div>
+    `).join('');
+}
+    
         </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

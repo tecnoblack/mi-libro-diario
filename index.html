@@ -554,27 +554,33 @@ async function generarMayor() {
         }
     }
     
-// 1. FUNCIÓN PARA EL BOTÓN (+) - AHORA SÍ CONECTADA
+// 1. FUNCIÓN PARA ABRIR EL MODAL (Botón +)
     function abrirModalCierre() {
-        document.getElementById('modal-periodo').style.display = 'flex';
+        const modal = document.getElementById('modal-periodo');
+        if (modal) modal.style.display = 'flex';
     }
 
-    // 2. FUNCIÓN PARA EL BOTÓN CANCELAR
+    // 2. FUNCIÓN PARA CERRAR EL MODAL (Botón Cancelar)
     function cerrarModalPeriodo() {
-        document.getElementById('modal-periodo').style.display = 'none';
-        document.getElementById('input-periodo-nuevo').value = '';
+        const modal = document.getElementById('modal-periodo');
+        if (modal) {
+            modal.style.display = 'none';
+            document.getElementById('input-periodo-nuevo').value = '';
+        }
     }
 
-    // 3. FUNCIÓN PARA ABRIR REGISTRO NUEVO
+    // 3. FUNCIÓN PARA REGISTRO NUEVO
     function abrirRegistroNuevo() {
         cambiarVista('vista-registro');
-        document.getElementById('cuerpo-tabla').innerHTML = '';
-        document.getElementById('resumenAsiento').value = '';
+        const cuerpo = document.getElementById('cuerpo-tabla');
+        if (cuerpo) cuerpo.innerHTML = '';
+        const resumen = document.getElementById('resumenAsiento');
+        if (resumen) resumen.value = '';
         actualizarTotales();
         agregarFila();
     }
 
-    // 4. FUNCIÓN PARA ASIGNAR (EL BOTÓN QUE ACTUALIZA EL MES)
+    // 4. FUNCIÓN PARA ASIGNAR MES
     async function ejecutarAsignacionDesdeHistorial() {
         const input = document.getElementById('input-periodo-nuevo');
         const nuevoMes = input.value.trim().toUpperCase();
@@ -603,8 +609,8 @@ async function generarMayor() {
             cambiarVista('vista-diario');
 
         } catch (err) {
-            console.error("Error completo:", err);
-            alert("Error al sincronizar: " + (err.message || "Problema de conexión"));
+            console.error("Error:", err);
+            alert("Error al sincronizar.");
         }
     }
 

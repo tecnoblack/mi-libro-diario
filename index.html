@@ -591,29 +591,45 @@ async function generarMayor() {
         }
 
         try {
-            const { error } = await _supabase
+            // Intentamos una actualización más directa
+            // Nota: .neq('nombre', 'TEMP_NADA') asegura que afecte a la fila activa
+            const { data, error } = await _supabase
                 .from('empresa')
                 .update({ periodo: nuevoMes })
-                .neq('nombre', 'TEMP_NADA');
+                .not('nombre', 'is', null); // Intenta actualizar cualquier fila que tenga nombre
 
-            if (error) throw error;
+            if (error) {
+                console.error("Error de Supabase:", error);
+                throw error;
+            }
 
-            const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
+            // Si llegamos aquí, la base de datos aceptó el cambio
+            // Ahora actualizamos visualmente todos los lugares
+            const IDs = [
+                'periodoSeleccionadoHistorial', 
+                'textoPeriodoDiario', 
+                'mayorPeriodoHeader', 
+                'periodoAsientoManual'
+            ];
+            
             IDs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = nuevoMes;
             });
 
-            alert("✅ Sistema actualizado a: " + nuevoMes);
+            alert("✅ ¡Éxito! Periodo actualizado a: " + nuevoMes);
             cerrarModalPeriodo();
+            
+            // Refrescar la vista actual para ver cambios
             cambiarVista('vista-diario');
 
         } catch (err) {
-            console.error("Error:", err);
-            alert("Error al sincronizar.");
+            console.error("Detalle del error:", err);
+            // Esto nos dirá qué pasó exactamente en la consola
+            alert("Error al sincronizar: " + (err.message || "Verifica la conexión a la base de datos"));
         }
     }
-
+    
 </script>
 
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

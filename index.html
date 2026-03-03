@@ -591,20 +591,15 @@ async function generarMayor() {
         }
 
         try {
-            // Intentamos una actualización más directa
-            // Nota: .neq('nombre', 'TEMP_NADA') asegura que afecte a la fila activa
-            const { data, error } = await _supabase
+            // ACTUALIZADO: Ahora usa 'periodo_actual' como me indicaste
+            const { error } = await _supabase
                 .from('empresa')
-                .update({ periodo: nuevoMes })
-                .not('nombre', 'is', null); // Intenta actualizar cualquier fila que tenga nombre
+                .update({ periodo_actual: nuevoMes }) // <--- Cambio aquí
+                .not('nombre', 'is', null); 
 
-            if (error) {
-                console.error("Error de Supabase:", error);
-                throw error;
-            }
+            if (error) throw error;
 
-            // Si llegamos aquí, la base de datos aceptó el cambio
-            // Ahora actualizamos visualmente todos los lugares
+            // Actualizamos los textos en la pantalla para que veas el cambio
             const IDs = [
                 'periodoSeleccionadoHistorial', 
                 'textoPeriodoDiario', 
@@ -617,16 +612,15 @@ async function generarMayor() {
                 if (el) el.innerText = nuevoMes;
             });
 
-            alert("✅ ¡Éxito! Periodo actualizado a: " + nuevoMes);
+            alert("✅ ¡Perfecto! Periodo actualizado a: " + nuevoMes);
             cerrarModalPeriodo();
             
-            // Refrescar la vista actual para ver cambios
+            // Te lleva a la vista del diario para empezar a trabajar
             cambiarVista('vista-diario');
 
         } catch (err) {
-            console.error("Detalle del error:", err);
-            // Esto nos dirá qué pasó exactamente en la consola
-            alert("Error al sincronizar: " + (err.message || "Verifica la conexión a la base de datos"));
+            console.error("Detalle técnico:", err);
+            alert("Error al sincronizar: " + (err.message || "Asegúrate de que la columna se llame periodo_actual"));
         }
     }
     

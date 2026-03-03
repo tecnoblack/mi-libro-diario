@@ -617,48 +617,6 @@ async function generarMayor() {
     }
 
     <script>
-        
-    // 1. PRIMERO: La configuración de Supabase (URL y KEY)
-    const _supabase = supabase.createClient('TU_URL', 'TU_KEY');
-
-    // 2. SEGUNDO: El código de Carga Inicial
-    // Este código busca el periodo en la base de datos apenas abre la página
-    async function cargarConfiguracionInicial() {
-        try {
-            const { data, error } = await _supabase
-                .from('empresa')
-                .select('periodo_actual')
-                .eq('id', 1)
-                .single();
-
-            if (data && data.periodo_actual) {
-                const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
-                IDs.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerText = data.periodo_actual;
-                });
-            }
-        } catch (err) {
-            console.error("Error al cargar:", err);
-        }
-    }
-
-    // 3. TERCERO: Ordenar que se ejecute la carga
-    document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
-
-    // 4. CUARTO: Tus funciones de siempre (login, registrar, etc.)
-    // ... aquí van tus funciones viejas ...
-
-    // 5. QUINTO: Las funciones de Asignar y Cerrar
-    async function ejecutarAsignacionDesdeHistorial() { 
-        // El código que ya te funcionó 
-    }
-
-    async function cerrarMesActual() {
-        // El código de cierre que te pasé antes
-    }
-    
-    </script>
 
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
     <div style="background:white; padding:25px; border-radius:15px; width:85%; max-width:350px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">

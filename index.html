@@ -653,6 +653,7 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
     async function cerrarMesActual() {
+        // 1. Obtenemos el mes que está en la pantalla
         const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
 
         if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
@@ -660,26 +661,23 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
             return;
         }
 
-        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?`);
-        
-        if (!confirmar) return;
+        if (!confirm(`¿Estás seguro de cerrar el mes ${periodo}?`)) return;
 
         try {
-            // 1. Guardar en la tabla con el nombre corregido (sin espacios ni tildes)
+            // 2. Insertar usando los nombres EXACTOS de tus columnas
             const { error: errorInsert } = await _supabase
-                .from('cierres_historicos') // <-- Nombre nuevo
-                .insert([{ 
-                    periodo: periodo, 
-                    fecha_cierre: new Date().toISOString().split('T')[0] 
-                }]);
+                .from('cierres_historicos')
+                .insert([
+                    { 
+                        nombre_periodo: periodo, // Cambiado de 'periodo' a 'nombre_periodo'
+                        fecha_cierre: new Date().toISOString().split('T')[0] 
+                        // id se genera solo y usuario_id puede quedar nulo por ahora
+                    }
+                ]);
 
-            if (errorInsert) {
-                // Si el error persiste, intentamos avisar qué pasó
-                console.error("Error al insertar:", errorInsert);
-                throw new Error("No se pudo guardar en el historial: " + errorInsert.message);
-            }
+            if (errorInsert) throw errorInsert;
 
-            // 2. Limpiar el periodo en la tabla empresa
+            // 3. Limpiar el periodo en la tabla empresa
             const { error: errorEmpresa } = await _supabase
                 .from('empresa')
                 .update({ periodo_actual: '---' })
@@ -687,11 +685,11 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
             if (errorEmpresa) throw errorEmpresa;
 
-            alert("✅ ¡Periodo cerrado y archivado correctamente!");
+            alert("✅ ¡Cierre guardado con éxito en el historial!");
             location.reload(); 
 
         } catch (err) {
-            console.error("Detalle del error:", err);
+            console.error("Error detallado:", err);
             alert("Hubo un problema: " + err.message);
         }
     }

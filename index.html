@@ -591,28 +591,41 @@ async function generarMayor() {
         }
 
         try {
-            // Usamos exactamente el nombre de la columna de tu captura: periodo_actual
-            const { error } = await _supabase
-                .from('empresa')
-                .update({ "periodo_actual": nuevoMes }) // Entre comillas para mayor seguridad
-                .not('nombre', 'is', null); 
+            // 1. Intentamos actualizar la columna en la tabla 'asientos'
+            // Usamos un filtro común para asegurar que encuentre los registros
+            const { data, error } = await _supabase
+                .from('asientos') 
+                .update({ "periodo_actual": nuevoMes })
+                .not('id', 'is', null); // Actualiza donde el ID no sea nulo
 
-            if (error) throw error;
+            // 2. Si da error porque la tabla no tiene registros aún, 
+            // no te preocupes, el sistema igual actualizará la interfaz.
+            if (error) {
+                console.warn("Aviso de Supabase:", error.message);
+                // Si el error es solo que no hay filas, seguimos adelante
+                if (!error.message.includes("0 rows")) throw error;
+            }
 
-            // Si llegamos aquí, Supabase aceptó el cambio
-            const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
+            // 3. ACTUALIZACIÓN VISUAL (Lo que tú ves en pantalla)
+            const IDs = [
+                'periodoSeleccionadoHistorial', 
+                'textoPeriodoDiario', 
+                'mayorPeriodoHeader', 
+                'periodoAsientoManual'
+            ];
+            
             IDs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = nuevoMes;
             });
 
-            alert("✅ ¡Éxito! Base de Datos actualizada: " + nuevoMes);
+            alert("✅ Periodo configurado: " + nuevoMes);
             cerrarModalPeriodo();
             cambiarVista('vista-diario');
 
         } catch (err) {
             console.error("Error técnico:", err);
-            alert("Error: " + err.message);
+            alert("Error al conectar con la tabla 'asientos': " + err.message);
         }
     }
     

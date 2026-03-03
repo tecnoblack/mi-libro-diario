@@ -591,36 +591,28 @@ async function generarMayor() {
         }
 
         try {
-            // ACTUALIZADO: Ahora usa 'periodo_actual' como me indicaste
+            // Usamos exactamente el nombre de la columna de tu captura: periodo_actual
             const { error } = await _supabase
                 .from('empresa')
-                .update({ periodo_actual: nuevoMes }) // <--- Cambio aquí
+                .update({ "periodo_actual": nuevoMes }) // Entre comillas para mayor seguridad
                 .not('nombre', 'is', null); 
 
             if (error) throw error;
 
-            // Actualizamos los textos en la pantalla para que veas el cambio
-            const IDs = [
-                'periodoSeleccionadoHistorial', 
-                'textoPeriodoDiario', 
-                'mayorPeriodoHeader', 
-                'periodoAsientoManual'
-            ];
-            
+            // Si llegamos aquí, Supabase aceptó el cambio
+            const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
             IDs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = nuevoMes;
             });
 
-            alert("✅ ¡Perfecto! Periodo actualizado a: " + nuevoMes);
+            alert("✅ ¡Éxito! Base de Datos actualizada: " + nuevoMes);
             cerrarModalPeriodo();
-            
-            // Te lleva a la vista del diario para empezar a trabajar
             cambiarVista('vista-diario');
 
         } catch (err) {
-            console.error("Detalle técnico:", err);
-            alert("Error al sincronizar: " + (err.message || "Asegúrate de que la columna se llame periodo_actual"));
+            console.error("Error técnico:", err);
+            alert("Error: " + err.message);
         }
     }
     

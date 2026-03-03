@@ -653,7 +653,6 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
     async function cerrarMesActual() {
-        // Obtenemos el nombre del periodo que está en la pantalla
         const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
 
         if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
@@ -661,20 +660,24 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
             return;
         }
 
-        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?\n\nSe guardará en el historial y se limpiará el periodo actual.`);
+        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?`);
         
         if (!confirmar) return;
 
         try {
-            // 1. Guardar en la tabla Cierres históricos
+            // 1. Guardar en la tabla con el nombre corregido (sin espacios ni tildes)
             const { error: errorInsert } = await _supabase
-                .from('Cierres históricos')
+                .from('cierres_historicos') // <-- Nombre nuevo
                 .insert([{ 
                     periodo: periodo, 
                     fecha_cierre: new Date().toISOString().split('T')[0] 
                 }]);
 
-            if (errorInsert) throw errorInsert;
+            if (errorInsert) {
+                // Si el error persiste, intentamos avisar qué pasó
+                console.error("Error al insertar:", errorInsert);
+                throw new Error("No se pudo guardar en el historial: " + errorInsert.message);
+            }
 
             // 2. Limpiar el periodo en la tabla empresa
             const { error: errorEmpresa } = await _supabase
@@ -684,15 +687,14 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
             if (errorEmpresa) throw errorEmpresa;
 
-            alert("✅ ¡Periodo cerrado correctamente!");
-            location.reload(); // Recarga para ver los cambios
+            alert("✅ ¡Periodo cerrado y archivado correctamente!");
+            location.reload(); 
 
         } catch (err) {
-            console.error("Error:", err);
+            console.error("Detalle del error:", err);
             alert("Hubo un problema: " + err.message);
         }
     }
-
         </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

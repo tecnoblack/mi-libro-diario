@@ -554,7 +554,18 @@ async function generarMayor() {
         }
     }
     
-// 1. FUNCIÓN PARA ABRIR EL FORMULARIO DE REGISTRO
+// 1. FUNCIÓN PARA EL BOTÓN (+) - AHORA SÍ CONECTADA
+    function abrirModalCierre() {
+        document.getElementById('modal-periodo').style.display = 'flex';
+    }
+
+    // 2. FUNCIÓN PARA EL BOTÓN CANCELAR
+    function cerrarModalPeriodo() {
+        document.getElementById('modal-periodo').style.display = 'none';
+        document.getElementById('input-periodo-nuevo').value = '';
+    }
+
+    // 3. FUNCIÓN PARA ABRIR REGISTRO NUEVO
     function abrirRegistroNuevo() {
         cambiarVista('vista-registro');
         document.getElementById('cuerpo-tabla').innerHTML = '';
@@ -563,17 +574,7 @@ async function generarMayor() {
         agregarFila();
     }
 
-    // 2. FUNCIONES PARA EL MODAL DE PERIODO
-    function abrirModalCierre() {
-        document.getElementById('modal-periodo').style.display = 'flex';
-    }
-
-    function cerrarModalPeriodo() {
-        document.getElementById('modal-periodo').style.display = 'none';
-        document.getElementById('input-periodo-nuevo').value = '';
-    }
-
-    // 3. FUNCIÓN PARA ASIGNAR EL NUEVO MES (EL BOTÓN ASIGNAR)
+    // 4. FUNCIÓN PARA ASIGNAR (EL BOTÓN QUE ACTUALIZA EL MES)
     async function ejecutarAsignacionDesdeHistorial() {
         const input = document.getElementById('input-periodo-nuevo');
         const nuevoMes = input.value.trim().toUpperCase();
@@ -584,15 +585,13 @@ async function generarMayor() {
         }
 
         try {
-            // Actualizamos en la base de datos de Supabase
             const { error } = await _supabase
                 .from('empresa')
                 .update({ periodo: nuevoMes })
-                .neq('nombre', 'TEMP_NADA'); // Filtro de seguridad
+                .neq('nombre', 'TEMP_NADA');
 
             if (error) throw error;
 
-            // Actualizamos todos los textos de la interfaz
             const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
             IDs.forEach(id => {
                 const el = document.getElementById(id);

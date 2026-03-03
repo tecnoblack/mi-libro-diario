@@ -554,35 +554,45 @@ async function generarMayor() {
         }
     }
     
-function abrirRegistroNuevo() {
-        // 1. Cambiamos a la vista de formulario
+// 1. FUNCIÓN PARA ABRIR EL FORMULARIO DE REGISTRO
+    function abrirRegistroNuevo() {
         cambiarVista('vista-registro');
-        
-        // 2. Limpiamos el contenido previo
         document.getElementById('cuerpo-tabla').innerHTML = '';
         document.getElementById('resumenAsiento').value = '';
-        
-        // 3. Reseteamos los totales
         actualizarTotales();
-        
-        // 4. Agregamos la primera fila vacía
         agregarFila();
     }
 
+    // 2. FUNCIONES PARA EL MODAL DE PERIODO
+    function abrirModalCierre() {
+        document.getElementById('modal-periodo').style.display = 'flex';
+    }
+
+    function cerrarModalPeriodo() {
+        document.getElementById('modal-periodo').style.display = 'none';
+        document.getElementById('input-periodo-nuevo').value = '';
+    }
+
+    // 3. FUNCIÓN PARA ASIGNAR EL NUEVO MES (EL BOTÓN ASIGNAR)
     async function ejecutarAsignacionDesdeHistorial() {
-        const nuevoMes = document.getElementById('input-periodo-nuevo').value.trim().toUpperCase();
+        const input = document.getElementById('input-periodo-nuevo');
+        const nuevoMes = input.value.trim().toUpperCase();
+
         if (!nuevoMes) {
             alert("Por favor, ingresa un nombre para el periodo.");
             return;
         }
+
         try {
+            // Actualizamos en la base de datos de Supabase
             const { error } = await _supabase
                 .from('empresa')
                 .update({ periodo: nuevoMes })
-                .neq('nombre', 'TEMP_NADA');
+                .neq('nombre', 'TEMP_NADA'); // Filtro de seguridad
 
             if (error) throw error;
 
+            // Actualizamos todos los textos de la interfaz
             const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
             IDs.forEach(id => {
                 const el = document.getElementById(id);
@@ -592,20 +602,11 @@ function abrirRegistroNuevo() {
             alert("✅ Sistema actualizado a: " + nuevoMes);
             cerrarModalPeriodo();
             cambiarVista('vista-diario');
+
         } catch (err) {
-            console.error(err);
-            alert("Error al sincronizar.");
+            console.error("Error completo:", err);
+            alert("Error al sincronizar: " + (err.message || "Problema de conexión"));
         }
-    }
-
-    // --- FUNCIONES PARA EL MODAL DE PERIODO ---
-    function abrirModalCierre() {
-        document.getElementById('modal-periodo').style.display = 'flex';
-    }
-
-    function cerrarModalPeriodo() {
-        document.getElementById('modal-periodo').style.display = 'none';
-        document.getElementById('input-periodo-nuevo').value = '';
     }
 
 </script>

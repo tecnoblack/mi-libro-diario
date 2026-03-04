@@ -805,7 +805,9 @@ async function cargarRegistros() {
             if (contenedorMayor) contenedorMayor.innerHTML = '';
 
             if (!data || data.length === 0) {
-                if (cuerpoDiario) cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay registros en este periodo.</td></tr>';
+                if (cuerpoDiario) {
+                    cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">📭 Hoja en blanco. No hay registros en este periodo.</td></tr>';
+                }
                 return;
             }
 
@@ -815,7 +817,7 @@ async function cargarRegistros() {
         } catch (err) {
             console.error("Error al sincronizar libros:", err);
         }
-    } // AQUÍ CIERRA LA FUNCIÓN CORRECTAMENTE
+    } 
     
         </script>
     

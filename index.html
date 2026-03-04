@@ -653,47 +653,55 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
+        const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
 
-    if (periodo === "---" || !periodo || periodo === "ESPERANDO SELECCIÓN...") {
-        alert("⚠️ No hay un periodo activo para cerrar.");
-        return;
-    }
+        if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
+            alert("⚠️ No hay un periodo activo para cerrar.");
+            return;
+        }
 
-    if (!confirm(`¿Estás seguro de cerrar ${periodo}? Los asientos se archivarán y el diario quedará en blanco.`)) return;
+        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?`);
+        if (!confirmar) return;
 
-    try {
-        // 1. Guardar el registro de cierre
-        const { error: errorInsert } = await _supabase
-            .from('cierres_historicos')
-            .insert([{ 
-                nombre_periodo: periodo, 
-                fecha_cierre: new Date().toISOString() 
-            }]);
-        if (errorInsert) throw errorInsert;
+        try {
+            // 1. Guardar en el historial
+            const { error: errorInsert } = await _supabase
+                .from('cierres_historicos')
+                .insert([{ 
+                    nombre_periodo: periodo, 
+                    fecha_cierre: new Date().toISOString().split('T')[0] 
+                }]);
+            if (errorInsert) throw errorInsert;
 
-        // 2. EL PASO QUE FALTA: "Archivar" los asientos para que no salgan en el Diario/Mayor
-        // Cambiamos el nombre del periodo en los asientos para que dejen de coincidir con el actual
-        const { error: errorUpdateAsientos } = await _supabase
-            .from('asientos')
-            .update({ periodo: 'HISTORIAL_' + periodo }) 
-            .eq('periodo', periodo);
-        if (errorUpdateAsientos) throw errorUpdateAsientos;
+            // 2. "Archivar" los asientos para que dejen de salir en el diario actual
+            const { error: errorUpdateAsientos } = await _supabase
+                .from('asientos')
+                .update({ periodo: 'ARCHIVADO_' + periodo })
+                .eq('periodo', periodo);
+            if (errorUpdateAsientos) throw errorUpdateAsientos;
 
-        // 3. Resetear el periodo de la empresa a blanco
-        const { error: errorEmpresa } = await _supabase
-            .from('empresa')
-            .update({ periodo_actual: '---' })
-            .eq('id', 1);
-        if (errorEmpresa) throw errorEmpresa;
+            // 3. Limpiar el periodo en la tabla empresa
+            const { error: errorEmpresa } = await _supabase
+                .from('empresa')
+                .update({ periodo_actual: '---' })
+                .eq('id', 1);
+            if (errorEmpresa) throw errorEmpresa;
 
-        alert("✅ Mes cerrado. Los libros ahora están en blanco para el nuevo periodo.");
-        location.reload(); 
+            // --- AQUÍ VA TU CÓDIGO NUEVO (Línea 655 aprox.) ---
+            
+            document.getElementById('textoPeriodoDiario').innerText = "---";
+            document.getElementById('mayorPeriodoHeader').innerText = "---";
+            document.getElementById('periodoSeleccionadoHistorial').innerText = "---";
 
-    } catch (err) {
-        alert("Error en el cierre: " + err.message);
-    }
-}
+            alert("✅ Periodo cerrado. Las hojas han sido limpiadas.");
+            
+            location.reload(); 
+
+        } catch (err) {
+            console.error("Error:", err);
+            alert("Hubo un problema: " + err.message);
+        }
+        }
 
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

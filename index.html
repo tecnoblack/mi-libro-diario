@@ -71,8 +71,8 @@
     
     <input type="password" id="password" class="input-login" placeholder="Contraseña">
     
-    <button class="btn-login" onclick="login()" style="margin-top: 20px;">
-        Entrar
+    <button class="btn-login" onclick="iniciarSesion()">
+    Entrar
     </button>
     
     <p style="margin-top: 25px; font-size: 0.85rem; color: #94a3b8;">
@@ -244,45 +244,35 @@
         alert("Error al conectar con el servidor. Recarga la página.");
     }
 
-    async function login() {
+async function iniciarSesion() {
     try {
-        const campoPass = document.getElementById('password');
-        const campoEmail = document.getElementById('email-login');
+        // 1. Capturamos los datos
+        const email = document.getElementById('email-login').value;
+        const pass = document.getElementById('password').value;
 
-        if (!campoPass) {
-            alert("Error técnico: No se encuentra el campo de contraseña en el HTML.");
-            return;
-        }
+        console.log("Intentando entrar..."); // Esto te ayudará a ver que el botón sí funciona
 
-        const pass = campoPass.value;
-        // El email lo capturamos pero, para no bloquearte, 
-        // entraremos solo con la contraseña por ahora
-        const email = campoEmail ? campoEmail.value : "";
-
-        // Cambia '1234' por tu contraseña real si es distinta
+        // 2. Tu seguridad (Cámbiala por tu clave real si no es 1234)
         if (pass === '1234') { 
-            // 1. Ocultar login
+            // 3. Si es correcta, entramos
             document.getElementById('vista-login').style.display = 'none';
             
-            // 2. Mostrar la interfaz principal (Diario)
             const vistaDiario = document.getElementById('vista-diario');
-            if (vistaDiario) {
-                vistaDiario.classList.add('activa');
-            }
+            if (vistaDiario) vistaDiario.classList.add('activa');
+
+            // Cargamos tus datos de Supabase
+            await cargarDatosEmpresa();
+            await cargarRegistros();
             
-            // 3. Cargar los datos de la base de datos
-            if (typeof cargarDatosEmpresa === 'function') await cargarDatosEmpresa();
-            if (typeof cargarRegistros === 'function') await cargarRegistros();
-            
-            alert("¡Bienvenido al Sistema!");
+            alert("✅ Acceso concedido. Bienvenido.");
         } else {
-            alert("Contraseña incorrecta");
+            alert("❌ Contraseña incorrecta");
         }
     } catch (error) {
-        console.error("Error en el proceso de login:", error);
-        alert("Error crítico al intentar entrar: " + error.message);
+        console.error("Error al iniciar sesión:", error);
+        alert("Error técnico: Revisa que todos los campos existan.");
     }
-    }
+}
 
     async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();

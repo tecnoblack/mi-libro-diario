@@ -788,7 +788,9 @@ async function cargarListaCierres() {
 
 async function cargarRegistros() {
         const pElement = document.getElementById('textoPeriodoDiario');
-        if (!pElement) return;
+        // Si no existe el elemento, no intentamos leerlo para evitar errores
+        if (!pElement) return; 
+        
         const periodoActual = pElement.innerText;
 
         try {
@@ -808,18 +810,19 @@ async function cargarRegistros() {
 
             if (!data || data.length === 0) {
                 if (cuerpoDiario) {
-                    cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">📭 Hoja en blanco. No hay registros en este periodo.</td></tr>';
+                    cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">📭 Hoja en blanco. No hay registros.</td></tr>';
                 }
                 return;
             }
 
+            // Llamamos a las funciones de mostrar datos si existen
             if (typeof mostrarAsientosEnTabla === 'function') mostrarAsientosEnTabla(data);
             if (typeof generarMayor === 'function') generarMayor(); 
 
         } catch (err) {
             console.error("Error al sincronizar libros:", err);
         }
-    } 
+    } // <--- ESTA LLAVE CIERRA cargarRegistros
 
 </script>
     

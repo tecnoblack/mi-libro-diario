@@ -63,11 +63,19 @@
 
     <div id="vista-login" class="seccion-vista activa">
         <div class="contenedor-login" id="vista-login">
-    <h2>Sistema Contable</h2>
-    <p>Ingresa la contraseña maestra</p>
-    <input type="password" id="password" class="input-login" placeholder="Contraseña">
+    <div style="font-size: 50px; margin-bottom: 20px;">🏢</div>
+    <h2 style="margin-bottom: 10px; color: var(--azul-pro);">Sistema Contable</h2>
+    <p style="color: #64748b; margin-bottom: 30px;">Ingresa la contraseña maestra para acceder al libro diario y mayor</p>
     
-    <button class="btn-login" onclick="iniciarSesion()">Entrar</button>
+    <input type="password" id="password" class="input-login" placeholder="Contraseña de acceso">
+    
+    <button class="btn-login" onclick="login()">
+        Entrar al Sistema
+    </button>
+    
+    <p style="margin-top: 25px; font-size: 0.85rem; color: #94a3b8;">
+        © 2024 TechSoluciones Contables - Acceso Privado
+    </p>
         </div>
 
     <div id="vista-menu" class="seccion-vista">

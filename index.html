@@ -248,50 +248,47 @@ async function iniciarSesion() {
     try {
         const pass = document.getElementById('password').value;
         
-        // 1. Validación de seguridad local (tu clave)
         if (pass !== '1234') { 
             alert("❌ Contraseña incorrecta");
             return;
         }
 
-        // 2. Consultar suscripción en Supabase
-        // Traemos la fecha de vencimiento de la tabla 'empresa'
         const { data, error } = await _supabase
             .from('empresa')
             .select('fecha_vencimiento')
-            .single(); // Asumimos que hay un solo registro de empresa
+            .single();
 
         if (error) {
-            console.error("Error al verificar suscripción:", error);
-            alert("Error al conectar con el servidor de licencias.");
-            return;
+            console.error("Error suscripción:", error);
+            alert("Conectado a Supabase, pero no se halló fecha de vencimiento.");
+            // Permitimos entrar para que no te quedes fuera mientras pruebas
+        } else {
+            const hoy = new Date();
+            const vencimiento = new Date(data.fecha_vencimiento);
+            if (hoy > vencimiento) {
+                alert("⚠️ Suscripción vencida: " + data.fecha_vencimiento);
+                return; 
+            }
         }
 
-        // 3. Comparar fechas
-        const hoy = new Date();
-        const fechaVencimiento = new Date(data.fecha_vencimiento);
-
-        // Si la fecha de hoy es mayor a la de vencimiento...
-        if (hoy > fechaVencimiento) {
-            alert("⚠️ Su suscripción ha vencido el: " + data.fecha_vencimiento + "\nPor favor, contacte al administrador para renovar.");
-            // Lo mantenemos en el login o lo devolvemos
-            document.getElementById('vista-login').style.display = 'block';
-            return; 
-        }
-
-        // 4. Si todo está bien, entra al sistema
+        // --- LA CLAVE PARA QUE FUNCIONE ---
+        // 1. Ocultar login
         document.getElementById('vista-login').style.display = 'none';
-        document.querySelectorAll('.seccion-vista').forEach(s => s.classList.remove('activa'));
-        document.getElementById('vista-diario').classList.add('activa');
+        document.getElementById('vista-login').classList.remove('activa');
+
+        // 2. Mostrar el MENÚ (vista-menu), no el diario directamente
+        const vistaMenu = document.getElementById('vista-menu');
+        if (vistaMenu) {
+            vistaMenu.style.display = 'block';
+            vistaMenu.classList.add('activa');
+        }
 
         await cargarDatosEmpresa();
-        await cargarRegistros();
-        
-        alert("✅ Acceso concedido. Suscripción activa.");
+        alert("✅ Acceso concedido.");
 
     } catch (err) {
         console.error("Error crítico:", err);
-        alert("Ocurrió un error inesperado al iniciar sesión.");
+        alert("Error al iniciar sesión. Revisa la consola (F12).");
     }
 }
 
@@ -338,28 +335,29 @@ async function iniciarSesion() {
 
     // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
-        try {
-            const { data, error } = await _supabase
-                .from('empresa')
-                .select('*')
-                .single();
+    try {
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('*')
+            .single();
 
-            if (error) throw error;
-
-            if (data) {
-                document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
-                const periodo = data.periodo || 'ENERO 2025';
-                const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
-                ids.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerText = periodo;
-                });
-            }
-        } catch (err) {
-            console.error("Error al cargar empresa:", err);
+        if (data) {
+            // Solo actualizamos los IDs que SÍ existen en tu HTML
+            const periodo = data.periodo_actual || 'SIN PERIODO';
+            const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = periodo;
+            });
+            
+            // Actualizamos los nombres de la empresa en las tablas
+            if(document.getElementById('empresaNombre')) document.getElementById('empresaNombre').innerText = data.nombre;
+            if(document.getElementById('mayorEmpresaNombre')) document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
         }
-    } // <-- ESTA LLAVE CIERRA LA FUNCIÓN CORRECTAMENTE
-
+    } catch (err) {
+        console.error("Error carga empresa:", err);
+    }
+    }
     async function guardarDatosEmpresa() {
         const n = document.getElementById('empresaNombre').innerText;
         const r = document.getElementById('empresaRif').innerText;

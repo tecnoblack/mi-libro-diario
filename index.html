@@ -315,19 +315,36 @@
     }
 
     function cambiarVista(id) {
-    document.querySelectorAll('.seccion-vista').forEach(v => v.classList.remove('activa'));
-    const vista = document.getElementById(id);
-    if (vista) {
-        vista.classList.add('activa');
-    }
+    // 1. Ocultar todas las secciones
+    document.querySelectorAll('.seccion-vista').forEach(s => s.classList.remove('activa'));
     
-    // Si entramos al diario o al historial, disparamos sus cargas
-    if (id === 'vista-diario') {
-        cargarDatosEmpresa();
-        consultarLibroDiario();
-    } else if (id === 'vista-historial') {
-        cargarListaCierres(); // Esta función hará que aparezcan los meses
+    // 2. Mostrar la sección seleccionada
+    const vistaDestino = document.getElementById(id);
+    if (vistaDestino) {
+        vistaDestino.classList.add('activa');
+    }
+
+    // 3. Ocultar el menú lateral (móvil)
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.remove('active');
+    }
+
+    // --- NUEVO: Cargar datos automáticamente al entrar al Diario o Mayor ---
+    if (id === 'vista-diario' || id === 'vista-mayor') {
+        // Esta función se encarga de que si el mes está cerrado ("---"), 
+        // la hoja se vea en blanco automáticamente.
+        if (typeof cargarRegistros === 'function') {
+            cargarRegistros();
         }
+    }
+
+    // Si entramos al historial, cargamos la lista de meses cerrados
+    if (id === 'vista-historial') {
+        if (typeof cargarListaCierres === 'function') {
+            cargarListaCierres();
+        }
+    }
     }
 
     async function asignarRefInteligente(elemento) {

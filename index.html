@@ -246,31 +246,52 @@
 
 async function iniciarSesion() {
     try {
-        // 1. Capturamos los datos
-        const email = document.getElementById('email-login').value;
         const pass = document.getElementById('password').value;
-
-        console.log("Intentando entrar..."); // Esto te ayudará a ver que el botón sí funciona
-
-        // 2. Tu seguridad (Cámbiala por tu clave real si no es 1234)
-        if (pass === '1234') { 
-            // 3. Si es correcta, entramos
-            document.getElementById('vista-login').style.display = 'none';
-            
-            const vistaDiario = document.getElementById('vista-diario');
-            if (vistaDiario) vistaDiario.classList.add('activa');
-
-            // Cargamos tus datos de Supabase
-            await cargarDatosEmpresa();
-            await cargarRegistros();
-            
-            alert("✅ Acceso concedido. Bienvenido.");
-        } else {
+        
+        // 1. Validación de seguridad local (tu clave)
+        if (pass !== '1234') { 
             alert("❌ Contraseña incorrecta");
+            return;
         }
-    } catch (error) {
-        console.error("Error al iniciar sesión:", error);
-        alert("Error técnico: Revisa que todos los campos existan.");
+
+        // 2. Consultar suscripción en Supabase
+        // Traemos la fecha de vencimiento de la tabla 'empresa'
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('fecha_vencimiento')
+            .single(); // Asumimos que hay un solo registro de empresa
+
+        if (error) {
+            console.error("Error al verificar suscripción:", error);
+            alert("Error al conectar con el servidor de licencias.");
+            return;
+        }
+
+        // 3. Comparar fechas
+        const hoy = new Date();
+        const fechaVencimiento = new Date(data.fecha_vencimiento);
+
+        // Si la fecha de hoy es mayor a la de vencimiento...
+        if (hoy > fechaVencimiento) {
+            alert("⚠️ Su suscripción ha vencido el: " + data.fecha_vencimiento + "\nPor favor, contacte al administrador para renovar.");
+            // Lo mantenemos en el login o lo devolvemos
+            document.getElementById('vista-login').style.display = 'block';
+            return; 
+        }
+
+        // 4. Si todo está bien, entra al sistema
+        document.getElementById('vista-login').style.display = 'none';
+        document.querySelectorAll('.seccion-vista').forEach(s => s.classList.remove('activa'));
+        document.getElementById('vista-diario').classList.add('activa');
+
+        await cargarDatosEmpresa();
+        await cargarRegistros();
+        
+        alert("✅ Acceso concedido. Suscripción activa.");
+
+    } catch (err) {
+        console.error("Error crítico:", err);
+        alert("Ocurrió un error inesperado al iniciar sesión.");
     }
 }
 

@@ -511,84 +511,82 @@
     }
 
 async function generarMayor() {
-    const cuentaSel = document.getElementById('select-cuenta-mayor').value;
-    const divRes = document.getElementById('resultado-mayor');
-    
-    // 1. LIMPIEZA INICIAL: Si no hay cuenta seleccionada o el mes cambió, vaciamos
-    if (!cuentaSel) {
-        divRes.innerHTML = "";
-        return;
-    }
-
-    // OBTENEMOS EL PERIODO ACTIVO DE LA PANTALLA (Para filtrar y que no salgan meses viejos)
-    const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
-
-    // 2. Obtener los movimientos de la cuenta FILTRADOS POR PERIODO
-    const { data: movs, error } = await _supabase
-        .from('asientos')
-        .select('*')
-        .eq('cuenta', cuentaSel)
-        .eq('periodo', periodoActual) // <--- ESTE ES EL FILTRO DE SEGURIDAD
-        .order('fecha', { ascending: true });
-
-    if (error || !movs?.length) { 
-        divRes.innerHTML = "<p style='text-align:center; padding:20px; color:#64748b;'>Sin datos para esta cuenta en el periodo seleccionado.</p>"; 
-        return; 
-    }
-
-    // 3. Crear el mapa para que el Asiento sea #1, #2, etc. (Solo del periodo actual)
-    const { data: todos } = await _supabase
-        .from('asientos')
-        .select('asiento_id')
-        .eq('periodo', periodoActual) // También filtramos aquí para la numeración
-        .order('asiento_id', { ascending: true });
-
-    const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
-    const mapaCorr = {}; 
-    idsUnicos.forEach((id, i) => { if (id) mapaCorr[id] = i + 1; });
-
-    // 4. Construir la tabla
-    let html = `<div class="info-mayor-header">
-        <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
-        <table class="tabla-mayor">
-            <thead>
-                <tr>
-                    <th>FECHA</th>
-                    <th>EXPLICACIÓN</th>
-                    <th style="text-align:center;">ASIENTO</th>
-                    <th>DÉBITO</th>
-                    <th>CRÉDITO</th>
-                    <th>SALDO</th>
-                </tr>
-            </thead>
-            <tbody>`;
-
-    let saldo = 0;
-    movs.forEach(m => {
-        // Aseguramos que use debito/credito o debe/haber según tu tabla
-        const d = parseFloat(m.debito || m.debe || 0);
-        const c = parseFloat(m.credito || m.haber || 0);
+        const cuentaSel = document.getElementById('select-cuenta-mayor').value;
+        const divRes = document.getElementById('resultado-mayor');
         
-        saldo += (d - c);
-        const numAsiento = mapaCorr[m.asiento_id] || "S/N";
+        if (!cuentaSel) {
+            if (divRes) divRes.innerHTML = "";
+            return;
+        }
 
-        html += `<tr>
-            <td>${m.fecha}</td>
-            <td>${m.descripcion}</td>
-            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-            <td>${d.toFixed(2)}</td>
-            <td>${c.toFixed(2)}</td>
-            <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
-        </tr>`;
-    });
+        // Detectamos el periodo para filtrar
+        const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
 
-    const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
-    html += `</tbody></table><div style="text-align:right; margin-top:15px; font-weight:bold;">
-        SALDO: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipo}</span>
-    </div></div>`;
-    
-    divRes.innerHTML = html;
-    }
+        try {
+            const { data: movs, error } = await _supabase
+                .from('asientos')
+                .select('*')
+                .eq('cuenta', cuentaSel)
+                .eq('periodo', periodoActual)
+                .order('fecha', { ascending: true });
+
+            if (error || !movs?.length) { 
+                divRes.innerHTML = "<p style='text-align:center; padding:20px; color:#64748b;'>Sin datos para esta cuenta en el periodo actual.</p>"; 
+                return; 
+            }
+
+            const { data: todos } = await _supabase
+                .from('asientos')
+                .select('asiento_id')
+                .eq('periodo', periodoActual)
+                .order('asiento_id', { ascending: true });
+
+            const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
+            const mapaCorr = {}; 
+            idsUnicos.forEach((id, i) => { if (id) mapaCorr[id] = i + 1; });
+
+            let html = `<div class="info-mayor-header">
+                <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
+                <table class="tabla-mayor">
+                    <thead>
+                        <tr>
+                            <th>FECHA</th>
+                            <th>EXPLICACIÓN</th>
+                            <th style="text-align:center;">ASIENTO</th>
+                            <th>DÉBITO</th>
+                            <th>CRÉDITO</th>
+                            <th>SALDO</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            let saldo = 0;
+            movs.forEach(m => {
+                const d = parseFloat(m.debito || m.debe || 0);
+                const c = parseFloat(m.credito || m.haber || 0);
+                saldo += (d - c);
+                const numAsiento = mapaCorr[m.asiento_id] || "S/N";
+
+                html += `<tr>
+                    <td>${m.fecha}</td>
+                    <td>${m.descripcion}</td>
+                    <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
+                    <td>${d.toFixed(2)}</td>
+                    <td>${c.toFixed(2)}</td>
+                    <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
+                </tr>`;
+            });
+
+            const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
+            html += `</tbody></table><div style="text-align:right; margin-top:15px; font-weight:bold;">
+                SALDO: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipo}</span>
+            </div></div>`;
+            
+            divRes.innerHTML = html;
+        } catch (e) {
+            console.error("Error en Mayor:", e);
+        }
+    } // <--- VERIFICA QUE ESTA LLAVE ESTÉ AQUÍ PARA CERRAR LA FUNCIÓN
 
     // Funciones de Borrado
     function activarModoBorrado() {

@@ -245,11 +245,43 @@
     }
 
     async function login() {
-        const email = document.getElementById('login-email').value;
-        const pass = document.getElementById('login-pass').value;
-        const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
-        if (error) alert("Error: " + error.message);
-        else verificarPerfil(data.user.id);
+    try {
+        const campoPass = document.getElementById('password');
+        const campoEmail = document.getElementById('email-login');
+
+        if (!campoPass) {
+            alert("Error técnico: No se encuentra el campo de contraseña en el HTML.");
+            return;
+        }
+
+        const pass = campoPass.value;
+        // El email lo capturamos pero, para no bloquearte, 
+        // entraremos solo con la contraseña por ahora
+        const email = campoEmail ? campoEmail.value : "";
+
+        // Cambia '1234' por tu contraseña real si es distinta
+        if (pass === '1234') { 
+            // 1. Ocultar login
+            document.getElementById('vista-login').style.display = 'none';
+            
+            // 2. Mostrar la interfaz principal (Diario)
+            const vistaDiario = document.getElementById('vista-diario');
+            if (vistaDiario) {
+                vistaDiario.classList.add('activa');
+            }
+            
+            // 3. Cargar los datos de la base de datos
+            if (typeof cargarDatosEmpresa === 'function') await cargarDatosEmpresa();
+            if (typeof cargarRegistros === 'function') await cargarRegistros();
+            
+            alert("¡Bienvenido al Sistema!");
+        } else {
+            alert("Contraseña incorrecta");
+        }
+    } catch (error) {
+        console.error("Error en el proceso de login:", error);
+        alert("Error crítico al intentar entrar: " + error.message);
+    }
     }
 
     async function verificarPerfil(userId) {

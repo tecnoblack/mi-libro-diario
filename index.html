@@ -751,6 +751,53 @@ async function cargarListaCierres() {
         contenedor.appendChild(div);
     });
     }
+
+async function cargarRegistros() {
+    // 1. Obtenemos el periodo que dice la etiqueta azul de la parte superior
+    const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
+
+    try {
+        // 2. Consultamos solo los asientos de ese periodo
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoActual)
+            .order('fecha', { ascending: true });
+
+        if (error) throw error;
+
+        // 3. Limpiamos las tablas visualmente
+        const cuerpoDiario = document.getElementById('cuerpo-diario');
+        const contenedorMayor = document.getElementById('contenedor-cuentas-mayor');
+        
+        if (cuerpoDiario) cuerpoDiario.innerHTML = '';
+        if (contenedorMayor) contenedorMayor.innerHTML = '';
+
+        // 4. Si el periodo es "---" o no hay datos, mostramos la hoja en blanco
+        if (!data || data.length === 0) {
+            if (cuerpoDiario) {
+                cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">📭 Hoja en blanco. Seleccione un periodo activo.</td></tr>';
+            }
+            if (contenedorMayor) {
+                contenedorMayor.innerHTML = '<p style="text-align:center; padding:20px; color:#64748b;">No hay movimientos para el Mayor.</p>';
+            }
+            return;
+        }
+
+        // 5. Si hay datos, llamamos a tus funciones de dibujo actuales
+        // (Nota: Asegúrate que estas funciones existan en tu código)
+        if (typeof mostrarAsientosEnTabla === 'function') {
+            mostrarAsientosEnTabla(data);
+        }
+        
+        if (typeof generarMayor === 'function') {
+            generarMayor(data);
+        }
+
+    } catch (err) {
+        console.error("Error al sincronizar libros:", err);
+    }
+    }
     
         </script>
     

@@ -59,27 +59,6 @@
 </head>
 <body>
 
-    <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
-
-    <div id="vista-login" class="seccion-vista activa">
-        <div class="contenedor-login" id="vista-login">
-    <div style="font-size: 50px; margin-bottom: 20px;">🏢</div>
-    <h2 style="margin-bottom: 10px; color: var(--azul-pro);">Sistema Contable</h2>
-    <p style="color: #64748b; margin-bottom: 30px;">Ingresa tus credenciales para acceder</p>
-    
-    <input type="email" id="email-login" class="input-login" placeholder="Gmail" style="margin-bottom: 15px;">
-    
-    <input type="password" id="password" class="input-login" placeholder="Contraseña">
-    
-    <button class="btn-login" onclick="iniciarSesion()">
-    Entrar
-    </button>
-    
-    <p style="margin-top: 25px; font-size: 0.85rem; color: #94a3b8;">
-        © 2024 TechSoluciones Contables - Acceso Privado
-    </p>
-        </div>
-
     <div id="vista-menu" class="seccion-vista">
         <div style="text-align: right; padding: 10px;">
             <button onclick="cerrarSesion()" style="border:none; background:none; color:red; cursor:pointer;">Cerrar Sesión ✕</button>
@@ -243,54 +222,6 @@
     } catch (e) {
         alert("Error al conectar con el servidor. Recarga la página.");
     }
-
-async function iniciarSesion() {
-    try {
-        const pass = document.getElementById('password').value;
-        
-        if (pass !== '1234') { 
-            alert("❌ Contraseña incorrecta");
-            return;
-        }
-
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('fecha_vencimiento')
-            .single();
-
-        if (error) {
-            console.error("Error suscripción:", error);
-            alert("Conectado a Supabase, pero no se halló fecha de vencimiento.");
-            // Permitimos entrar para que no te quedes fuera mientras pruebas
-        } else {
-            const hoy = new Date();
-            const vencimiento = new Date(data.fecha_vencimiento);
-            if (hoy > vencimiento) {
-                alert("⚠️ Suscripción vencida: " + data.fecha_vencimiento);
-                return; 
-            }
-        }
-
-        // --- LA CLAVE PARA QUE FUNCIONE ---
-        // 1. Ocultar login
-        document.getElementById('vista-login').style.display = 'none';
-        document.getElementById('vista-login').classList.remove('activa');
-
-        // 2. Mostrar el MENÚ (vista-menu), no el diario directamente
-        const vistaMenu = document.getElementById('vista-menu');
-        if (vistaMenu) {
-            vistaMenu.style.display = 'block';
-            vistaMenu.classList.add('activa');
-        }
-
-        await cargarDatosEmpresa();
-        alert("✅ Acceso concedido.");
-
-    } catch (err) {
-        console.error("Error crítico:", err);
-        alert("Error al iniciar sesión. Revisa la consola (F12).");
-    }
-}
 
     async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();

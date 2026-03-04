@@ -65,12 +65,14 @@
         <div class="contenedor-login" id="vista-login">
     <div style="font-size: 50px; margin-bottom: 20px;">🏢</div>
     <h2 style="margin-bottom: 10px; color: var(--azul-pro);">Sistema Contable</h2>
-    <p style="color: #64748b; margin-bottom: 30px;">Ingresa la contraseña maestra para acceder al libro diario y mayor</p>
+    <p style="color: #64748b; margin-bottom: 30px;">Ingresa tus credenciales para acceder</p>
     
-    <input type="password" id="password" class="input-login" placeholder="Contraseña de acceso">
+    <input type="email" id="email-login" class="input-login" placeholder="Gmail" style="margin-bottom: 15px;">
     
-    <button class="btn-login" onclick="login()">
-        Entrar al Sistema
+    <input type="password" id="password" class="input-login" placeholder="Contraseña">
+    
+    <button class="btn-login" onclick="login()" style="margin-top: 20px;">
+        Entrar
     </button>
     
     <p style="margin-top: 25px; font-size: 0.85rem; color: #94a3b8;">

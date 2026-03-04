@@ -62,13 +62,13 @@
     <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
 
     <div id="vista-login" class="seccion-vista activa">
-        <div class="contenedor-login">
-            <h2 style="color: var(--azul-pro);">ACCESO AL SISTEMA</h2>
-            <input type="email" id="login-email" class="input-login" placeholder="Correo Electrónico">
-            <input type="password" id="login-pass" class="input-login" placeholder="Contraseña">
-            <button class="btn-accion-azul" style="width: 100%; padding: 15px; margin-top: 10px;" onclick="iniciarSesion()">Entrar</button>
+        <div class="contenedor-login" id="vista-login">
+    <h2>Sistema Contable</h2>
+    <p>Ingresa la contraseña maestra</p>
+    <input type="password" id="password" class="input-login" placeholder="Contraseña">
+    
+    <button class="btn-login" onclick="iniciarSesion()">Entrar</button>
         </div>
-    </div>
 
     <div id="vista-menu" class="seccion-vista">
         <div style="text-align: right; padding: 10px;">
@@ -234,7 +234,7 @@
         alert("Error al conectar con el servidor. Recarga la página.");
     }
 
-    async function iniciarSesion() {
+    async function login() {
         const email = document.getElementById('login-email').value;
         const pass = document.getElementById('login-pass').value;
         const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });

@@ -59,6 +59,17 @@
 </head>
 <body>
 
+    <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
+
+    <div id="vista-login" class="seccion-vista activa">
+        <div class="contenedor-login">
+            <h2 style="color: var(--azul-pro);">ACCESO AL SISTEMA</h2>
+            <input type="email" id="login-email" class="input-login" placeholder="Correo Electrónico">
+            <input type="password" id="login-pass" class="input-login" placeholder="Contraseña">
+            <button class="btn-accion-azul" style="width: 100%; padding: 15px; margin-top: 10px;" onclick="iniciarSesion()">Entrar</button>
+        </div>
+    </div>
+
     <div id="vista-menu" class="seccion-vista">
         <div style="text-align: right; padding: 10px;">
             <button onclick="cerrarSesion()" style="border:none; background:none; color:red; cursor:pointer;">Cerrar Sesión ✕</button>
@@ -223,6 +234,14 @@
         alert("Error al conectar con el servidor. Recarga la página.");
     }
 
+    async function iniciarSesion() {
+        const email = document.getElementById('login-email').value;
+        const pass = document.getElementById('login-pass').value;
+        const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) alert("Error: " + error.message);
+        else verificarPerfil(data.user.id);
+    }
+
     async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
     const { data: perfil, error } = await _supabase
@@ -266,29 +285,28 @@
 
     // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
-    try {
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('*')
-            .single();
+        try {
+            const { data, error } = await _supabase
+                .from('empresa')
+                .select('*')
+                .single();
 
-        if (data) {
-            // Solo actualizamos los IDs que SÍ existen en tu HTML
-            const periodo = data.periodo_actual || 'SIN PERIODO';
-            const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = periodo;
-            });
-            
-            // Actualizamos los nombres de la empresa en las tablas
-            if(document.getElementById('empresaNombre')) document.getElementById('empresaNombre').innerText = data.nombre;
-            if(document.getElementById('mayorEmpresaNombre')) document.getElementById('mayorEmpresaNombre').innerText = data.nombre;
+            if (error) throw error;
+
+            if (data) {
+                document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
+                const periodo = data.periodo || 'ENERO 2025';
+                const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerText = periodo;
+                });
+            }
+        } catch (err) {
+            console.error("Error al cargar empresa:", err);
         }
-    } catch (err) {
-        console.error("Error carga empresa:", err);
-    }
-    }
+    } // <-- ESTA LLAVE CIERRA LA FUNCIÓN CORRECTAMENTE
+
     async function guardarDatosEmpresa() {
         const n = document.getElementById('empresaNombre').innerText;
         const r = document.getElementById('empresaRif').innerText;
@@ -319,14 +337,6 @@
         if (typeof cargarRegistros === 'function') {
             cargarRegistros();
         }
-    }
-
-    // Si entramos al historial, cargamos la lista de meses cerrados
-    if (id === 'vista-historial') {
-        if (typeof cargarListaCierres === 'function') {
-            cargarListaCierres();
-        }
-    }
     }
 
     // Si entramos al historial, cargamos la lista de meses cerrados
@@ -495,41 +505,19 @@
 async function generarMayor() {
     const cuentaSel = document.getElementById('select-cuenta-mayor').value;
     const divRes = document.getElementById('resultado-mayor');
-    
-    // 1. LIMPIEZA INICIAL: Si no hay cuenta seleccionada o el mes cambió, vaciamos
-    if (!cuentaSel) {
-        divRes.innerHTML = "";
-        return;
-    }
+    if (!cuentaSel) return;
 
-    // OBTENEMOS EL PERIODO ACTIVO DE LA PANTALLA (Para filtrar y que no salgan meses viejos)
-    const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
+    // 1. Obtener los movimientos de la cuenta
+    const { data: movs, error } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSel).order('fecha', { ascending: true });
+    if (error || !movs?.length) { divRes.innerHTML = "<p>Sin datos para esta cuenta.</p>"; return; }
 
-    // 2. Obtener los movimientos de la cuenta FILTRADOS POR PERIODO
-    const { data: movs, error } = await _supabase
-        .from('asientos')
-        .select('*')
-        .eq('cuenta', cuentaSel)
-        .eq('periodo', periodoActual) // <--- ESTE ES EL FILTRO DE SEGURIDAD
-        .order('fecha', { ascending: true });
-
-    if (error || !movs?.length) { 
-        divRes.innerHTML = "<p style='text-align:center; padding:20px; color:#64748b;'>Sin datos para esta cuenta en el periodo seleccionado.</p>"; 
-        return; 
-    }
-
-    // 3. Crear el mapa para que el Asiento sea #1, #2, etc. (Solo del periodo actual)
-    const { data: todos } = await _supabase
-        .from('asientos')
-        .select('asiento_id')
-        .eq('periodo', periodoActual) // También filtramos aquí para la numeración
-        .order('asiento_id', { ascending: true });
-
+    // 2. Crear el mapa para que el Asiento sea #1, #2, etc.
+    const { data: todos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
     const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
     const mapaCorr = {}; 
     idsUnicos.forEach((id, i) => { if (id) mapaCorr[id] = i + 1; });
 
-    // 4. Construir la tabla
+    // 3. Construir la tabla con ASIENTO a la derecha de EXPLICACIÓN
     let html = `<div class="info-mayor-header">
         <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
         <table class="tabla-mayor">
@@ -547,19 +535,15 @@ async function generarMayor() {
 
     let saldo = 0;
     movs.forEach(m => {
-        // Aseguramos que use debito/credito o debe/haber según tu tabla
-        const d = parseFloat(m.debito || m.debe || 0);
-        const c = parseFloat(m.credito || m.haber || 0);
-        
-        saldo += (d - c);
+        saldo += (m.debito - m.credito);
         const numAsiento = mapaCorr[m.asiento_id] || "S/N";
 
         html += `<tr>
             <td>${m.fecha}</td>
             <td>${m.descripcion}</td>
             <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-            <td>${d.toFixed(2)}</td>
-            <td>${c.toFixed(2)}</td>
+            <td>${m.debito.toFixed(2)}</td>
+            <td>${m.credito.toFixed(2)}</td>
             <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
         </tr>`;
     });
@@ -571,7 +555,7 @@ async function generarMayor() {
     
     divRes.innerHTML = html;
 }
-    
+
     // Funciones de Borrado
     function activarModoBorrado() {
         document.getElementById('contenedor-diario').classList.add('modo-borrar');
@@ -734,7 +718,7 @@ async function cerrarMesActual() {
             console.error("Error:", err);
             alert("Hubo un problema: " + err.message);
         }
-}
+        }
 
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
@@ -769,44 +753,53 @@ async function cargarListaCierres() {
     }
 
 async function cargarRegistros() {
-        const pElement = document.getElementById('textoPeriodoDiario');
-        // Si no existe el elemento, no intentamos leerlo para evitar errores
-        if (!pElement) return; 
+    // 1. Obtenemos el periodo que dice la etiqueta azul de la parte superior
+    const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
+
+    try {
+        // 2. Consultamos solo los asientos de ese periodo
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoActual)
+            .order('fecha', { ascending: true });
+
+        if (error) throw error;
+
+        // 3. Limpiamos las tablas visualmente
+        const cuerpoDiario = document.getElementById('cuerpo-diario');
+        const contenedorMayor = document.getElementById('contenedor-cuentas-mayor');
         
-        const periodoActual = pElement.innerText;
+        if (cuerpoDiario) cuerpoDiario.innerHTML = '';
+        if (contenedorMayor) contenedorMayor.innerHTML = '';
 
-        try {
-            const { data, error } = await _supabase
-                .from('asientos')
-                .select('*')
-                .eq('periodo', periodoActual)
-                .order('fecha', { ascending: true });
-
-            if (error) throw error;
-
-            const cuerpoDiario = document.getElementById('cuerpo-diario');
-            const contenedorMayor = document.getElementById('contenedor-cuentas-mayor');
-            
-            if (cuerpoDiario) cuerpoDiario.innerHTML = '';
-            if (contenedorMayor) contenedorMayor.innerHTML = '';
-
-            if (!data || data.length === 0) {
-                if (cuerpoDiario) {
-                    cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">📭 Hoja en blanco. No hay registros.</td></tr>';
-                }
-                return;
+        // 4. Si el periodo es "---" o no hay datos, mostramos la hoja en blanco
+        if (!data || data.length === 0) {
+            if (cuerpoDiario) {
+                cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">📭 Hoja en blanco. Seleccione un periodo activo.</td></tr>';
             }
-
-            // Llamamos a las funciones de mostrar datos si existen
-            if (typeof mostrarAsientosEnTabla === 'function') mostrarAsientosEnTabla(data);
-            if (typeof generarMayor === 'function') generarMayor(); 
-
-        } catch (err) {
-            console.error("Error al sincronizar libros:", err);
+            if (contenedorMayor) {
+                contenedorMayor.innerHTML = '<p style="text-align:center; padding:20px; color:#64748b;">No hay movimientos para el Mayor.</p>';
+            }
+            return;
         }
-    }
 
-</script>
+        // 5. Si hay datos, llamamos a tus funciones de dibujo actuales
+        // (Nota: Asegúrate que estas funciones existan en tu código)
+        if (typeof mostrarAsientosEnTabla === 'function') {
+            mostrarAsientosEnTabla(data);
+        }
+        
+        if (typeof generarMayor === 'function') {
+            generarMayor(data);
+        }
+
+    } catch (err) {
+        console.error("Error al sincronizar libros:", err);
+    }
+    }
+    
+        </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
     <div style="background:white; padding:25px; border-radius:15px; width:85%; max-width:350px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">

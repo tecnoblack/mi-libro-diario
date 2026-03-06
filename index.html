@@ -213,6 +213,14 @@
         <button class="etiqueta-btn" onclick="verMayorDelMes()">📊 Libro Mayor</button>
     </div>
 
+                    <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center; font-size: 1.1rem;"></h3>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-accion-azul" style="flex:1; background:#2563eb;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
+        <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
+    </div>
+</div>
+
     <div id="tabla-registros"></div>
 </div>
             </div>
@@ -732,8 +740,6 @@ async function cerrarMesActual() {
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
     if (!contenedor) return;
-
-    // LIMPIAMOS EL CONTENEDOR ANTES DE CARGAR
     contenedor.innerHTML = ''; 
 
     const { data, error } = await _supabase
@@ -746,28 +752,19 @@ async function cargarListaCierres() {
         return;
     }
 
-    // Dibujamos las etiquetas (una por cada cierre real en la base de datos)
     data.forEach(cierre => {
         const div = document.createElement('div');
         div.style = "background: white; padding: 15px; border-radius: 10px; border-left: 5px solid var(--verde-exito); box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;";
         div.innerHTML = `
             <div>
                 <strong style="color: var(--azul-pro);">${cierre.nombre_periodo}</strong>
-                <small style="display:block; color: #64748b;">${new Date(cierre.fecha_cierre).toLocaleDateString()}</small>
+                <small style="display:block; color: #64748b;">Cerrado el: ${new Date(cierre.fecha_cierre).toLocaleDateString()}</small>
             </div>
-            <button onclick="verDetalleCierre('${cierre.nombre_periodo}')" style="background: none; border: 1px solid var(--azul-pro); color: var(--azul-pro); padding: 5px 10px; border-radius: 5px; cursor: pointer;">Ver Reporte</button>
-            <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;"></div>
-            <div id="selector-reportes" style="display: none; margin-top: 20px; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; flex-direction: column; gap: 15px;">
-    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
-    <div style="display: flex; gap: 10px;">
-        <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
-        <button class="btn-accion-azul" style="flex:1; background-color:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
-    </div>
-</div>
+            <button onclick="abrirOpcionesReporte('${cierre.nombre_periodo}')" style="background: var(--azul-pro); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">Ver Reporte</button>
         `;
         contenedor.appendChild(div);
     });
-    }
+}
 
 async function cargarRegistros() {
     // 1. Obtenemos el periodo que dice la etiqueta azul de la parte superior
@@ -864,11 +861,13 @@ async function verDetalleReporte(tipo) {
     const selector = document.getElementById('selector-reportes');
     const titulo = document.getElementById('titulo-reporte-seleccionado');
     
-    selector.style.display = 'flex';
-    titulo.innerText = "REPORTE: " + periodo;
-    
-    // Desplazar la pantalla hacia abajo para ver las opciones
-    selector.scrollIntoView({ behavior: 'smooth' });
+    if (selector && titulo) {
+        selector.style.display = 'flex'; // Aquí es donde "reacciona" el botón
+        titulo.innerText = "MES SELECCIONADO: " + periodo;
+        selector.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        console.error("No se encontró el contenedor selector-reportes");
+    }
 }
 
 async function verDetalleReporte(tipo) {

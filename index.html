@@ -140,7 +140,7 @@
                 <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
             </div>
             <button class="btn-accion-azul" style="background-color: var(--verde-exito); margin-bottom: 15px;" onclick="agregarFila()">+ Añadir Cuenta</button>
-            <table>
+            <table id="tabla-registros">
                 <thead>
                     <tr>
                         <th style="width: 15%;">FECHA</th>
@@ -150,7 +150,7 @@
                         <th style="width: 15%;">CRÉDITO</th>
                     </tr>
                 </thead>
-                <tbody id="cuerpo-tabla"></tbody>
+                <tbody id="cuerpo-diario"></tbody>
             </table>
             <div class="totales-seccion">
                 <span>TOTAL ASIENTO</span>
@@ -186,7 +186,15 @@
         <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
         <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;">
             </div>
+        
+        <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
+    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
+        <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
     </div>
+</div>
+
 </div>
     <div id="vista-historial-detalle" class="seccion-vista">
         <div class="contenedor-principal">
@@ -212,15 +220,7 @@
         <button class="etiqueta-btn" onclick="verDiarioDelMes()">📖 Libro Diario</button>
         <button class="etiqueta-btn" onclick="verMayorDelMes()">📊 Libro Mayor</button>
     </div>
-
-                    <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center; font-size: 1.1rem;"></h3>
-    <div style="display: flex; gap: 10px;">
-        <button class="btn-accion-azul" style="flex:1; background:#2563eb;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
-        <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
-    </div>
-</div>
-
+                    
     <div id="tabla-registros"></div>
 </div>
             </div>
@@ -838,21 +838,33 @@ async function verDetalleReporte(tipo) {
     }
 }
 
-    function mostrarAsientosEnTabla(asientos) {
+   function mostrarAsientosEnTabla(asientos) {
     const cuerpo = document.getElementById('cuerpo-diario');
-    if (!cuerpo) return;
+    if (!cuerpo) {
+        console.error("Error: No se encontró el elemento 'cuerpo-diario'");
+        return;
+    }
 
-    cuerpo.innerHTML = ""; // Limpiar tabla
-    
+    // 1. Limpiamos el contenido (quita el mensaje de "Cargando...")
+    cuerpo.innerHTML = "";
+
+    // 2. Si no hay datos, avisamos al usuario
+    if (!asientos || asientos.length === 0) {
+        cuerpo.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No hay registros para este periodo</td></tr>";
+        return;
+    }
+
+    // 3. Dibujamos las filas
     asientos.forEach(a => {
-        cuerpo.innerHTML += `
-            <tr>
-                <td>${a.fecha}</td>
-                <td>${a.cuenta}</td>
-                <td style="text-align:center;">${a.ref || ''}</td>
-                <td style="text-align:right;">${a.debito.toFixed(2)}</td>
-                <td style="text-align:right;">${a.credito.toFixed(2)}</td>
-            </tr>`;
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${a.fecha || ''}</td>
+            <td>${a.cuenta || ''}</td>
+            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${a.ref || ''}</td>
+            <td style="text-align:right;">${(a.debito || 0).toFixed(2)}</td>
+            <td style="text-align:right;">${(a.credito || 0).toFixed(2)}</td>
+        `;
+        cuerpo.appendChild(fila);
     });
 }
 
@@ -871,16 +883,25 @@ async function verDetalleReporte(tipo) {
 }
 
 async function verDetalleReporte(tipo) {
+    // Usamos el periodo que guardamos al tocar "Ver Reporte"
+    const periodoParaFiltrar = periodoSeleccionadoHistorial; 
+
     if (tipo === 'diario') {
-        // Cambiamos a la vista de diario y forzamos el texto del periodo
-        document.getElementById('textoPeriodoDiario').innerText = "ARCHIVADO_" + periodoSeleccionadoHistorial;
+        // Forzamos al sistema a mostrar el periodo del historial
+        document.getElementById('textoPeriodoDiario').innerText = periodoParaFiltrar;
         cambiarVista('vista-diario');
-        await cargarRegistros(); 
+        
+        // Llamamos a cargar registros pero pasando el periodo del historial
+        const { data } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoParaFiltrar); // Buscamos los registros de ese mes
+        
+        mostrarAsientosEnTabla(data || []);
     } else {
-        // Cambiamos a la vista de mayor
-        document.getElementById('mayorPeriodoHeader').innerText = "ARCHIVADO_" + periodoSeleccionadoHistorial;
+        document.getElementById('mayorPeriodoHeader').innerText = periodoParaFiltrar;
         cambiarVista('vista-mayor');
-        await cargarCuentasSelect();
+        // Aquí cargarías la lógica del mayor para ese periodo
     }
 }
     

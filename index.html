@@ -347,14 +347,6 @@
     }
     }
 
-    // Si entramos al historial, cargamos la lista de meses cerrados
-    if (id === 'vista-historial') {
-        if (typeof cargarListaCierres === 'function') {
-            cargarListaCierres();
-        }
-    }
-    }
-
     async function asignarRefInteligente(elemento) {
         const nombreCuenta = elemento.innerText.trim();
         if (nombreCuenta === "") return;
@@ -805,7 +797,7 @@ async function cargarRegistros() {
     } catch (err) {
         console.error("Error al sincronizar libros:", err);
     }
-                    }
+    }
     
         </script>
     

@@ -465,6 +465,33 @@
     }
 
     async function guardarAsiento() {
+        // 1. LEER EL PERIODO DE LA PANTALLA
+    const periodoElemento = document.getElementById('textoPeriodoDiario');
+    const periodoRaw = periodoElemento ? periodoElemento.innerText : "";
+    
+    // 2. LIMPIAR EL TEXTO (Quita la palabra "Periodo:" si existe)
+    const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+
+    // 3. VALIDACIÓN (Si está vacío o es el texto por defecto, detiene el guardado)
+    if (!periodoActivo || periodoActivo === "" || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
+        Swal.fire({
+            title: "Periodo No Activado",
+            text: "Ve a la sección 'Historial' y activa un mes para poder registrar.",
+            icon: "warning"
+        });
+        return; // Esto evita que el código siga hacia abajo
+    }
+
+        const nuevoAsiento = {
+    fecha: document.getElementById('fecha').value,
+    cuenta: document.getElementById('cuenta').value,
+    ref: document.getElementById('referencia').value,
+    debito: parseFloat(document.getElementById('debito').value) || 0,
+    credito: parseFloat(document.getElementById('credito').value) || 0,
+    periodo: periodoActivo, // <--- ESTO ES LO QUE HACE QUE SE TRASLADE AL HISTORIAL
+    created_at: new Date()
+};
+        
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return alert("Inicia sesión nuevamente.");
 
@@ -768,7 +795,8 @@ async function cargarListaCierres() {
 
 async function cargarRegistros() {
     // 1. Obtenemos el periodo que dice la etiqueta azul de la parte superior
-    const periodoActual = document.getElementById('textoPeriodoDiario').innerText;
+const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
     try {
         // 2. Consultamos solo los asientos de ese periodo

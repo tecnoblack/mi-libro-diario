@@ -811,6 +811,45 @@ async function cargarRegistros() {
         console.error("Error al sincronizar libros:", err);
     }
     }
+
+    // 1. Función para mostrar los botones de Diario/Mayor
+function mostrarOpcionesReporte() {
+    document.getElementById('selector-reportes').style.display = 'flex';
+}
+
+// 2. Función para entrar a ver los registros del mes
+async function verDetalleReporte(tipo) {
+    // Obtenemos el mes que el usuario seleccionó (ej: "MARZO 2026")
+    const periodo = document.getElementById('textoPeriodoDiario').innerText;
+
+    if (tipo === 'diario') {
+        cambiarVista('vista-diario');
+        // Aquí llamas a cargarRegistros que ya tienes, pero asegúrate de que use el periodo
+        await cargarRegistros(); 
+    } else {
+        cambiarVista('vista-mayor');
+        // Aquí generas el reporte del mayor solo de ese mes
+        await generarMayorDelMes(periodo);
+    }
+}
+
+    function mostrarAsientosEnTabla(asientos) {
+    const cuerpo = document.getElementById('cuerpo-diario');
+    if (!cuerpo) return;
+
+    cuerpo.innerHTML = ""; // Limpiar tabla
+    
+    asientos.forEach(a => {
+        cuerpo.innerHTML += `
+            <tr>
+                <td>${a.fecha}</td>
+                <td>${a.cuenta}</td>
+                <td style="text-align:center;">${a.ref || ''}</td>
+                <td style="text-align:right;">${a.debito.toFixed(2)}</td>
+                <td style="text-align:right;">${a.credito.toFixed(2)}</td>
+            </tr>`;
+    });
+}
     
         </script>
     

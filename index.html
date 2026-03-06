@@ -792,7 +792,12 @@ async function cargarRegistros() {
         
         if (typeof generarMayor === 'function') {
             generarMayor(data);
+
         }
+
+            if (typeof mostrarAsientosEnTabla === 'function') {
+    mostrarAsientosEnTabla(data);
+    }
 
     } catch (err) {
         console.error("Error al sincronizar libros:", err);

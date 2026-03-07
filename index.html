@@ -152,7 +152,10 @@
                         <th style="width: 15%;">CRÉDITO</th>
                     </tr>
                 </thead>
-                <tbody id="contenedor-filas"></tbody>
+                <table id="tabla-escritura" style="width:100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+        </thead>
+    <tbody id="contenedor-filas"></tbody> </table>
             </table>
             <div class="totales-seccion">
                 <span>TOTAL ASIENTO</span>
@@ -256,28 +259,20 @@
     async function iniciarSesion() {
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
+    
+    // Bloqueamos el botón para evitar múltiples clics
+    const btn = document.querySelector(".btn-accion-azul");
+    btn.disabled = true; btn.innerText = "Cargando...";
 
-    // Tu conexión original a Supabase
     const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
 
     if (error) {
-        Swal.fire("Error", "No se pudo entrar: " + error.message, "error");
+        alert("Error: " + error.message);
+        btn.disabled = false; btn.innerText = "Entrar";
     } else {
-        // Si todo está bien, verificamos perfil y preparamos la app
         verificarPerfil(data.user.id);
-        
-        // MOSTRAR EL MENÚ (Para que cambie la vista)
-        document.getElementById('vista-login').classList.remove('activa');
-        document.getElementById('vista-menu').classList.add('activa');
-        
-        // PREPARAR LAS FILAS (Sin cuadritos, estilo Excel)
-        const cont = document.getElementById('contenedor-filas');
-        if (cont) {
-            cont.innerHTML = ''; 
-            agregarFila(); // Crea la primera fila para que la lógica de IVA/Totales se active
-        }
     }
-}
+    }
 
     async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
@@ -421,7 +416,6 @@ function agregarFila() {
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 
 
-    // Diseño original de celdas editables para que tus funciones lean .innerText
     nuevaFila.innerHTML = `
         <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="if(typeof ejecutarLogicaIVA==='function') ejecutarLogicaIVA(); actualizarTotales();"></td>
@@ -433,7 +427,7 @@ function agregarFila() {
         </td>
     `;
     contenedor.appendChild(nuevaFila);
-}
+    }
 
     function ejecutarLogicaIVA() {
         actualizarTotales();

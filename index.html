@@ -397,8 +397,12 @@
     }
 
 function agregarFila() {
+    console.log("Intentando agregar fila..."); // Esto nos dirá en la consola si funciona
     const contenedor = document.getElementById('contenedor-filas');
-    if (!contenedor) return;
+    if (!contenedor) {
+        console.error("No se encontró el contenedor-filas");
+        return;
+    }
 
     const nuevaFila = document.createElement('div');
     nuevaFila.className = "fila-asiento";
@@ -406,13 +410,14 @@ function agregarFila() {
     
     nuevaFila.innerHTML = `
         <input type="text" class="input-cuenta" placeholder="Cuenta" required style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
-        <input type="number" class="input-debito" placeholder="Debe" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
-        <input type="number" class="input-credito" placeholder="Haber" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
+        <input type="number" class="input-debito" placeholder="0" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
+        <input type="number" class="input-credito" placeholder="0" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
         <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:1.2rem;">
-            <i class="fas fa-trash"></i>
+            <i class="fas fa-minus-circle"></i>
         </button>
     `;
     contenedor.appendChild(nuevaFila);
+    console.log("Fila agregada con éxito");
 }
 
     function ejecutarLogicaIVA() {
@@ -474,9 +479,8 @@ function agregarFila() {
         div.innerHTML = html;
     }
 
-    async function guardarAsiento() {
+   async function guardarAsiento() {
     try {
-        // 1. Limpiar el periodo
         const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
         const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
@@ -494,45 +498,28 @@ function agregarFila() {
             const cuenta = f.querySelector('.input-cuenta').value.trim();
             const d = parseFloat(f.querySelector('.input-debito').value) || 0;
             const c = parseFloat(f.querySelector('.input-credito').value) || 0;
-            
             if (cuenta && (d > 0 || c > 0)) {
-                datos.push({ 
-                    fecha, 
-                    cuenta, 
-                    ref: referencia, 
-                    debito: d, 
-                    credito: c, 
-                    periodo: periodoActivo,
-                    created_at: new Date()
-                });
+                datos.push({ fecha, cuenta, ref: referencia, debito: d, credito: c, periodo: periodoActivo });
             }
         });
 
         if (datos.length === 0) {
-            Swal.fire("Error", "Llena al menos una fila con cuenta y monto", "error");
+            Swal.fire("Error", "Llena al menos una fila", "error");
             return;
         }
 
-        // 2. Insertar en Supabase
-       const { error } = await _supabase.from('asientos').insert(datosAInsertar);
-        
+        const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        await Swal.fire("¡Éxito!", "Asiento guardado", "success");
-        
-        // Limpiar y resetear
+        await Swal.fire("Éxito", "Asiento guardado", "success");
         document.getElementById('contenedor-filas').innerHTML = '';
-        agregarFila(); // Esto es lo que hace que aparezca una fila nueva
-        document.getElementById('referencia').value = '';
-        
-        // Ejecutar tus otras funciones
-        await cargarRegistros(); 
+        agregarFila(); 
+        if (typeof cargarRegistros === 'function') await cargarRegistros();
         if (typeof actualizarTotales === 'function') actualizarTotales();
-        if (typeof ejecutarLogicaIVA === 'function') ejecutarLogicaIVA();
 
-    } catch (err) {
-        console.error("Error:", err);
-        Swal.fire("Error", "No se pudo conectar: " + err.message, "error");
+    } catch (e) {
+        console.error("Error en guardarAsiento:", e);
+        Swal.fire("Error", e.message, "error");
     }
 }
 

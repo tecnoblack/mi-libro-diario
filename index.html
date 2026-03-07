@@ -514,20 +514,25 @@ function agregarFila() {
         }
 
         // 2. Insertar en Supabase
-        const { error } = await _supabase.from('asientos').insert(datos);
+       const { error } = await _supabase.from('asientos').insert(datosAInsertar);
+        
         if (error) throw error;
 
-        await Swal.fire("¡Éxito!", "Asiento guardado en " + periodoActivo, "success");
+        await Swal.fire("¡Éxito!", "Asiento guardado", "success");
         
-        // 3. Limpiar y refrescar
+        // Limpiar y resetear
         document.getElementById('contenedor-filas').innerHTML = '';
+        agregarFila(); // Esto es lo que hace que aparezca una fila nueva
         document.getElementById('referencia').value = '';
-        agregarFila(); // Deja una fila nueva lista
-        await cargarRegistros();
+        
+        // Ejecutar tus otras funciones
+        await cargarRegistros(); 
+        if (typeof actualizarTotales === 'function') actualizarTotales();
+        if (typeof ejecutarLogicaIVA === 'function') ejecutarLogicaIVA();
 
-    } catch (e) {
-        console.error(e);
-        Swal.fire("Error", "No se pudo guardar: " + e.message, "error");
+    } catch (err) {
+        console.error("Error:", err);
+        Swal.fire("Error", "No se pudo conectar: " + err.message, "error");
     }
 }
 

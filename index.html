@@ -402,11 +402,13 @@ function agregarFila() {
 
     const nuevaFila = document.createElement('div');
     nuevaFila.className = "fila-asiento";
+    nuevaFila.style = "display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; margin-bottom: 10px; align-items: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;";
+    
     nuevaFila.innerHTML = `
-        <input type="text" class="input-cuenta" placeholder="Nombre de la cuenta" required>
-        <input type="number" class="input-debito" placeholder="0.00" step="0.01" value="0">
-        <input type="number" class="input-credito" placeholder="0.00" step="0.01" value="0">
-        <button type="button" class="btn-eliminar" onclick="this.parentElement.remove()">
+        <input type="text" class="input-cuenta" placeholder="Cuenta" required style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
+        <input type="number" class="input-debito" placeholder="Debe" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
+        <input type="number" class="input-credito" placeholder="Haber" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
+        <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:1.2rem;">
             <i class="fas fa-trash"></i>
         </button>
     `;
@@ -473,79 +475,61 @@ function agregarFila() {
     }
 
     async function guardarAsiento() {
-        // 1. LEER EL PERIODO DE LA PANTALLA
-    const periodoElemento = document.getElementById('textoPeriodoDiario');
-    const periodoRaw = periodoElemento ? periodoElemento.innerText : "";
-    
-    // 2. LIMPIAR EL TEXTO (Quita la palabra "Periodo:" si existe)
-    const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+    try {
+        // 1. Limpiar el periodo
+        const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+        const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
-    // 3. VALIDACIÓN (Si está vacío o es el texto por defecto, detiene el guardado)
-    if (!periodoActivo || periodoActivo === "" || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
-        Swal.fire({
-            title: "Periodo No Activado",
-            text: "Ve a la sección 'Historial' y activa un mes para poder registrar.",
-            icon: "warning"
-        });
-        return; // Esto evita que el código siga hacia abajo
-    }
+        if (!periodoActivo || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
+            Swal.fire("Aviso", "Primero activa un periodo en el Historial", "warning");
+            return;
+        }
 
-        const nuevoAsiento = {
-    fecha: document.getElementById('fecha').value,
-    cuenta: document.getElementById('cuenta').value,
-    ref: document.getElementById('referencia').value,
-    debito: parseFloat(document.getElementById('debito').value) || 0,
-    credito: parseFloat(document.getElementById('credito').value) || 0,
-    periodo: periodoActivo, // <--- ESTO ES LO QUE HACE QUE SE TRASLADE AL HISTORIAL
-    created_at: new Date()
-};
+        const filas = document.querySelectorAll('.fila-asiento');
+        const fecha = document.getElementById('fecha').value;
+        const referencia = document.getElementById('referencia').value;
         
-        const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) return alert("Inicia sesión nuevamente.");
-
-        const btn = document.getElementById('btnGuardar');
-        btn.disabled = true;
-        btn.innerText = "Guardando...";
-
-        const idGrupo = Date.now();
-        const glosa = document.getElementById('resumenAsiento').value || "Asiento contable";
-        let per = document.getElementById('periodoActualHeader')?.innerText.trim() || "FEBRERO 2026"; 
-
-        const registros = [];
-        document.querySelectorAll('#cuerpo-tabla tr').forEach(f => {
-            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            if (cuenta !== "") {
-                registros.push({ 
-                    asiento_id: idGrupo, 
-                    descripcion: glosa, 
-                    cuenta: cuenta, 
-                    user_id: user.id,
-                    ref: f.querySelector('.col-ref').innerText || "1",
-                    debito: parseFloat(f.querySelector('.val-debito').innerText) || 0,
-                    credito: parseFloat(f.querySelector('.val-credito').innerText) || 0,
-                    fecha: new Date().toISOString().split('T')[0],
-                    periodo: per
+        let datos = [];
+        filas.forEach(f => {
+            const cuenta = f.querySelector('.input-cuenta').value.trim();
+            const d = parseFloat(f.querySelector('.input-debito').value) || 0;
+            const c = parseFloat(f.querySelector('.input-credito').value) || 0;
+            
+            if (cuenta && (d > 0 || c > 0)) {
+                datos.push({ 
+                    fecha, 
+                    cuenta, 
+                    ref: referencia, 
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo,
+                    created_at: new Date()
                 });
             }
         });
 
-        if (registros.length < 2) {
-            alert("El asiento debe tener al menos 2 cuentas.");
-            btn.disabled = false;
-            btn.innerText = "Guardar Asiento";
+        if (datos.length === 0) {
+            Swal.fire("Error", "Llena al menos una fila con cuenta y monto", "error");
             return;
         }
 
-        const { error } = await _supabase.from('asientos').insert(registros);
-        if (error) {
-            alert("Error: " + error.message);
-            btn.disabled = false;
-            btn.innerText = "Guardar Asiento";
-        } else {
-            alert("✅ Asiento guardado con éxito.");
-            cambiarVista('vista-diario');
-        }
+        // 2. Insertar en Supabase
+        const { error } = await _supabase.from('asientos').insert(datos);
+        if (error) throw error;
+
+        await Swal.fire("¡Éxito!", "Asiento guardado en " + periodoActivo, "success");
+        
+        // 3. Limpiar y refrescar
+        document.getElementById('contenedor-filas').innerHTML = '';
+        document.getElementById('referencia').value = '';
+        agregarFila(); // Deja una fila nueva lista
+        await cargarRegistros();
+
+    } catch (e) {
+        console.error(e);
+        Swal.fire("Error", "No se pudo guardar: " + e.message, "error");
     }
+}
 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

@@ -254,12 +254,30 @@
     }
 
     async function iniciarSesion() {
-        const email = document.getElementById('login-email').value;
-        const pass = document.getElementById('login-pass').value;
-        const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
-        if (error) alert("Error: " + error.message);
-        else verificarPerfil(data.user.id);
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+
+    // Tu conexión original a Supabase
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+
+    if (error) {
+        Swal.fire("Error", "No se pudo entrar: " + error.message, "error");
+    } else {
+        // Si todo está bien, verificamos perfil y preparamos la app
+        verificarPerfil(data.user.id);
+        
+        // MOSTRAR EL MENÚ (Para que cambie la vista)
+        document.getElementById('vista-login').classList.remove('activa');
+        document.getElementById('vista-menu').classList.add('activa');
+        
+        // PREPARAR LAS FILAS (Sin cuadritos, estilo Excel)
+        const cont = document.getElementById('contenedor-filas');
+        if (cont) {
+            cont.innerHTML = ''; 
+            agregarFila(); // Crea la primera fila para que la lógica de IVA/Totales se active
+        }
     }
+}
 
     async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
@@ -403,18 +421,17 @@ function agregarFila() {
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 
 
-    // Volvemos al diseño de celdas editables sin cuadros grises
+    // Diseño original de celdas editables para que tus funciones lean .innerText
     nuevaFila.innerHTML = `
         <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
+        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="if(typeof ejecutarLogicaIVA==='function') ejecutarLogicaIVA(); actualizarTotales();"></td>
         <td contenteditable="true" class="txt-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
         <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
         <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
         </td>
     `;
-    
     contenedor.appendChild(nuevaFila);
 }
 

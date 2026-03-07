@@ -139,7 +139,7 @@
                 <label><b>Descripción del Asiento (Glosa):</b></label>
                 <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
             </div>
-        <button type="button" class="btn-accion-azul" onclick="agregarFila()">
+        <button type="button" onclick="agregarFila()" class="btn-primario">
     <i class="fas fa-plus"></i> Añadir Fila
 </button>
             <table id="tabla-registros">
@@ -914,7 +914,8 @@ async function verDetalleReporte(tipo) {
         document.getElementById('mayorPeriodoHeader').innerText = periodoParaFiltrar;
         cambiarVista('vista-mayor');
         // Aquí cargarías la lógica del mayor para ese periodo
-    }
+    } 
+} 
 }
     
         </script>

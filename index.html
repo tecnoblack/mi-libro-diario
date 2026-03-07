@@ -397,16 +397,25 @@
     }
 
 function agregarFila() {
-    // Buscamos el cuerpo de la tabla que acabamos de renombrar
     const contenedor = document.getElementById('contenedor-filas');
-    
-    if (!contenedor) {
-        console.error("No se encontró el contenedor-filas");
-        return;
-    }
+    if (!contenedor) return;
 
-    // Creamos una nueva fila de tabla
     const nuevaFila = document.createElement('tr');
+    nuevaFila.className = "fila-asiento"; // Esta clase es vital para tus Totales e IVA
+
+    nuevaFila.innerHTML = `
+        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
+        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="ejecutarLogicaIVA(); actualizarTotales();"></td>
+        <td contenteditable="true" class="txt-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
+        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
+        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
+        <td style="text-align:center; border:1px solid #e2e8f0;">
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
+        </td>
+    `;
+    
+    contenedor.appendChild(nuevaFila);
+}
     
     // Metemos las celdas con los inputs
     nuevaFila.innerHTML = `

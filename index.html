@@ -152,8 +152,7 @@
                         <th style="width: 15%;">CRÉDITO</th>
                     </tr>
                 </thead>
-               <tbody id="contenedor-filas">
-    </tbody>
+                <tbody id="contenedor-filas"></tbody>
             </table>
             <div class="totales-seccion">
                 <span>TOTAL ASIENTO</span>
@@ -402,12 +401,11 @@ function agregarFila() {
     if (!contenedor) return;
 
     const nuevaFila = document.createElement('tr');
-    nuevaFila.className = "fila-asiento"; 
+    nuevaFila.className = "fila-asiento"; // Esta clase es vital para tus Totales e IVA
 
-    // Volvemos al diseño de celdas editables (sin los cuadros grises)
     nuevaFila.innerHTML = `
         <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="if(typeof ejecutarLogicaIVA==='function') ejecutarLogicaIVA(); actualizarTotales();"></td>
+        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" oninput="ejecutarLogicaIVA(); actualizarTotales();"></td>
         <td contenteditable="true" class="txt-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
         <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
         <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
@@ -418,6 +416,7 @@ function agregarFila() {
     
     contenedor.appendChild(nuevaFila);
 }
+    
     // Metemos las celdas con los inputs
     nuevaFila.innerHTML = `
         <td><input type="date" class="input-fecha" style="width:100%; border:none; padding:8px;"></td>

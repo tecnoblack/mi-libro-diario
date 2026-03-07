@@ -152,7 +152,7 @@
                         <th style="width: 15%;">CRÉDITO</th>
                     </tr>
                 </thead>
-                <tbody id="cuerpo-diario"></tbody>
+                <tbody id="contenedor-filas"></tbody>
             </table>
             <div class="totales-seccion">
                 <span>TOTAL ASIENTO</span>
@@ -397,27 +397,31 @@
     }
 
 function agregarFila() {
-    console.log("Intentando agregar fila..."); // Esto nos dirá en la consola si funciona
+    // Buscamos el cuerpo de la tabla que acabamos de renombrar
     const contenedor = document.getElementById('contenedor-filas');
+    
     if (!contenedor) {
         console.error("No se encontró el contenedor-filas");
         return;
     }
 
-    const nuevaFila = document.createElement('div');
-    nuevaFila.className = "fila-asiento";
-    nuevaFila.style = "display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; margin-bottom: 10px; align-items: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;";
+    // Creamos una nueva fila de tabla
+    const nuevaFila = document.createElement('tr');
     
+    // Metemos las celdas con los inputs
     nuevaFila.innerHTML = `
-        <input type="text" class="input-cuenta" placeholder="Cuenta" required style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
-        <input type="number" class="input-debito" placeholder="0" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
-        <input type="number" class="input-credito" placeholder="0" step="0.01" value="0" style="width:100%; border:1px solid #cbd5e1; border-radius:4px; padding:8px;">
-        <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:1.2rem;">
-            <i class="fas fa-minus-circle"></i>
-        </button>
+        <td><input type="date" class="input-fecha" style="width:100%; border:none; padding:8px;"></td>
+        <td><input type="text" class="input-cuenta" placeholder="Nombre de la cuenta" style="width:100%; border:none; padding:8px;"></td>
+        <td><input type="text" class="input-ref" placeholder="Ref" style="width:100%; border:none; padding:8px;"></td>
+        <td><input type="number" class="input-debito" value="0" step="0.01" style="width:100%; border:none; padding:8px; text-align:right;"></td>
+        <td><input type="number" class="input-credito" value="0" step="0.01" style="width:100%; border:none; padding:8px; text-align:right;"></td>
+        <td style="text-align:center;">
+            <button type="button" onclick="this.parentElement.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer; font-size:1.2rem;">×</button>
+        </td>
     `;
+    
+    // Añadimos la fila a la tabla
     contenedor.appendChild(nuevaFila);
-    console.log("Fila agregada con éxito");
 }
 
     function ejecutarLogicaIVA() {

@@ -511,7 +511,7 @@
 
    async function guardarAsiento() {
     try {
-        // 1. Obtener el periodo
+        // 1. Obtener el periodo activo
         const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
         const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
@@ -523,20 +523,21 @@
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
 
-        // 2. Recorrer las filas y leer el contenido de las celdas
+        // 2. Recorrer las filas usando las nuevas clases y innerText
         filas.forEach(f => {
-            // Leemos .innerText porque ahora son celdas editables (estilo Excel)
+            // Extraemos los datos de las celdas (contenteditable usa innerText)
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            const fch = f.querySelector('.val-fecha').innerText.trim();
-            const rf = f.querySelector('.col-ref').innerText.trim();
+            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
+            const refFila = f.querySelector('.col-ref').innerText.trim();
 
+            // Solo agregamos si hay una cuenta y algún monto
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fch, 
+                    fecha: fechaFila, 
                     cuenta: cuenta, 
-                    ref: rf, 
+                    ref: refFila, 
                     debito: d, 
                     credito: c, 
                     periodo: periodoActivo 
@@ -545,16 +546,16 @@
         });
 
         if (datos.length === 0) {
-            Swal.fire("Error", "Llena al menos una fila con cuenta y monto", "error");
+            Swal.fire("Error", "Debe llenar al menos una fila con cuenta y monto", "error");
             return;
         }
 
-        // 3. Validar cuadre antes de subir (Opcional pero recomendado)
-        const totalD = parseFloat(document.getElementById('total-debito').innerText) || 0;
-        const totalC = parseFloat(document.getElementById('total-credito').innerText) || 0;
-        
-        if (Math.abs(totalD - totalC) > 0.01) {
-            Swal.fire("Error", "El asiento no está cuadrado (Débito ≠ Crédito)", "error");
+        // 3. Validación de Cuadre (Opcional pero evita errores en Supabase)
+        const totalDebito = parseFloat(document.getElementById('total-debito').innerText) || 0;
+        const totalCredito = parseFloat(document.getElementById('total-credito').innerText) || 0;
+
+        if (Math.abs(totalDebito - totalCredito) > 0.01) {
+            Swal.fire("Error", "El asiento no está cuadrado", "error");
             return;
         }
 
@@ -562,19 +563,20 @@
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
+        // 5. Éxito y limpieza
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
         
-        // 5. Limpiar y reiniciar
         document.getElementById('contenedor-filas').innerHTML = '';
-        agregarFila(); 
+        agregarFila(); // Deja una fila limpia lista para el próximo asiento
+        
         if (typeof cargarRegistros === 'function') await cargarRegistros();
         if (typeof actualizarTotales === 'function') actualizarTotales();
 
     } catch (e) {
         console.error("Error en guardarAsiento:", e);
-        Swal.fire("Error", e.message, "error");
+        Swal.fire("Error", "Ocurrió un error al guardar: " + e.message, "error");
     }
-    }
+        }
 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

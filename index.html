@@ -482,23 +482,24 @@
 
    function actualizarTotales() {
     let deb = 0, cre = 0;
-    // Sumar valores de las celdas con clase val-debito y val-credito
+    // Sumamos los valores de las celdas editables
     document.querySelectorAll('.val-debito').forEach(t => deb += parseFloat(t.innerText) || 0);
     document.querySelectorAll('.val-credito').forEach(t => cre += parseFloat(t.innerText) || 0);
     
-    // IMPORTANTE: Estos IDs deben existir en tu HTML
-    const elDeb = document.getElementById('total-debito');
-    const elCre = document.getElementById('total-credito');
+    const elDeb = document.getElementById('totalDebito');
+    const elCre = document.getElementById('totalCredito');
     
     if(elDeb) elDeb.innerText = deb.toFixed(2);
     if(elCre) elCre.innerText = cre.toFixed(2);
 
-    // Activar/Desactivar botón visualmente
+    // Lógica del botón: Se activa solo si cuadra y es mayor a cero
+    const ok = deb > 0 && Math.abs(deb - cre) < 0.01;
     const btn = document.getElementById('btnGuardar');
+    
     if (btn) {
-        const ok = (deb > 0 && Math.abs(deb - cre) < 0.01);
+        btn.disabled = !ok;
         btn.style.opacity = ok ? "1" : "0.5";
-        // No le ponemos disabled aquí para que el usuario pueda hacer clic y ver el error de por qué no cuadra
+        btn.style.cursor = ok ? "pointer" : "not-allowed";
     }
 }
 
@@ -520,11 +521,10 @@
         div.innerHTML = html;
     }
 
-   async function guardarAsiento() {
+  async function guardarAsiento() {
     try {
-        // 1. Verificar Periodo
-        const elPeriodo = document.getElementById('textoPeriodoDiario');
-        const periodoRaw = elPeriodo ? elPeriodo.innerText : "";
+        const elementoPeriodo = document.getElementById('textoPeriodoDiario');
+        const periodoRaw = elementoPeriodo ? elementoPeriodo.innerText : "";
         const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
         if (!periodoActivo || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
@@ -532,7 +532,6 @@
             return;
         }
 
-        // 2. Recolectar datos de las filas
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
@@ -558,34 +557,32 @@
         });
 
         if (datos.length === 0) {
-            Swal.fire("Error", "La tabla está vacía. Ingrese cuenta y montos.", "error");
+            Swal.fire("Error", "Debe llenar al menos una fila válida", "error");
             return;
         }
 
-        // 3. Validar Cuadre final
-        const tD = parseFloat(document.getElementById('total-debito').innerText) || 0;
-        const tC = parseFloat(document.getElementById('total-credito').innerText) || 0;
+        // Validación final de totales antes de subir
+        const tD = parseFloat(document.getElementById('totalDebito').innerText) || 0;
+        const tC = parseFloat(document.getElementById('totalCredito').innerText) || 0;
 
         if (Math.abs(tD - tC) > 0.01) {
-            Swal.fire("Error", `El asiento no cuadra. Dif: ${(tD - tC).toFixed(2)}`, "error");
+            Swal.fire("Error", "El asiento no está cuadrado", "error");
             return;
         }
 
-        // 4. Insertar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // 5. Éxito
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
         document.getElementById('contenedor-filas').innerHTML = '';
         if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
         
-        agregarFila(); // Crear primera fila vacía
+        agregarFila(); 
         actualizarTotales();
 
     } catch (e) {
         console.error("Error al guardar:", e);
-        Swal.fire("Error", "Fallo al guardar: " + e.message, "error");
+        Swal.fire("Error", "Fallo técnico: " + e.message, "error");
     }
 }
 

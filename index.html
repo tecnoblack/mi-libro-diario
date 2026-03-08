@@ -511,6 +511,7 @@
 
    async function guardarAsiento() {
     try {
+        // 1. Obtener el periodo
         const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
         const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
@@ -520,28 +521,50 @@
         }
 
         const filas = document.querySelectorAll('.fila-asiento');
-        const fecha = document.getElementById('fecha').value;
-        const referencia = document.getElementById('referencia').value;
-        
         let datos = [];
+
+        // 2. Recorrer las filas y leer el contenido de las celdas
         filas.forEach(f => {
-            const cuenta = f.querySelector('.input-cuenta').value.trim();
-            const d = parseFloat(f.querySelector('.input-debito').value) || 0;
-            const c = parseFloat(f.querySelector('.input-credito').value) || 0;
+            // Leemos .innerText porque ahora son celdas editables (estilo Excel)
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            const fch = f.querySelector('.val-fecha').innerText.trim();
+            const rf = f.querySelector('.col-ref').innerText.trim();
+
             if (cuenta && (d > 0 || c > 0)) {
-                datos.push({ fecha, cuenta, ref: referencia, debito: d, credito: c, periodo: periodoActivo });
+                datos.push({ 
+                    fecha: fch, 
+                    cuenta: cuenta, 
+                    ref: rf, 
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo 
+                });
             }
         });
 
         if (datos.length === 0) {
-            Swal.fire("Error", "Llena al menos una fila", "error");
+            Swal.fire("Error", "Llena al menos una fila con cuenta y monto", "error");
             return;
         }
 
+        // 3. Validar cuadre antes de subir (Opcional pero recomendado)
+        const totalD = parseFloat(document.getElementById('total-debito').innerText) || 0;
+        const totalC = parseFloat(document.getElementById('total-credito').innerText) || 0;
+        
+        if (Math.abs(totalD - totalC) > 0.01) {
+            Swal.fire("Error", "El asiento no está cuadrado (Débito ≠ Crédito)", "error");
+            return;
+        }
+
+        // 4. Insertar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        await Swal.fire("Éxito", "Asiento guardado", "success");
+        await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
+        
+        // 5. Limpiar y reiniciar
         document.getElementById('contenedor-filas').innerHTML = '';
         agregarFila(); 
         if (typeof cargarRegistros === 'function') await cargarRegistros();
@@ -551,7 +574,7 @@
         console.error("Error en guardarAsiento:", e);
         Swal.fire("Error", e.message, "error");
     }
-}
+    }
 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

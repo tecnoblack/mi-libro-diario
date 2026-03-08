@@ -418,33 +418,61 @@
     }
 
     function ejecutarLogicaIVA() {
-        actualizarTotales();
-        const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
-        filas.forEach(f => {
-            const c = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            if (c.includes('fiscal')) tieneFiscal = true;
-            if (c === 'caja' || c === 'banco' || c === 'caja chica') {
-                const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
-                const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-                if (d > 0 || cr > 0) { filaDinero = f; monto = d || cr; esIngreso = d > 0; }
+    // 1. Buscamos en el nuevo ID: contenedor-filas
+    const filas = document.querySelectorAll('#contenedor-filas tr');
+    let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
+
+    // 2. Analizamos qué hay escrito en las filas
+    filas.forEach(f => {
+        const celdaCuenta = f.querySelector('.txt-cuenta');
+        if (!celdaCuenta) return;
+        
+        const c = celdaCuenta.innerText.toLowerCase().trim();
+        
+        // Buscamos si ya escribiste la cuenta de IVA (Fiscal)
+        if (c.includes('fiscal')) tieneFiscal = true;
+
+        // Detectamos si es un movimiento de Caja o Banco
+        if (c === 'caja' || c === 'banco' || c === 'caja chica') {
+            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+            if (d > 0 || cr > 0) { 
+                filaDinero = f; 
+                monto = d || cr; 
+                esIngreso = d > 0; // Si hay débito en caja/banco, es un ingreso
             }
-        });
-        if (!tieneFiscal || !filaDinero || monto === 0) return;
-        const neto = (monto / 1.16).toFixed(2), iva = (monto - neto).toFixed(2);
-        filas.forEach(f => {
-            const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
-            if (n.includes('fiscal')) {
-                if (esIngreso) { f.querySelector('.val-credito').innerText = iva; f.querySelector('.val-debito').innerText = "0"; }
-                else { f.querySelector('.val-debito').innerText = iva; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(f.querySelector('.txt-cuenta'));
-            } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
-                if (esIngreso) { f.querySelector('.val-credito').innerText = neto; f.querySelector('.val-debito').innerText = "0"; }
-                else { f.querySelector('.val-debito').innerText = neto; f.querySelector('.val-credito').innerText = "0"; }
-                asignarRefInteligente(f.querySelector('.txt-cuenta'));
-            }
-        });
-        actualizarTotales();
+        }
+    });
+
+    // Si no has escrito "Fiscal" aún o no hay monto en Caja/Banco, no hace nada
+    if (!tieneFiscal || !filaDinero || monto === 0) return;
+
+    // 3. Cálculo matemático (Desglose del 16%)
+    const neto = (monto / 1.16).toFixed(2);
+    const iva = (monto - neto).toFixed(2);
+
+    // 4. Repartimos los montos en las filas correspondientes
+    filas.forEach(f => {
+        const celdaCuenta = f.querySelector('.txt-cuenta');
+        if (!celdaCuenta) return;
+        
+        const n = celdaCuenta.innerText.toLowerCase().trim();
+        const celdaDebito = f.querySelector('.val-debito');
+        const celdaCredito = f.querySelector('.val-credito');
+
+        if (n.includes('fiscal')) {
+            // Si es ingreso (debito en caja), el IVA va al Crédito (Débito Fiscal)
+            // Si es egreso (credito en caja), el IVA va al Débito (Crédito Fiscal)
+            if (esIngreso) { celdaCredito.innerText = iva; celdaDebito.innerText = "0"; }
+            else { celdaDebito.innerText = iva; celdaCredito.innerText = "0"; }
+        } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
+            // La cuenta de gasto o ingreso recibe el monto neto
+            if (esIngreso) { celdaCredito.innerText = neto; celdaDebito.innerText = "0"; }
+            else { celdaDebito.innerText = neto; celdaCredito.innerText = "0"; }
+        }
+    });
+
+    actualizarTotales();
     }
 
     function actualizarTotales() {

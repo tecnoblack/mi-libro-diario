@@ -229,6 +229,7 @@
         </div>
     </div>
     
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
@@ -480,38 +481,21 @@
     actualizarTotales();
     }
 
-  function actualizarTotales() {
-    let deb = 0;
-    let cre = 0;
-
-    // 1. Sumamos los valores de las celdas usando sus clases exactas
-    document.querySelectorAll('.val-debito').forEach(celda => {
-        const valor = parseFloat(celda.innerText.replace(',', '.')) || 0;
-        deb += valor;
-    });
-
-    document.querySelectorAll('.val-credito').forEach(celda => {
-        const valor = parseFloat(celda.innerText.replace(',', '.')) || 0;
-        cre += valor;
-    });
+function actualizarTotales() {
+    let deb = 0, cre = 0;
     
-    // 2. Buscamos los IDs del área de totales que me pasaste
+    // Sumamos los montos (usamos replace por si escribes con coma en vez de punto)
+    document.querySelectorAll('.val-debito').forEach(t => deb += parseFloat(t.innerText.replace(',', '.')) || 0);
+    document.querySelectorAll('.val-credito').forEach(t => cre += parseFloat(t.innerText.replace(',', '.')) || 0);
+    
+    // Usamos EXACTAMENTE los IDs que tienes en tu HTML
     const elDeb = document.getElementById('totalDebito');
     const elCre = document.getElementById('totalCredito');
     
-    if (elDeb) elDeb.innerText = deb.toFixed(2);
-    if (elCre) elCre.innerText = cre.toFixed(2);
-
-    // 3. Lógica del botón Guardar
-    const btn = document.getElementById('btnGuardar');
-    if (btn) {
-        const esValido = deb > 0 && Math.abs(deb - cre) < 0.01;
-        btn.disabled = !esValido;
-        btn.style.opacity = esValido ? "1" : "0.5";
-        btn.style.cursor = esValido ? "pointer" : "not-allowed";
-    }
+    if(elDeb) elDeb.innerText = deb.toFixed(2);
+    if(elCre) elCre.innerText = cre.toFixed(2);
 }
-
+    
     async function consultarLibroDiario() {
         const div = document.getElementById('tabla-registros');
         const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
@@ -532,53 +516,81 @@
 
 async function guardarAsiento() {
     try {
+        // 1. Verificar Periodo
         const elPeriodo = document.getElementById('textoPeriodoDiario');
-        const periodoActivo = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+        const periodoRaw = elPeriodo ? elPeriodo.innerText : "";
+        const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
-        if (!periodoActivo || periodoActivo.includes("---")) {
-            Swal.fire("Aviso", "Selecciona un periodo activo", "warning");
+        if (!periodoActivo || periodoActivo === "Sin asignar" || periodoActivo.toUpperCase().includes("SIN PERIODO") || periodoActivo.includes("---")) {
+            Swal.fire("Aviso", "Primero activa un periodo en el Historial", "warning");
             return;
         }
 
+        // 2. Recolectar datos
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
+        const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
-            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
-            const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            const fecha = f.querySelector('.val-fecha').innerText.trim();
-            const ref = f.querySelector('.col-ref').innerText.trim();
+            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
+            const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
+            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
+            const refFila = f.querySelector('.col-ref').innerText.trim();
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha, cuenta, ref, debito: d, credito: c, periodo: periodoActivo 
+                    fecha: fechaFila, cuenta: cuenta, ref: refFila, 
+                    debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
                 });
             }
         });
 
-        // REVISIÓN FINAL: ¿Coinciden los totales?
-        const tD = parseFloat(document.getElementById('totalDebito').innerText) || 0;
-        const tC = parseFloat(document.getElementById('totalCredito').innerText) || 0;
-
-        if (Math.abs(tD - tC) > 0.01) {
-            Swal.fire("Error", "El asiento no está cuadrado", "error");
+        if (datos.length === 0) {
+            Swal.fire("Error", "La tabla está vacía o faltan cuentas.", "error");
             return;
         }
 
+        // 3. Validar Cuadre usando los IDs correctos
+        const elTD = document.getElementById('totalDebito');
+        const elTC = document.getElementById('totalCredito');
+
+        if (!elTD || !elTC) {
+            Swal.fire("Error", "No se encontraron los totales en pantalla.", "error");
+            return;
+        }
+
+        const tD = parseFloat(elTD.innerText) || 0;
+        const tC = parseFloat(elTC.innerText) || 0;
+
+        if (Math.abs(tD - tC) > 0.01) {
+            Swal.fire("Error", `El asiento no cuadra. Diferencia: ${(Math.abs(tD - tC)).toFixed(2)}`, "error");
+            return;
+        }
+
+        // 4. Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        await Swal.fire("Éxito", "Asiento guardado", "success");
+        // 5. Éxito
+        await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
         document.getElementById('contenedor-filas').innerHTML = '';
-        agregarFila();
+        if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
+        
+        agregarFila(); 
         actualizarTotales();
 
     } catch (e) {
-        Swal.fire("Error", e.message, "error");
+        console.error("Error al guardar:", e);
+        // Si Swal falla por alguna razón, usamos alert normal para que no haya errores silenciosos
+        if (typeof Swal !== 'undefined') {
+            Swal.fire("Error", "Fallo técnico: " + e.message, "error");
+        } else {
+            alert("Error al guardar: " + e.message);
+        }
     }
 }
-
+    
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');

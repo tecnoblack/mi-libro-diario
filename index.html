@@ -406,17 +406,14 @@
     nuevaFila.innerHTML = `
         <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
-            oninput="if(typeof ejecutarLogicaIVA === 'function') ejecutarLogicaIVA(); if(typeof asignarRefInteligente === 'function') asignarRefInteligente(this); actualizarTotales();"></td>
-        <td contenteditable="true" class="txt-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="actualizarTotales()">0</td>
-        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="actualizarTotales()">0</td>
+            oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
+        <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
+        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
+        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
         </td>
     `;
-    
     contenedor.appendChild(nuevaFila);
     }
 

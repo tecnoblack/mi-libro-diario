@@ -480,26 +480,35 @@
     actualizarTotales();
     }
 
-   function actualizarTotales() {
-    let deb = 0, cre = 0;
-    // Sumamos los valores de las celdas editables
-    document.querySelectorAll('.val-debito').forEach(t => deb += parseFloat(t.innerText) || 0);
-    document.querySelectorAll('.val-credito').forEach(t => cre += parseFloat(t.innerText) || 0);
+  function actualizarTotales() {
+    let deb = 0;
+    let cre = 0;
+
+    // 1. Sumamos los valores de las celdas usando sus clases exactas
+    document.querySelectorAll('.val-debito').forEach(celda => {
+        const valor = parseFloat(celda.innerText.replace(',', '.')) || 0;
+        deb += valor;
+    });
+
+    document.querySelectorAll('.val-credito').forEach(celda => {
+        const valor = parseFloat(celda.innerText.replace(',', '.')) || 0;
+        cre += valor;
+    });
     
+    // 2. Buscamos los IDs del área de totales que me pasaste
     const elDeb = document.getElementById('totalDebito');
     const elCre = document.getElementById('totalCredito');
     
-    if(elDeb) elDeb.innerText = deb.toFixed(2);
-    if(elCre) elCre.innerText = cre.toFixed(2);
+    if (elDeb) elDeb.innerText = deb.toFixed(2);
+    if (elCre) elCre.innerText = cre.toFixed(2);
 
-    // Lógica del botón: Se activa solo si cuadra y es mayor a cero
-    const ok = deb > 0 && Math.abs(deb - cre) < 0.01;
+    // 3. Lógica del botón Guardar
     const btn = document.getElementById('btnGuardar');
-    
     if (btn) {
-        btn.disabled = !ok;
-        btn.style.opacity = ok ? "1" : "0.5";
-        btn.style.cursor = ok ? "pointer" : "not-allowed";
+        const esValido = deb > 0 && Math.abs(deb - cre) < 0.01;
+        btn.disabled = !esValido;
+        btn.style.opacity = esValido ? "1" : "0.5";
+        btn.style.cursor = esValido ? "pointer" : "not-allowed";
     }
 }
 
@@ -521,47 +530,34 @@
         div.innerHTML = html;
     }
 
-  async function guardarAsiento() {
+async function guardarAsiento() {
     try {
-        const elementoPeriodo = document.getElementById('textoPeriodoDiario');
-        const periodoRaw = elementoPeriodo ? elementoPeriodo.innerText : "";
-        const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+        const elPeriodo = document.getElementById('textoPeriodoDiario');
+        const periodoActivo = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
 
-        if (!periodoActivo || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
-            Swal.fire("Aviso", "Primero activa un periodo en el Historial", "warning");
+        if (!periodoActivo || periodoActivo.includes("---")) {
+            Swal.fire("Aviso", "Selecciona un periodo activo", "warning");
             return;
         }
 
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
-        const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
 
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
-            const refFila = f.querySelector('.col-ref').innerText.trim();
+            const fecha = f.querySelector('.val-fecha').innerText.trim();
+            const ref = f.querySelector('.col-ref').innerText.trim();
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaFila, 
-                    cuenta: cuenta, 
-                    ref: refFila, 
-                    debito: d, 
-                    credito: c, 
-                    periodo: periodoActivo,
-                    descripcion: glosa
+                    fecha, cuenta, ref, debito: d, credito: c, periodo: periodoActivo 
                 });
             }
         });
 
-        if (datos.length === 0) {
-            Swal.fire("Error", "Debe llenar al menos una fila válida", "error");
-            return;
-        }
-
-        // Validación final de totales antes de subir
+        // REVISIÓN FINAL: ¿Coinciden los totales?
         const tD = parseFloat(document.getElementById('totalDebito').innerText) || 0;
         const tC = parseFloat(document.getElementById('totalCredito').innerText) || 0;
 
@@ -573,16 +569,13 @@
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
+        await Swal.fire("Éxito", "Asiento guardado", "success");
         document.getElementById('contenedor-filas').innerHTML = '';
-        if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
-        
-        agregarFila(); 
+        agregarFila();
         actualizarTotales();
 
     } catch (e) {
-        console.error("Error al guardar:", e);
-        Swal.fire("Error", "Fallo técnico: " + e.message, "error");
+        Swal.fire("Error", e.message, "error");
     }
 }
 

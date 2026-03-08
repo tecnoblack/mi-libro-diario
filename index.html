@@ -400,11 +400,16 @@
     const contenedor = document.getElementById('contenedor-filas');
     if (!contenedor) return;
 
+    // Obtener la fecha actual en formato local (DD/MM/YYYY)
+    // Si prefieres el formato ISO (YYYY-MM-DD), usa: new Date().toISOString().split('T')[0]
+    const hoy = new Date();
+    const fechaAuto = hoy.toLocaleDateString('es-ES'); 
+
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 
 
     nuevaFila.innerHTML = `
-        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;"></td>
+        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
             oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
         <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>

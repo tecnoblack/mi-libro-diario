@@ -408,70 +408,70 @@
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
             oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
         <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
-        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales()">0</td>
+        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
+        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
         </td>
     `;
     contenedor.appendChild(nuevaFila);
     }
 
     function ejecutarLogicaIVA() {
-    // 1. Buscamos en el nuevo ID: contenedor-filas
+    actualizarTotales();
+    // CAMBIO 1: Ahora usamos 'contenedor-filas' en lugar de 'cuerpo-tabla'
     const filas = document.querySelectorAll('#contenedor-filas tr');
     let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
-
-    // 2. Analizamos qué hay escrito en las filas
+    
     filas.forEach(f => {
         const celdaCuenta = f.querySelector('.txt-cuenta');
-        if (!celdaCuenta) return;
+        if (!celdaCuenta) return; // Seguridad por si la fila está vacía
         
         const c = celdaCuenta.innerText.toLowerCase().trim();
-        
-        // Buscamos si ya escribiste la cuenta de IVA (Fiscal)
         if (c.includes('fiscal')) tieneFiscal = true;
-
-        // Detectamos si es un movimiento de Caja o Banco
+        
         if (c === 'caja' || c === 'banco' || c === 'caja chica') {
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
             if (d > 0 || cr > 0) { 
                 filaDinero = f; 
                 monto = d || cr; 
-                esIngreso = d > 0; // Si hay débito en caja/banco, es un ingreso
+                esIngreso = d > 0; 
             }
         }
     });
 
-    // Si no has escrito "Fiscal" aún o no hay monto en Caja/Banco, no hace nada
     if (!tieneFiscal || !filaDinero || monto === 0) return;
-
-    // 3. Cálculo matemático (Desglose del 16%)
-    const neto = (monto / 1.16).toFixed(2);
-    const iva = (monto - neto).toFixed(2);
-
-    // 4. Repartimos los montos en las filas correspondientes
+    
+    const neto = (monto / 1.16).toFixed(2), iva = (monto - neto).toFixed(2);
+    
     filas.forEach(f => {
         const celdaCuenta = f.querySelector('.txt-cuenta');
         if (!celdaCuenta) return;
-        
-        const n = celdaCuenta.innerText.toLowerCase().trim();
-        const celdaDebito = f.querySelector('.val-debito');
-        const celdaCredito = f.querySelector('.val-credito');
 
+        const n = celdaCuenta.innerText.toLowerCase().trim();
         if (n.includes('fiscal')) {
-            // Si es ingreso (debito en caja), el IVA va al Crédito (Débito Fiscal)
-            // Si es egreso (credito en caja), el IVA va al Débito (Crédito Fiscal)
-            if (esIngreso) { celdaCredito.innerText = iva; celdaDebito.innerText = "0"; }
-            else { celdaDebito.innerText = iva; celdaCredito.innerText = "0"; }
+            if (esIngreso) { 
+                f.querySelector('.val-credito').innerText = iva; 
+                f.querySelector('.val-debito').innerText = "0"; 
+            } else { 
+                f.querySelector('.val-debito').innerText = iva; 
+                f.querySelector('.val-credito').innerText = "0"; 
+            }
+            asignarRefInteligente(f.querySelector('.txt-cuenta'));
         } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
-            // La cuenta de gasto o ingreso recibe el monto neto
-            if (esIngreso) { celdaCredito.innerText = neto; celdaDebito.innerText = "0"; }
-            else { celdaDebito.innerText = neto; celdaCredito.innerText = "0"; }
+            if (esIngreso) { 
+                f.querySelector('.val-credito').innerText = neto; 
+                f.querySelector('.val-debito').innerText = "0"; 
+            } else { 
+                f.querySelector('.val-debito').innerText = neto; 
+                f.querySelector('.val-credito').innerText = "0"; 
+            }
+            asignarRefInteligente(f.querySelector('.txt-cuenta'));
         }
     });
-
     actualizarTotales();
     }
 

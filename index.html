@@ -510,9 +510,15 @@
     }
 
    async function guardarAsiento() {
+    console.log("Iniciando proceso de guardado..."); // Para ver en consola que el botón responde
     try {
-        // 1. Obtener el periodo activo
-        const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+        // 1. Obtener el periodo (esto es vital)
+        const elementoPeriodo = document.getElementById('textoPeriodoDiario');
+        if (!elementoPeriodo) {
+            Swal.fire("Error", "No se encuentra el indicador de periodo", "error");
+            return;
+        }
+        const periodoRaw = elementoPeriodo.innerText;
         const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
         if (!periodoActivo || periodoActivo.toUpperCase().includes("SIN PERIODO")) {
@@ -523,21 +529,21 @@
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
 
-        // 2. Recorrer las filas usando las nuevas clases y innerText
-        filas.forEach(f => {
-            // Extraemos los datos de las celdas (contenteditable usa innerText)
+        // 2. Recorrer las filas - NOTA: Ya no buscamos 'fecha' o 'referencia' fuera de la tabla
+        filas.forEach((f, index) => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
-            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
-            const refFila = f.querySelector('.col-ref').innerText.trim();
+            const fch = f.querySelector('.val-fecha').innerText.trim();
+            const rf = f.querySelector('.col-ref').innerText.trim();
 
-            // Solo agregamos si hay una cuenta y algún monto
+            console.log(`Fila ${index}: Cuenta=${cuenta}, D=${d}, C=${c}`);
+
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaFila, 
+                    fecha: fch, 
                     cuenta: cuenta, 
-                    ref: refFila, 
+                    ref: rf, 
                     debito: d, 
                     credito: c, 
                     periodo: periodoActivo 
@@ -546,37 +552,38 @@
         });
 
         if (datos.length === 0) {
-            Swal.fire("Error", "Debe llenar al menos una fila con cuenta y monto", "error");
+            Swal.fire("Error", "Llena al menos una fila con cuenta y monto", "error");
             return;
         }
 
-        // 3. Validación de Cuadre (Opcional pero evita errores en Supabase)
-        const totalDebito = parseFloat(document.getElementById('total-debito').innerText) || 0;
-        const totalCredito = parseFloat(document.getElementById('total-credito').innerText) || 0;
+        // 3. Validar Totales (Solo si los totales son iguales permite guardar)
+        const tDeb = parseFloat(document.getElementById('total-debito').innerText) || 0;
+        const tCre = parseFloat(document.getElementById('total-credito').innerText) || 0;
 
-        if (Math.abs(totalDebito - totalCredito) > 0.01) {
-            Swal.fire("Error", "El asiento no está cuadrado", "error");
+        if (Math.abs(tDeb - tCre) > 0.01 || tDeb === 0) {
+            Swal.fire("Error", "El asiento no está cuadrado o está vacío", "error");
             return;
         }
 
-        // 4. Insertar en Supabase
+        // 4. Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // 5. Éxito y limpieza
+        // 5. Éxito
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
         
+        // Limpiar tabla y dejar una fila nueva
         document.getElementById('contenedor-filas').innerHTML = '';
-        agregarFila(); // Deja una fila limpia lista para el próximo asiento
+        agregarFila(); 
         
         if (typeof cargarRegistros === 'function') await cargarRegistros();
         if (typeof actualizarTotales === 'function') actualizarTotales();
 
     } catch (e) {
-        console.error("Error en guardarAsiento:", e);
-        Swal.fire("Error", "Ocurrió un error al guardar: " + e.message, "error");
+        console.error("Error crítico en guardarAsiento:", e);
+        Swal.fire("Error", "Error al guardar: " + e.message, "error");
     }
-        }
+   }
 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

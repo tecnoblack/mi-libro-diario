@@ -919,23 +919,42 @@ async function verDetalleReporte(tipo) {
 }
 
    function mostrarAsientosEnTabla(datos) {
-    const cuerpoDiario = document.getElementById('cuerpo-diario');
-    if (!cuerpoDiario) return;
+    // Cambiamos el ID para que coincida con tu HTML
+    const contenedor = document.getElementById('tabla-registros');
+    if (!contenedor) return;
 
-    cuerpoDiario.innerHTML = ''; // Limpiar
+    // Creamos la estructura de la tabla dentro del DIV
+    let tablaHTML = `
+        <table style="width:100%; border-collapse: collapse; background: white;">
+            <thead>
+                <tr style="background: #f8fafc; text-align: left;">
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Fecha</th>
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Cuenta</th>
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Ref</th>
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0; text-align:right;">Débito</th>
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0; text-align:right;">Crédito</th>
+                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Glosa</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
+    // Llenamos las filas
     datos.forEach(asiento => {
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.fecha}</td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.cuenta}</td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.ref || ''}</td>
-            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : '-'}</td>
-            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : '-'}</td>
-            <td style="padding:10px; border-bottom:1px solid #eee; font-style:italic; color:#666; font-size:0.85rem;">${asiento.descripcion || ''}</td>
-        `;
-        cuerpoDiario.appendChild(fila);
+        tablaHTML += `
+            <tr>
+                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.fecha}</td>
+                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.cuenta}</td>
+                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.ref || ''}</td>
+                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : '-'}</td>
+                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : '-'}</td>
+                <td style="padding:10px; border-bottom:1px solid #eee; font-style:italic; color:#666; font-size:0.85rem;">${asiento.descripcion || ''}</td>
+            </tr>`;
     });
+
+    tablaHTML += `</tbody></table>`;
+    
+    // Inyectamos todo el código generado en tu DIV
+    contenedor.innerHTML = tablaHTML;
     }
 
     function abrirOpcionesReporte(periodo) {

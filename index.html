@@ -1145,52 +1145,35 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     }
 }
 
-/**
- * Versión para el HISTORIAL DE CIERRES (Solo Lectura)
- */
-async function verDetalleReporteHistorial(tipo) {
-    // Usamos el periodo guardado al tocar "Ver Reporte" en la tabla de historial
+async function verDetalleReporte(tipo) {
+    // Usamos el periodo que guardamos al tocar "Ver Reporte"
     const periodoParaFiltrar = periodoSeleccionadoHistorial; 
 
     if (tipo === 'diario') {
-        // 1. Preparamos la interfaz
-        const etiquetaPeriodo = document.getElementById('textoPeriodoDiario');
-        if (etiquetaPeriodo) etiquetaPeriodo.innerText = `HISTORIAL: ${periodoParaFiltrar}`;
-        
+        // Forzamos al sistema a mostrar el periodo del historial
+        document.getElementById('textoPeriodoDiario').innerText = periodoParaFiltrar;
         cambiarVista('vista-diario');
         
-        // 2. Traemos los datos de Supabase
-        const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .eq('periodo', periodoParaFiltrar)
-            .order('fecha', { ascending: true });
-
-        if (error) {
-            console.error("Error al cargar historial:", error);
-            return;
-        }
-        
-        // 3. ¡IMPORTANTE! Llamamos con el parámetro TRUE para bloquear todo
-        mostrarAsientosEnTabla(data || [], true);
-
-    } else if (tipo === 'mayor') {
-        const etiquetaMayor = document.getElementById('mayorPeriodoHeader');
-        if (etiquetaMayor) etiquetaMayor.innerText = periodoParaFiltrar;
-        
-        cambiarVista('vista-mayor');
-        
-        // Aquí puedes llamar a tu función de generarMayor pasándole los datos
+        // Llamamos a cargar registros pero pasando el periodo del historial
         const { data } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoParaFiltrar);
-            
-        if (typeof generarMayor === 'function') {
-            generarMayor(data);
-        }
+            .eq('periodo', periodoParaFiltrar); // Buscamos los registros de ese mes
+        
+        mostrarAsientosEnTabla(data || []);
+    } else {
+        document.getElementById('mayorPeriodoHeader').innerText = periodoParaFiltrar;
+        cambiarVista('vista-mayor');
+        // Aquí cargarías la lógica del mayor para ese periodo
     } 
-}
+} 
+
+// --- LÓGICA DE ELIMINACIÓN DE ASIENTOS ---
+
+/**
+ * Activa o desactiva la visualización de los checkboxes de borrado.
+ * Vinculada a tu botón id="btnActivarBorrado"
+ */
     
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');

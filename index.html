@@ -922,70 +922,88 @@ async function verDetalleReporte(tipo) {
     const contenedor = document.getElementById('tabla-registros');
     if (!contenedor) return;
 
+    // 1. Agrupamos los datos. Usaremos la 'ref' o la 'descripcion' como clave del grupo.
+    const asientosAgrupados = {};
+    datos.forEach(reg => {
+        // Usamos la descripción + fecha como "ID" del grupo para que no se mezclen
+        const grupoId = reg.descripcion + "_" + reg.fecha; 
+        if (!asientosAgrupados[grupoId]) {
+            asientosAgrupados[grupoId] = [];
+        }
+        asientosAgrupados[grupoId].push(reg);
+    });
+
     let tablaHTML = `
-        <table style="width:100%; border-collapse: collapse; background: white; border: 1px solid #000; font-family: 'Courier New', Courier, monospace;">
+        <table style="width:100%; border-collapse: collapse; background: white; border: 2px solid #000;">
             <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid #000;">
                     <th class="col-borrar" style="display:none; padding:10px; border: 1px solid #000; width: 40px;">Sel.</th>
-                    <th style="padding:10px; border: 1px solid #000; width: 120px;">Fecha</th>
+                    <th style="padding:10px; border: 1px solid #000; width: 100px;">Fecha</th>
                     <th style="padding:10px; border: 1px solid #000;">Cuenta y Detalle</th>
-                    <th style="padding:10px; border: 1px solid #000; width: 60px;">Ref</th>
+                    <th style="padding:10px; border: 1px solid #000; width: 80px;">Ref</th>
                     <th style="padding:10px; border: 1px solid #000; width: 120px; text-align:right;">Débito</th>
                     <th style="padding:10px; border: 1px solid #000; width: 120px; text-align:right;">Crédito</th>
                 </tr>
             </thead>
             <tbody>`;
 
-    // Agrupamos por número de asiento si es necesario, o usamos el índice
-    datos.forEach((asiento, i) => {
-        // FILA DE NÚMERO DE ASIENTO (Encabezado del registro)
+    let numeroAsiento = 1;
+
+    // 2. Iteramos sobre los grupos (cada grupo es UN asiento completo)
+    for (const id in asientosAgrupados) {
+        const lineas = asientosAgrupados[id];
+        const fechaAsiento = lineas[0].fecha;
+        const glosaAsiento = lineas[0].descripcion;
+
+        // FILA ENCABEZADO DEL ASIENTO
         tablaHTML += `
-            <tr style="background: #f8fafc;">
-                <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
-                <td colspan="5" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold; letter-spacing: 2px;">
-                    --- ASIENTO N° ${i + 1} ---
+            <tr style="background: #fdfdfd;">
+                <td class="col-borrar" style="display:none; border: 1px solid #000; text-align:center;">
+                    <input type="checkbox" class="check-borrar" value="${lineas.map(l => l.id).join(',')}">
+                </td>
+                <td colspan="5" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold;">
+                    --- ASIENTO N° ${numeroAsiento} ---
                 </td>
             </tr>`;
 
-        // FILA DE DATOS (Cuentas y Montos)
-        tablaHTML += `
-            <tr>
-                <td class="col-borrar" style="display:none; padding:10px; border: 1px solid #000; text-align:center;">
-                    <input type="checkbox" class="check-borrar" value="${asiento.id}">
-                </td>
-                <td style="padding:10px; border: 1px solid #000; vertical-align:top;">${asiento.fecha}</td>
-                <td style="padding:10px; border: 1px solid #000;">
-                    <div style="${asiento.credito > 0 ? 'margin-left: 40px;' : 'font-weight:bold;'}">
-                        ${asiento.cuenta}
-                    </div>
-                </td>
-                <td style="padding:10px; border: 1px solid #000; text-align:center;">${asiento.ref || ''}</td>
-                <td style="padding:10px; border: 1px solid #000; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : ''}</td>
-                <td style="padding:10px; border: 1px solid #000; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : ''}</td>
-            </tr>`;
-
-        // FILA DE GLOSA / DESCRIPCIÓN (Pie del registro)
-        if (asiento.descripcion) {
+        // FILAS DE LAS CUENTAS (Débitos primero, luego Créditos con sangría)
+        lineas.forEach(linea => {
             tablaHTML += `
                 <tr>
                     <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
-                    <td colspan="5" style="padding:5px 10px 15px 50px; border: 1px solid #000; font-style:italic; color: #444; font-size: 0.85rem;">
-                        P/R: ${asiento.descripcion}
+                    <td style="padding:5px 10px; border: 1px solid #000; text-align:center;">${fechaAsiento}</td>
+                    <td style="padding:5px 10px; border: 1px solid #000;">
+                        <div style="${linea.credito > 0 ? 'margin-left: 40px;' : 'font-weight:bold;'}">
+                            ${linea.cuenta}
+                        </div>
+                    </td>
+                    <td style="padding:5px 10px; border: 1px solid #000; text-align:center;">${linea.ref || ''}</td>
+                    <td style="padding:5px 10px; border: 1px solid #000; text-align:right;">
+                        ${linea.debito > 0 ? linea.debito.toFixed(2) : ''}
+                    </td>
+                    <td style="padding:5px 10px; border: 1px solid #000; text-align:right;">
+                        ${linea.credito > 0 ? linea.credito.toFixed(2) : ''}
+                    </td>
+                </tr>`;
+        });
+
+        // FILA DE LA GLOSA (Al final de todas las cuentas del asiento)
+        if (glosaAsiento) {
+            tablaHTML += `
+                <tr>
+                    <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
+                    <td colspan="5" style="padding:5px 10px 10px 60px; border: 1px solid #000; font-style:italic; color: #555;">
+                        P/R: ${glosaAsiento}
                     </td>
                 </tr>`;
         }
-    });
+
+        numeroAsiento++;
+    }
 
     tablaHTML += `</tbody></table>`;
     contenedor.innerHTML = tablaHTML;
    }
-
-// Función para marcar/desmarcar todos de un golpe
-function toggleTodos(master) {
-    document.querySelectorAll('.check-borrar').forEach(check => {
-        check.checked = master.checked;
-    });
-}
 
     function abrirOpcionesReporte(periodo) {
     periodoSeleccionadoHistorial = periodo;

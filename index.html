@@ -996,11 +996,31 @@ async function verDetalleReporte(tipo) {
     }
     }
 
-  function mostrarAsientosEnTabla(datos) {
+  /**
+ * Muestra el Libro Diario. 
+ * @param {Array} datos - Registros de la DB.
+ * @param {Boolean} modoLectura - Si es true, oculta botones de acción y bloquea edición.
+ */
+function mostrarAsientosEnTabla(datos, modoLectura = false) {
     const contenedor = document.getElementById('tabla-registros');
     if (!contenedor) return;
 
-    // 1. Agrupamos los datos por Asiento (usando descripción y fecha como clave)
+    // --- LÓGICA DE CONTROL DE INTERFAZ ---
+    // Ocultamos o mostramos los botones de acción principal según el modo
+    const btnAgregar = document.getElementById('btn-abrir-modal'); // Cambia este ID por el tuyo si es distinto
+    const btnEliminar = document.getElementById('btnActivarBorrado');
+    const btnConfirmar = document.getElementById('btnConfirmarBorrado');
+
+    if (modoLectura) {
+        if (btnAgregar) btnAgregar.style.display = 'none';
+        if (btnEliminar) btnEliminar.style.display = 'none';
+        if (btnConfirmar) btnConfirmar.style.display = 'none';
+    } else {
+        if (btnAgregar) btnAgregar.style.display = 'inline-block';
+        if (btnEliminar) btnEliminar.style.display = 'inline-block';
+    }
+
+    // 1. Agrupamos los datos por Asiento
     const asientosAgrupados = {};
     let totalDebitoGeneral = 0;
     let totalCreditoGeneral = 0;
@@ -1012,19 +1032,22 @@ async function verDetalleReporte(tipo) {
         }
         asientosAgrupados[grupoId].push(reg);
         
-        // Sumamos para el total final
         totalDebitoGeneral += (reg.debito || 0);
         totalCreditoGeneral += (reg.credito || 0);
     });
+
+    // Determinar si las celdas serán editables
+    const editableAttr = modoLectura ? 'contenteditable="false"' : 'contenteditable="true"';
 
     // 2. Iniciamos la construcción de la tabla
     let tablaHTML = `
         <table style="width:100%; border-collapse: collapse; background: white; border: 2px solid #000; font-family: 'Courier New', Courier, monospace;">
             <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid #000;">
+                    ${!modoLectura ? `
                     <th class="col-borrar" style="display:none; padding:10px; border: 1px solid #000; width: 40px; text-align:center;">
                         <input type="checkbox" onclick="toggleTodos(this)">
-                    </th>
+                    </th>` : ''}
                     <th style="padding:10px; border: 1px solid #000; width: 100px;">Fecha</th>
                     <th style="padding:10px; border: 1px solid #000;">Cuenta y Detalle</th>
                     <th style="padding:10px; border: 1px solid #000; width: 60px;">Ref</th>
@@ -1040,17 +1063,16 @@ async function verDetalleReporte(tipo) {
         const lineas = asientosAgrupados[id];
         const fechaAsiento = lineas[0].fecha;
         const glosaAsiento = lineas[0].descripcion;
-        
-        // Juntamos todos los IDs de este asiento para borrarlos juntos si se selecciona
         const idsDelAsiento = lineas.map(l => l.id).join(',');
 
-        // --- FILA ENCABEZADO: NÚMERO DE ASIENTO + CHECKBOX ---
+        // --- FILA ENCABEZADO ---
         tablaHTML += `
             <tr style="background: #f8fafc;">
+                ${!modoLectura ? `
                 <td class="col-borrar" style="display:none; border: 1px solid #000; text-align:center;">
                     <input type="checkbox" class="check-borrar" value="${idsDelAsiento}">
-                </td>
-                <td colspan="5" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold; letter-spacing: 2px;">
+                </td>` : ''}
+                <td colspan="${modoLectura ? '5' : '5'}" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold; letter-spacing: 2px;">
                     --- ASIENTO N° ${numeroAsiento} ---
                 </td>
             </tr>`;
@@ -1059,18 +1081,18 @@ async function verDetalleReporte(tipo) {
         lineas.forEach(linea => {
             tablaHTML += `
                 <tr>
-                    <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
+                    ${!modoLectura ? '<td class="col-borrar" style="display:none; border: 1px solid #000;"></td>' : ''}
                     <td style="padding:5px 10px; border: 1px solid #000; text-align:center;">${fechaAsiento}</td>
-                    <td style="padding:5px 10px; border: 1px solid #000;">
+                    <td ${editableAttr} style="padding:5px 10px; border: 1px solid #000;">
                         <div style="${linea.credito > 0 ? 'margin-left: 40px;' : 'font-weight:bold;'}">
                             ${linea.cuenta}
                         </div>
                     </td>
-                    <td style="padding:5px 10px; border: 1px solid #000; text-align:center;">${linea.ref || ''}</td>
-                    <td style="padding:5px 10px; border: 1px solid #000; text-align:right;">
+                    <td ${editableAttr} style="padding:5px 10px; border: 1px solid #000; text-align:center;">${linea.ref || ''}</td>
+                    <td ${editableAttr} style="padding:5px 10px; border: 1px solid #000; text-align:right;">
                         ${linea.debito > 0 ? linea.debito.toLocaleString(undefined, {minimumFractionDigits: 2}) : ''}
                     </td>
-                    <td style="padding:5px 10px; border: 1px solid #000; text-align:right;">
+                    <td ${editableAttr} style="padding:5px 10px; border: 1px solid #000; text-align:right;">
                         ${linea.credito > 0 ? linea.credito.toLocaleString(undefined, {minimumFractionDigits: 2}) : ''}
                     </td>
                 </tr>`;
@@ -1080,7 +1102,7 @@ async function verDetalleReporte(tipo) {
         if (glosaAsiento) {
             tablaHTML += `
                 <tr>
-                    <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
+                    ${!modoLectura ? '<td class="col-borrar" style="display:none; border: 1px solid #000;"></td>' : ''}
                     <td colspan="5" style="padding:5px 10px 10px 60px; border: 1px solid #000; font-style:italic; color: #555; font-size: 0.85rem;">
                         P/R: ${glosaAsiento}
                     </td>
@@ -1089,13 +1111,13 @@ async function verDetalleReporte(tipo) {
         numeroAsiento++;
     }
 
-    // --- FILA DE TOTALES (SUMAS IGUALES) ---
+    // --- FILA DE TOTALES ---
     const descuadre = Math.abs(totalDebitoGeneral - totalCreditoGeneral) > 0.01;
     const colorTotal = descuadre ? '#dc2626' : '#16a34a';
 
     tablaHTML += `
         <tr style="background: #f1f5f9; font-weight: bold; border-top: 3px double #000;">
-            <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
+            ${!modoLectura ? '<td class="col-borrar" style="display:none; border: 1px solid #000;"></td>' : ''}
             <td colspan="3" style="padding:15px; border: 1px solid #000; text-align:right;">TOTAL SUMAS IGUALES:</td>
             <td style="padding:10px; border: 1px solid #000; text-align:right; color: ${colorTotal};">
                 ${totalDebitoGeneral.toLocaleString(undefined, {minimumFractionDigits: 2})}
@@ -1108,16 +1130,10 @@ async function verDetalleReporte(tipo) {
     tablaHTML += `</tbody></table>`;
     contenedor.innerHTML = tablaHTML;
 
-    // Si hay descuadre, lanzamos un aviso visual extra
     if (descuadre) {
         contenedor.innerHTML += `<p style="color:red; text-align:center; font-weight:bold; margin-top:10px;">⚠️ El Libro Diario no cuadra por ${(totalDebitoGeneral - totalCreditoGeneral).toFixed(2)}</p>`;
     }
-}
-
-// Función auxiliar para seleccionar todos los checkboxes de golpe
-function toggleTodos(master) {
-    document.querySelectorAll('.check-borrar').forEach(cb => cb.checked = master.checked);
-}
+        }
 
     function abrirOpcionesReporte(periodo) {
     periodoSeleccionadoHistorial = periodo;

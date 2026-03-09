@@ -891,17 +891,20 @@ async function cargarListaCierres() {
 }
 
 async function cargarRegistros() {
-    // 1. Obtenemos el periodo que dice la etiqueta azul de la parte superior
-const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
-const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+    // 1. Obtenemos el periodo de la etiqueta azul
+    const periodoElemento = document.getElementById('textoPeriodoDiario');
+    if (!periodoElemento) return;
+    
+    const periodoRaw = periodoElemento.innerText;
+    const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
     try {
-        // 2. Consultamos solo los asientos de ese periodo
+        // 2. CONSULTA COMPLETA A SUPABASE (Todo el bloque debe ir junto)
         const { data, error } = await _supabase
-    .from('asientos')
-    .select('*')
-    .eq('periodo', periodo)
-    .order('fecha', { ascending: true });
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodo)
+            .order('fecha', { ascending: true });
 
         if (error) throw error;
 
@@ -912,35 +915,28 @@ const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
         if (cuerpoDiario) cuerpoDiario.innerHTML = '';
         if (contenedorMayor) contenedorMayor.innerHTML = '';
 
-        // 4. Si el periodo es "---" o no hay datos, mostramos la hoja en blanco
+        // 4. Si el periodo es "---" o no hay datos, mostramos mensaje de vacío
         if (!data || data.length === 0) {
             if (cuerpoDiario) {
                 cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">📭 Hoja en blanco. Seleccione un periodo activo.</td></tr>';
             }
-            if (contenedorMayor) {
-                contenedorMayor.innerHTML = '<p style="text-align:center; padding:20px; color:#64748b;">No hay movimientos para el Mayor.</p>';
-            }
             return;
         }
 
-        // 5. Si hay datos, llamamos a tus funciones de dibujo actuales
-        // (Nota: Asegúrate que estas funciones existan en tu código)
+        // 5. DIBUJAR LAS TABLAS
+        // Aquí usamos "false" porque cargarRegistros() se usa para el diario de trabajo (editable)
         if (typeof mostrarAsientosEnTabla === 'function') {
-            mostrarAsientosEnTabla(data);
+            mostrarAsientosEnTabla(data, false); 
         }
         
         if (typeof generarMayor === 'function') {
             generarMayor(data);
         }
 
-        if (typeof mostrarAsientosEnTabla === 'function') {
-    mostrarAsientosEnTabla(data);
-}
-
     } catch (err) {
         console.error("Error al sincronizar libros:", err);
     }
-    }
+            }
     
     // 1. Función para mostrar los botones de Diario/Mayor
 function mostrarOpcionesReporte() {
@@ -1149,35 +1145,53 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     }
 }
 
-async function verDetalleReporte(tipo) {
-    // Usamos el periodo que guardamos al tocar "Ver Reporte"
+/**
+ * Versión para el HISTORIAL DE CIERRES (Solo Lectura)
+ */
+async function verDetalleReporteHistorial(tipo) {
+    // Usamos el periodo guardado al tocar "Ver Reporte" en la tabla de historial
     const periodoParaFiltrar = periodoSeleccionadoHistorial; 
 
     if (tipo === 'diario') {
-        // Forzamos al sistema a mostrar el periodo del historial
-        document.getElementById('textoPeriodoDiario').innerText = periodoParaFiltrar;
+        // 1. Preparamos la interfaz
+        const etiquetaPeriodo = document.getElementById('textoPeriodoDiario');
+        if (etiquetaPeriodo) etiquetaPeriodo.innerText = `HISTORIAL: ${periodoParaFiltrar}`;
+        
         cambiarVista('vista-diario');
         
-        // Llamamos a cargar registros pero pasando el periodo del historial
+        // 2. Traemos los datos de Supabase
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoParaFiltrar)
+            .order('fecha', { ascending: true });
+
+        if (error) {
+            console.error("Error al cargar historial:", error);
+            return;
+        }
+        
+        // 3. ¡IMPORTANTE! Llamamos con el parámetro TRUE para bloquear todo
+        mostrarAsientosEnTabla(data || [], true);
+
+    } else if (tipo === 'mayor') {
+        const etiquetaMayor = document.getElementById('mayorPeriodoHeader');
+        if (etiquetaMayor) etiquetaMayor.innerText = periodoParaFiltrar;
+        
+        cambiarVista('vista-mayor');
+        
+        // Aquí puedes llamar a tu función de generarMayor pasándole los datos
         const { data } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoParaFiltrar); // Buscamos los registros de ese mes
-        
-        mostrarAsientosEnTabla(data || []);
-    } else {
-        document.getElementById('mayorPeriodoHeader').innerText = periodoParaFiltrar;
-        cambiarVista('vista-mayor');
-        // Aquí cargarías la lógica del mayor para ese periodo
+            .eq('periodo', periodoParaFiltrar);
+            
+        if (typeof generarMayor === 'function') {
+            generarMayor(data);
+        }
     } 
-} 
-
-// --- LÓGICA DE ELIMINACIÓN DE ASIENTOS ---
-
-/**
- * Activa o desactiva la visualización de los checkboxes de borrado.
- * Vinculada a tu botón id="btnActivarBorrado"
- */
+}
+    
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');
     const btnActivar = document.getElementById('btnActivarBorrado');

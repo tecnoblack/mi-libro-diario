@@ -853,10 +853,10 @@ const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
     try {
         // 2. Consultamos solo los asientos de ese periodo
         const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .eq('periodo', periodoActual)
-            .order('fecha', { ascending: true });
+    .from('asientos')
+    .select('*')
+    .eq('periodo', periodo)
+    .order('fecha', { ascending: true });
 
         if (error) throw error;
 
@@ -918,35 +918,25 @@ async function verDetalleReporte(tipo) {
     }
 }
 
-   function mostrarAsientosEnTabla(asientos) {
-    const cuerpo = document.getElementById('cuerpo-diario');
-    if (!cuerpo) {
-        console.error("Error: No se encontró el elemento 'cuerpo-diario'");
-        return;
-    }
+   function mostrarAsientosEnTabla(datos) {
+    const cuerpoDiario = document.getElementById('cuerpo-diario');
+    if (!cuerpoDiario) return;
 
-    // 1. Limpiamos el contenido (quita el mensaje de "Cargando...")
-    cuerpo.innerHTML = "";
+    cuerpoDiario.innerHTML = ''; // Limpiar
 
-    // 2. Si no hay datos, avisamos al usuario
-    if (!asientos || asientos.length === 0) {
-        cuerpo.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No hay registros para este periodo</td></tr>";
-        return;
-    }
-
-    // 3. Dibujamos las filas
-    asientos.forEach(a => {
+    datos.forEach(asiento => {
         const fila = document.createElement('tr');
         fila.innerHTML = `
-            <td>${a.fecha || ''}</td>
-            <td>${a.cuenta || ''}</td>
-            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${a.ref || ''}</td>
-            <td style="text-align:right;">${(a.debito || 0).toFixed(2)}</td>
-            <td style="text-align:right;">${(a.credito || 0).toFixed(2)}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.fecha}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.cuenta}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.ref || ''}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : '-'}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : '-'}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; font-style:italic; color:#666; font-size:0.85rem;">${asiento.descripcion || ''}</td>
         `;
-        cuerpo.appendChild(fila);
+        cuerpoDiario.appendChild(fila);
     });
-}
+    }
 
     function abrirOpcionesReporte(periodo) {
     periodoSeleccionadoHistorial = periodo;

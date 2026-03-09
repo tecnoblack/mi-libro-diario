@@ -989,12 +989,12 @@ async function verDetalleReporte(tipo) {
     }
     }
 
-   function mostrarAsientosEnTabla(datos) {
+  function mostrarAsientosEnTabla(datos) {
     const contenedor = document.getElementById('tabla-registros');
     if (!contenedor) return;
 
+    // 1. Agrupamos los datos por Asiento (usando descripción y fecha como clave)
     const asientosAgrupados = {};
-    // Variables para acumular el total general
     let totalDebitoGeneral = 0;
     let totalCreditoGeneral = 0;
 
@@ -1005,16 +1005,19 @@ async function verDetalleReporte(tipo) {
         }
         asientosAgrupados[grupoId].push(reg);
         
-        // Vamos sumando cada registro al total
+        // Sumamos para el total final
         totalDebitoGeneral += (reg.debito || 0);
         totalCreditoGeneral += (reg.credito || 0);
     });
 
+    // 2. Iniciamos la construcción de la tabla
     let tablaHTML = `
         <table style="width:100%; border-collapse: collapse; background: white; border: 2px solid #000; font-family: 'Courier New', Courier, monospace;">
             <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid #000;">
-                    <th class="col-borrar" style="display:none; padding:10px; border: 1px solid #000; width: 40px;">Sel.</th>
+                    <th class="col-borrar" style="display:none; padding:10px; border: 1px solid #000; width: 40px; text-align:center;">
+                        <input type="checkbox" onclick="toggleTodos(this)">
+                    </th>
                     <th style="padding:10px; border: 1px solid #000; width: 100px;">Fecha</th>
                     <th style="padding:10px; border: 1px solid #000;">Cuenta y Detalle</th>
                     <th style="padding:10px; border: 1px solid #000; width: 60px;">Ref</th>
@@ -1030,16 +1033,22 @@ async function verDetalleReporte(tipo) {
         const lineas = asientosAgrupados[id];
         const fechaAsiento = lineas[0].fecha;
         const glosaAsiento = lineas[0].descripcion;
+        
+        // Juntamos todos los IDs de este asiento para borrarlos juntos si se selecciona
+        const idsDelAsiento = lineas.map(l => l.id).join(',');
 
-        // Fila de Número de Asiento
+        // --- FILA ENCABEZADO: NÚMERO DE ASIENTO + CHECKBOX ---
         tablaHTML += `
             <tr style="background: #f8fafc;">
-                <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
-                <td colspan="5" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold;">
+                <td class="col-borrar" style="display:none; border: 1px solid #000; text-align:center;">
+                    <input type="checkbox" class="check-borrar" value="${idsDelAsiento}">
+                </td>
+                <td colspan="5" style="padding:5px; border: 1px solid #000; text-align:center; font-weight:bold; letter-spacing: 2px;">
                     --- ASIENTO N° ${numeroAsiento} ---
                 </td>
             </tr>`;
 
+        // --- FILAS DE CUENTAS ---
         lineas.forEach(linea => {
             tablaHTML += `
                 <tr>
@@ -1060,6 +1069,7 @@ async function verDetalleReporte(tipo) {
                 </tr>`;
         });
 
+        // --- FILA DE GLOSA ---
         if (glosaAsiento) {
             tablaHTML += `
                 <tr>
@@ -1072,17 +1082,14 @@ async function verDetalleReporte(tipo) {
         numeroAsiento++;
     }
 
-    // --- FILA DE TOTALES GENERALES (Sumas Iguales) ---
-    // Verificamos si cuadra para poner un color de alerta o de éxito
+    // --- FILA DE TOTALES (SUMAS IGUALES) ---
     const descuadre = Math.abs(totalDebitoGeneral - totalCreditoGeneral) > 0.01;
-    const colorTotal = descuadre ? '#dc2626' : '#16a34a'; // Rojo si no cuadra, verde si sí.
+    const colorTotal = descuadre ? '#dc2626' : '#16a34a';
 
     tablaHTML += `
         <tr style="background: #f1f5f9; font-weight: bold; border-top: 3px double #000;">
             <td class="col-borrar" style="display:none; border: 1px solid #000;"></td>
-            <td colspan="3" style="padding:10px; border: 1px solid #000; text-align:right; text-transform: uppercase;">
-                TOTAL SUMAS IGUALES:
-            </td>
+            <td colspan="3" style="padding:15px; border: 1px solid #000; text-align:right;">TOTAL SUMAS IGUALES:</td>
             <td style="padding:10px; border: 1px solid #000; text-align:right; color: ${colorTotal};">
                 ${totalDebitoGeneral.toLocaleString(undefined, {minimumFractionDigits: 2})}
             </td>
@@ -1091,18 +1098,19 @@ async function verDetalleReporte(tipo) {
             </td>
         </tr>`;
 
-    if (descuadre) {
-        tablaHTML += `
-            <tr>
-                <td colspan="6" style="text-align:center; color: red; font-size: 0.8rem; padding: 5px;">
-                    ⚠️ Advertencia: El libro diario presenta un descuadre de ${(totalDebitoGeneral - totalCreditoGeneral).toFixed(2)}
-                </td>
-            </tr>`;
-    }
-
     tablaHTML += `</tbody></table>`;
     contenedor.innerHTML = tablaHTML;
+
+    // Si hay descuadre, lanzamos un aviso visual extra
+    if (descuadre) {
+        contenedor.innerHTML += `<p style="color:red; text-align:center; font-weight:bold; margin-top:10px;">⚠️ El Libro Diario no cuadra por ${(totalDebitoGeneral - totalCreditoGeneral).toFixed(2)}</p>`;
     }
+}
+
+// Función auxiliar para seleccionar todos los checkboxes de golpe
+function toggleTodos(master) {
+    document.querySelectorAll('.check-borrar').forEach(cb => cb.checked = master.checked);
+}
 
     function abrirOpcionesReporte(periodo) {
     periodoSeleccionadoHistorial = periodo;
@@ -1141,6 +1149,108 @@ async function verDetalleReporte(tipo) {
     } 
 } 
 
+// --- LÓGICA DE ELIMINACIÓN DE ASIENTOS ---
+
+/**
+ * Activa o desactiva la visualización de los checkboxes de borrado.
+ * Vinculada a tu botón id="btnActivarBorrado"
+ */
+function activarModoBorrado() {
+    const columnas = document.querySelectorAll('.col-borrar');
+    const btnActivar = document.getElementById('btnActivarBorrado');
+    const btnConfirmar = document.getElementById('btnConfirmarBorrado');
+
+    if (!btnActivar || !btnConfirmar) return;
+
+    // Alternar visibilidad de la columna de checkboxes
+    columnas.forEach(col => {
+        col.style.display = (col.style.display === 'none' || col.style.display === '') ? 'table-cell' : 'none';
+    });
+
+    // Cambiar estado de los botones
+    if (btnConfirmar.style.display === 'none' || btnConfirmar.style.display === '') {
+        btnConfirmar.style.display = 'inline-block';
+        btnActivar.innerHTML = '🚫 Cancelar';
+        btnActivar.style.backgroundColor = '#64748b'; // Color neutro para cancelar
+    } else {
+        btnConfirmar.style.display = 'none';
+        btnActivar.innerHTML = '🗑️ Eliminar Asiento';
+        btnActivar.style.backgroundColor = ''; // Vuelve al color original
+    }
+}
+
+/**
+ * Procesa la eliminación en Supabase de los asientos seleccionados.
+ * Vinculada a tu botón id="btnConfirmarBorrado"
+ */
+async function confirmarEliminacion() {
+    // 1. Recolectar todos los IDs de los checkboxes marcados
+    const seleccionados = document.querySelectorAll('.check-borrar:checked');
+    
+    if (seleccionados.length === 0) {
+        Swal.fire({
+            title: "Selección vacía",
+            text: "Por favor, marca al menos un asiento para eliminar.",
+            icon: "info",
+            confirmButtonColor: "var(--azul-pro)"
+        });
+        return;
+    }
+
+    // Convertimos la lista de IDs (que vienen separados por coma en el value) en un array plano
+    let idsAEliminar = [];
+    seleccionados.forEach(cb => {
+        const idsArray = cb.value.split(',');
+        idsAEliminar = idsAEliminar.concat(idsArray);
+    });
+
+    // 2. Pedir confirmación al usuario
+    const { isConfirmed } = await Swal.fire({
+        title: '¿Confirmar eliminación?',
+        text: `Estás a punto de borrar ${seleccionados.length} asiento(s) completo(s). Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: 'var(--rojo-error)',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar permanentemente',
+        cancelButtonText: 'Regresar'
+    });
+
+    if (isConfirmed) {
+        try {
+            // Mostrar estado de carga
+            Swal.showLoading();
+
+            // 3. Ejecutar el borrado en Supabase usando el operador .in()
+            const { error } = await _supabase
+                .from('asientos')
+                .delete()
+                .in('id', idsAEliminar);
+
+            if (error) throw error;
+
+            // 4. Éxito
+            await Swal.fire({
+                title: "¡Eliminado!",
+                text: "Los registros han sido borrados de la base de datos.",
+                icon: "success",
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+            // Limpiar la vista: ocultamos checkboxes y recargamos datos
+            activarModoBorrado(); 
+            if (typeof cargarRegistros === 'function') {
+                await cargarRegistros(); 
+            }
+
+        } catch (err) {
+            console.error("Error al eliminar:", err);
+            Swal.fire("Error", "Hubo un problema al conectar con la base de datos: " + err.message, "error");
+        }
+    }
+}
+    
         </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

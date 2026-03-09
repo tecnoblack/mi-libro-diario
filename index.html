@@ -368,33 +368,67 @@
     }
 
     async function asignarRefInteligente(elemento) {
-        const nombreCuenta = elemento.innerText.trim();
-        if (nombreCuenta === "") return;
-        const filaActual = elemento.closest('tr');
-        const celdaRefActual = filaActual.querySelector('.col-ref');
+    const nombreCuenta = elemento.innerText.trim();
+    if (nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") return;
+
+    const filaActual = elemento.closest('tr');
+    const celdaRefActual = filaActual.querySelector('.col-ref');
+
+    // 1. REVISAR EN PANTALLA: ¿Esta cuenta ya se escribió en otra fila arriba?
+    const filasPantalla = document.querySelectorAll('#cuerpo-tabla tr');
+    let refEncontradaEnPantalla = null;
+    let maxEnPantalla = 0;
+
+    filasPantalla.forEach(f => {
+        const nFila = f.querySelector('.txt-cuenta').innerText.trim();
+        const rFila = parseInt(f.querySelector('.col-ref').innerText);
         
-        const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
+        if (!isNaN(rFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, rFila);
+            // Si el nombre coincide y no es la fila donde estoy parado
+            if (nFila === nombreCuenta && f !== filaActual) {
+                refEncontradaEnPantalla = rFila;
+            }
+        }
+    });
+
+    // Si la encontramos en pantalla, se la asignamos y terminamos
+    if (refEncontradaEnPantalla !== null) {
+        celdaRefActual.innerText = refEncontradaEnPantalla;
+        return;
+    }
+
+    // 2. REVISAR EN BASE DE DATOS: Si no está en pantalla, buscamos su Ref histórica
+    try {
+        const { data: historial, error } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
+
         if (historial && historial.length > 0) {
             celdaRefActual.innerText = historial[0].ref;
             return;
         }
-        const { data: todos } = await _supabase.from('asientos').select('ref');
+
+        // 3. NUEVA CUENTA: Si es totalmente nueva, buscamos el máximo global para seguir la secuencia
+        const { data: todos } = await _supabase
+            .from('asientos')
+            .select('ref');
+
         let maxGlobal = 0;
-        if (todos) {
+        if (todos && todos.length > 0) {
             const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
             maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
         }
-        const filas = document.querySelectorAll('#cuerpo-tabla tr');
-        let maxEnPantalla = 0, refPropia = null;
-        filas.forEach(f => {
-            const nFila = f.querySelector('.txt-cuenta').innerText.trim();
-            const rFila = parseInt(f.querySelector('.col-ref').innerText);
-            if (!isNaN(rFila)) {
-                maxEnPantalla = Math.max(maxEnPantalla, rFila);
-                if (nFila === nombreCuenta) refPropia = rFila;
-            }
-        });
-        celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
+
+        // El nuevo número será el máximo entre lo que hay en DB y lo que hay en pantalla + 1
+        const nuevaRef = Math.max(maxGlobal, maxEnPantalla) + 1;
+        celdaRefActual.innerText = nuevaRef;
+
+    } catch (err) {
+        console.error("Error en Ref Inteligente:", err);
+    }
     }
 
     function agregarFila() {

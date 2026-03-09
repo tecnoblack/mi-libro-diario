@@ -368,42 +368,42 @@
     }
 
     async function asignarRefInteligente(elemento) {
-    // 1. Limpieza y validación inicial
+    // 1. Limpieza y validación: Si no hay cuenta o es el texto por defecto, no hace nada
     const nombreCuenta = elemento.innerText.trim();
-    if (!nombreCuenta || nombreCuenta === "Seleccione cuenta..." || nombreCuenta.length < 2) return;
+    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") {
+        return;
+    }
 
     const filaActual = elemento.closest('tr');
     const celdaRefActual = filaActual.querySelector('.col-ref');
+    
+    // 2. BUSQUEDA EN PANTALLA (Prioridad alta): Evita peticiones innecesarias a Supabase
+    const filas = document.querySelectorAll('#cuerpo-tabla tr');
+    let maxEnPantalla = 0;
+    let refEncontradaEnPantalla = null;
 
-    // 2. PRIORIDAD 1: Buscar en la pantalla (Lo más rápido y seguro)
-    // Buscamos si el usuario ya escribió esta cuenta en otra fila de la misma tabla
-    const todasLasFilas = document.querySelectorAll('#cuerpo-tabla tr');
-    let refEnPantalla = null;
-    let maxRefEnPantalla = 0;
+    filas.forEach(f => {
+        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim();
+        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
 
-    todasLasFilas.forEach(f => {
-        const txtCuentaFila = f.querySelector('.txt-cuenta')?.innerText.trim();
-        const refFila = parseInt(f.querySelector('.col-ref')?.innerText);
-
-        if (!isNaN(refFila)) {
-            maxRefEnPantalla = Math.max(maxRefEnPantalla, refFila);
-            // Si la cuenta coincide y no es la fila actual, copiamos su REF
-            if (txtCuentaFila === nombreCuenta && f !== filaActual) {
-                refEnPantalla = refFila;
+        if (!isNaN(refEnFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
+            // Si la cuenta ya existe en otra fila de esta misma sesión
+            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
+                refEnEncontradaEnPantalla = refEnFila;
             }
         }
     });
 
-    // Si ya existe en pantalla, la asignamos de inmediato y no molestamos a la base de datos
-    if (refEnPantalla !== null) {
-        celdaRefActual.innerText = refEnPantalla;
-        return; 
+    // Si ya la encontramos en pantalla, la asignamos y cortamos aquí
+    if (refEncontradaEnPantalla !== null) {
+        celdaRefActual.innerText = refEncontradaEnPantalla;
+        return;
     }
 
-    // 3. PRIORIDAD 2: Buscar en la Base de Datos (Solo si es cuenta "nueva" para esta sesión)
+    // 3. BUSQUEDA EN HISTORIAL (Supabase): Solo si es una cuenta "nueva" en esta sesión
     try {
-        // Buscamos si esa cuenta ya existe en el historial de Supabase
-        const { data: historial, error } = await _supabase
+        const { data: historial } = await _supabase
             .from('asientos')
             .select('ref')
             .eq('cuenta', nombreCuenta)
@@ -414,24 +414,22 @@
             return;
         }
 
-        // 4. SI ES CUENTA TOTALMENTE NUEVA: Generar el siguiente número correlativo
-        // Buscamos el máximo global en la DB
-        const { data: todosRegistros } = await _supabase
+        // 4. SI ES TOTALMENTE NUEVA: Calcular el siguiente correlativo global
+        const { data: todos } = await _supabase
             .from('asientos')
             .select('ref');
 
-        let maxDB = 0;
-        if (todosRegistros && todosRegistros.length > 0) {
-            const numeros = todosRegistros.map(r => parseInt(r.ref)).filter(n => !isNaN(n));
-            maxDB = numeros.length > 0 ? Math.max(...numeros) : 0;
+        let maxGlobal = 0;
+        if (todos) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
         }
 
-        // La nueva REF es el máximo entre la DB y la Pantalla + 1
-        const nuevaRef = Math.max(maxDB, maxRefEnPantalla) + 1;
-        celdaRefActual.innerText = nuevaRef;
+        // El nuevo número es el máximo entre base de datos y pantalla + 1
+        celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
 
-    } catch (err) {
-        console.error("Error crítico en Ref Inteligente:", err);
+    } catch (error) {
+        console.error("Error al asignar Ref:", error);
     }
     }
     

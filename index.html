@@ -919,43 +919,52 @@ async function verDetalleReporte(tipo) {
 }
 
    function mostrarAsientosEnTabla(datos) {
-    // Cambiamos el ID para que coincida con tu HTML
     const contenedor = document.getElementById('tabla-registros');
     if (!contenedor) return;
 
-    // Creamos la estructura de la tabla dentro del DIV
+    // Estructura con encabezado que incluye la columna para seleccionar
     let tablaHTML = `
-        <table style="width:100%; border-collapse: collapse; background: white;">
+        <table style="width:100%; border-collapse: collapse; background: white; border: 1px solid #cbd5e1;">
             <thead>
-                <tr style="background: #f8fafc; text-align: left;">
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Fecha</th>
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Cuenta</th>
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Ref</th>
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0; text-align:right;">Débito</th>
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0; text-align:right;">Crédito</th>
-                    <th style="padding:10px; border-bottom:2px solid #e2e8f0;">Glosa</th>
+                <tr style="background: #f1f5f9; text-align: left;">
+                    <th style="padding:10px; border: 1px solid #cbd5e1; width: 30px; text-align:center;">
+                        <input type="checkbox" id="seleccionar-todos" onclick="toggleTodos(this)">
+                    </th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1;">Fecha</th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1;">Cuenta</th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1;">Ref</th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1; text-align:right;">Débito</th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1; text-align:right;">Crédito</th>
+                    <th style="padding:10px; border: 1px solid #cbd5e1;">Descripción</th>
                 </tr>
             </thead>
             <tbody>`;
 
-    // Llenamos las filas
     datos.forEach(asiento => {
         tablaHTML += `
-            <tr>
-                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.fecha}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.cuenta}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee;">${asiento.ref || ''}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : '-'}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : '-'}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee; font-style:italic; color:#666; font-size:0.85rem;">${asiento.descripcion || ''}</td>
+            <tr class="fila-dato" data-id="${asiento.id}">
+                <td style="padding:10px; border: 1px solid #cbd5e1; text-align:center;">
+                    <input type="checkbox" class="check-borrar" value="${asiento.id}">
+                </td>
+                <td style="padding:10px; border: 1px solid #cbd5e1;">${asiento.fecha}</td>
+                <td style="padding:10px; border: 1px solid #cbd5e1; font-weight: 500;">${asiento.cuenta}</td>
+                <td style="padding:10px; border: 1px solid #cbd5e1;">${asiento.ref || ''}</td>
+                <td style="padding:10px; border: 1px solid #cbd5e1; text-align:right;">${asiento.debito > 0 ? asiento.debito.toFixed(2) : '-'}</td>
+                <td style="padding:10px; border: 1px solid #cbd5e1; text-align:right;">${asiento.credito > 0 ? asiento.credito.toFixed(2) : '-'}</td>
+                <td style="padding:10px; border: 1px solid #cbd5e1; color: #64748b; font-size: 0.85rem;">${asiento.descripcion || ''}</td>
             </tr>`;
     });
 
     tablaHTML += `</tbody></table>`;
-    
-    // Inyectamos todo el código generado en tu DIV
     contenedor.innerHTML = tablaHTML;
-    }
+}
+
+// Función para marcar/desmarcar todos de un golpe
+function toggleTodos(master) {
+    document.querySelectorAll('.check-borrar').forEach(check => {
+        check.checked = master.checked;
+    });
+}
 
     function abrirOpcionesReporte(periodo) {
     periodoSeleccionadoHistorial = periodo;
@@ -993,7 +1002,7 @@ async function verDetalleReporte(tipo) {
         // Aquí cargarías la lógica del mayor para ese periodo
     } 
 } 
-    
+
         </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

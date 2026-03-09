@@ -896,27 +896,60 @@ const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
         console.error("Error al sincronizar libros:", err);
     }
     }
-
+    
     // 1. Función para mostrar los botones de Diario/Mayor
 function mostrarOpcionesReporte() {
     document.getElementById('selector-reportes').style.display = 'flex';
 }
 
-// 2. Función para entrar a ver los registros del mes
+/**
+ * Función principal para alternar entre Libro Diario y Libro Mayor.
+ * @param {string} tipo - Puede ser 'diario' o 'mayor'.
+ */
 async function verDetalleReporte(tipo) {
-    // Obtenemos el mes que el usuario seleccionó (ej: "MARZO 2026")
-    const periodo = document.getElementById('textoPeriodoDiario').innerText;
+    // 1. Obtenemos el periodo actual de la interfaz para que el reporte sea preciso
+    const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+    const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
+    // 2. Lógica de cambio de vista y actualización de títulos
     if (tipo === 'diario') {
-        cambiarVista('vista-diario');
-        // Aquí llamas a cargarRegistros que ya tienes, pero asegúrate de que use el periodo
-        await cargarRegistros(); 
-    } else {
-        cambiarVista('vista-mayor');
-        // Aquí generas el reporte del mayor solo de ese mes
-        await generarMayorDelMes(periodo);
+        // Cambia a la sección del Diario
+        if (typeof cambiarVista === 'function') {
+            cambiarVista('vista-diario');
+        }
+        
+        const titulo = document.getElementById('titulo-reporte-seleccionado');
+        if (titulo) {
+            titulo.innerText = "LIBRO DIARIO";
+        }
+        
+        console.log(`Cargando Libro Diario para el periodo: ${periodo}`);
+    } 
+    else if (tipo === 'mayor') {
+        // Cambia a la sección del Mayor (Cuentas T)
+        if (typeof cambiarVista === 'function') {
+            cambiarVista('vista-mayor');
+        }
+        
+        const titulo = document.getElementById('titulo-reporte-seleccionado');
+        if (titulo) {
+            titulo.innerText = "LIBRO MAYOR";
+        }
+        
+        console.log(`Cargando Libro Mayor para el periodo: ${periodo}`);
     }
-}
+
+    // 3. Sincronización de Datos
+    // Llamamos a cargarRegistros, que ya configuramos para que:
+    // - Consulte Supabase filtrando por el periodo.
+    // - Dibuje los asientos agrupados si ve la 'vista-diario'.
+    // - Dibuje las Cuentas T si ve la 'vista-mayor'.
+    try {
+        await cargarRegistros();
+    } catch (error) {
+        console.error("Error al actualizar el reporte:", error);
+    }
+    }
 
    function mostrarAsientosEnTabla(datos) {
     const contenedor = document.getElementById('tabla-registros');

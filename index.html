@@ -1007,13 +1007,15 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     const btnEliminar = document.getElementById('btnActivarBorrado');
     const btnConfirmar = document.getElementById('btnConfirmarBorrado');
 
+    // --- BLOQUEO FÍSICO DE LA TABLA ---
     if (modoLectura) {
-        if (btnAgregar) btnAgregar.style.display = 'none';
-        if (btnEliminar) btnEliminar.style.display = 'none';
-        if (btnConfirmar) btnConfirmar.style.display = 'none';
+        contenedor.style.pointerEvents = "none"; // Impide clics y escritura
+        contenedor.style.userSelect = "none";    // Impide seleccionar texto
+        contenedor.style.filter = "grayscale(0.5)"; // Efecto visual de archivo
     } else {
-        if (btnAgregar) btnAgregar.style.display = 'inline-block';
-        if (btnEliminar) btnEliminar.style.display = 'inline-block';
+        contenedor.style.pointerEvents = "auto";
+        contenedor.style.userSelect = "auto";
+        contenedor.style.filter = "none";
     }
 
     // 1. Agrupamos los datos por Asiento
@@ -1146,34 +1148,46 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
 }
 
 async function verDetalleReporte(tipo) {
-    // Usamos el periodo que guardamos al tocar "Ver Reporte"
-    const periodoParaFiltrar = periodoSeleccionadoHistorial; 
+    // Usamos el periodo que guardamos al tocar "Ver Reporte" en la lista de cierres
+    const periodoOriginal = periodoSeleccionadoHistorial; 
+    // Buscamos con el prefijo que el sistema le puso al cerrar el mes
+    const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
 
     if (tipo === 'diario') {
-        // Forzamos al sistema a mostrar el periodo del historial
-        document.getElementById('textoPeriodoDiario').innerText = periodoParaFiltrar;
+        document.getElementById('textoPeriodoDiario').innerText = periodoOriginal;
         cambiarVista('vista-diario');
         
-        // Llamamos a cargar registros pero pasando el periodo del historial
+        // Consultamos los asientos que tienen el periodo "ARCHIVADO_..."
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoArchivado);
+        
+        if (error) {
+            console.error("Error al cargar historial:", error);
+            return;
+        }
+
+        // IMPORTANTE: Pasamos "true" para activar el Modo Lectura (Bloqueo de edición)
+        mostrarAsientosEnTabla(data || [], true);
+        
+    } else if (tipo === 'mayor') {
+        document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
+        cambiarVista('vista-mayor');
+        
+        // Consultamos los asientos archivados para el mayor
         const { data } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoParaFiltrar); // Buscamos los registros de ese mes
-        
-        mostrarAsientosEnTabla(data || []);
-    } else {
-        document.getElementById('mayorPeriodoHeader').innerText = periodoParaFiltrar;
-        cambiarVista('vista-mayor');
-        // Aquí cargarías la lógica del mayor para ese periodo
+            .eq('periodo', periodoArchivado);
+
+        // Aquí podrías llamar a una función específica para dibujar el mayor del historial
+        if (data) {
+            // Si tienes una función para procesar datos del mayor, úsala aquí
+            console.log("Datos del mayor cargados:", data.length);
+        }
     } 
-} 
-
-// --- LÓGICA DE ELIMINACIÓN DE ASIENTOS ---
-
-/**
- * Activa o desactiva la visualización de los checkboxes de borrado.
- * Vinculada a tu botón id="btnActivarBorrado"
- */
+}
     
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');

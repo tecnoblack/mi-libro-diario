@@ -639,54 +639,95 @@ async function generarMayor() {
     const divRes = document.getElementById('resultado-mayor');
     if (!cuentaSel) return;
 
-    // 1. Obtener los movimientos de la cuenta
-    const { data: movs, error } = await _supabase.from('asientos').select('*').eq('cuenta', cuentaSel).order('fecha', { ascending: true });
-    if (error || !movs?.length) { divRes.innerHTML = "<p>Sin datos para esta cuenta.</p>"; return; }
+    // 1. Obtener los movimientos de la cuenta seleccionada
+    const { data: movs, error } = await _supabase
+        .from('asientos')
+        .select('*')
+        .eq('cuenta', cuentaSel)
+        .order('fecha', { ascending: true })
+        .order('id', { ascending: true }); // Segundo orden para mantener consistencia
 
-    // 2. Crear el mapa para que el Asiento sea #1, #2, etc.
-    const { data: todos } = await _supabase.from('asientos').select('asiento_id').order('asiento_id', { ascending: true });
-    const idsUnicos = [...new Set(todos.map(a => a.asiento_id))];
-    const mapaCorr = {}; 
-    idsUnicos.forEach((id, i) => { if (id) mapaCorr[id] = i + 1; });
+    if (error || !movs?.length) { 
+        divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Sin datos para esta cuenta en el periodo seleccionado.</p>"; 
+        return; 
+    }
 
-    // 3. Construir la tabla con ASIENTO a la derecha de EXPLICACIÓN
-    let html = `<div class="info-mayor-header">
-        <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
-        <table class="tabla-mayor">
+    // 2. Mapeo de Asientos Inteligente
+    // Obtenemos todos los IDs de asiento distintos de la DB para asignarles el #1, #2, etc.
+    // Usamos select('asiento_id') con orden para que el correlativo sea cronológico
+    const { data: todosIds } = await _supabase
+        .from('asientos')
+        .select('asiento_id')
+        .order('fecha', { ascending: true })
+        .order('id', { ascending: true });
+
+    const mapaCorr = {};
+    if (todosIds) {
+        // Filtramos duplicados manteniendo el orden cronológico
+        const idsUnicos = [...new Set(todosIds.map(a => a.asiento_id))];
+        idsUnicos.forEach((id, i) => { 
+            if (id) mapaCorr[id] = i + 1; 
+        });
+    }
+
+    // 3. Construir la tabla
+    let html = `
+    <div class="info-mayor-header">
+        <div class="cuenta-ref-row" style="display:flex; justify-content:space-between; margin-bottom:15px; font-weight:bold; color:var(--azul-pro); border-bottom:2px solid #eee; padding-bottom:5px;">
+            <span>CUENTA: ${cuentaSel.toUpperCase()}</span>
+            <span>REF: ${movs[0].ref || 'S/R'}</span>
+        </div>
+        <table class="tabla-mayor" style="width:100%; border-collapse: collapse;">
             <thead>
-                <tr>
-                    <th>FECHA</th>
-                    <th>EXPLICACIÓN</th>
-                    <th style="text-align:center;">ASIENTO</th>
-                    <th>DÉBITO</th>
-                    <th>CRÉDITO</th>
-                    <th>SALDO</th>
+                <tr style="background:#f8fafc;">
+                    <th style="border:1px solid #ddd; padding:8px;">FECHA</th>
+                    <th style="border:1px solid #ddd; padding:8px;">EXPLICACIÓN (GLOSA)</th>
+                    <th style="border:1px solid #ddd; padding:8px; text-align:center;">ASIENTO</th>
+                    <th style="border:1px solid #ddd; padding:8px; text-align:right;">DÉBITO</th>
+                    <th style="border:1px solid #ddd; padding:8px; text-align:right;">CRÉDITO</th>
+                    <th style="border:1px solid #ddd; padding:8px; text-align:right;">SALDO</th>
                 </tr>
             </thead>
             <tbody>`;
 
-    let saldo = 0;
+    let saldoAcumulado = 0;
+
     movs.forEach(m => {
-        saldo += (m.debito - m.credito);
+        const debito = m.debito || 0;
+        const credito = m.credito || 0;
+        saldoAcumulado += (debito - credito);
+        
+        // Recuperamos el número correlativo del mapa
         const numAsiento = mapaCorr[m.asiento_id] || "S/N";
 
-        html += `<tr>
-            <td>${m.fecha}</td>
-            <td>${m.descripcion}</td>
-            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-            <td>${m.debito.toFixed(2)}</td>
-            <td>${m.credito.toFixed(2)}</td>
-            <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
-        </tr>`;
+        html += `
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:8px; text-align:center;">${m.fecha}</td>
+                <td style="padding:8px;">${m.descripcion}</td>
+                <td style="padding:8px; text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
+                <td style="padding:8px; text-align:right;">${debito.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td style="padding:8px; text-align:right;">${credito.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td style="padding:8px; text-align:right; font-weight:bold; color:${saldoAcumulado >= 0 ? '#16a34a' : '#dc2626'};">
+                    ${Math.abs(saldoAcumulado).toLocaleString(undefined, {minimumFractionDigits:2})}
+                </td>
+            </tr>`;
     });
 
-    const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
-    html += `</tbody></table><div style="text-align:right; margin-top:15px; font-weight:bold;">
-        SALDO: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipo}</span>
-    </div></div>`;
+    const tipoSaldo = saldoAcumulado >= 0 ? 'DEUDOR' : 'ACREEDOR';
+
+    html += `
+            </tbody>
+        </table>
+        <div style="text-align:right; margin-top:20px; font-size:1.1rem;">
+            <span style="font-weight:bold;">SALDO FINAL:</span> 
+            <span style="padding:5px 10px; border-radius:6px; background:${saldoAcumulado >= 0 ? '#dcfce7' : '#fee2e2'}; color:${saldoAcumulado >= 0 ? '#16a34a' : '#dc2626'}; font-weight:bold;">
+                ${Math.abs(saldoAcumulado).toLocaleString(undefined, {minimumFractionDigits:2})} (${tipoSaldo})
+            </span>
+        </div>
+    </div>`;
     
     divRes.innerHTML = html;
-}
+    }
 
     // Funciones de Borrado
     function activarModoBorrado() {

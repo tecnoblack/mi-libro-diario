@@ -230,7 +230,21 @@
                     
     <div id="tabla-registros"></div>
 </div>
+                
+                <div id="vista-balance" class="seccion-vista">
+    <div class="contenedor-principal">
+        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+        <div class="header-contable">
+            <h2>BALANCE GENERAL</h2>
+            <p id="balance-periodo-header">Periodo: Sin seleccionar</p>
+        </div>
+        
+        <div id="contenedor-balance" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
             </div>
+        
+        <button class="btn-accion-azul" onclick="imprimirBalance()" style="margin-top:20px; width:100%;">Descargar PDF / Imprimir</button>
+    </div>
+           </div>
         </div>
     </div>
     

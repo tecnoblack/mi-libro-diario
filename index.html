@@ -1299,16 +1299,19 @@ async function confirmarEliminacion() {
 }
 
     async function generarBalanceGeneral() {
-    const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
-    const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+    let periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+    let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
     
-    // 1. Obtener datos de Supabase
+    // Intentamos buscar el periodo normal y el archivado
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
-        .eq('periodo', periodo);
+        .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`); // Busca ambos casos
 
-    if (error) return;
+    if (error) {
+        console.error("Error en Balance:", error);
+        return;
+    }
 
     // 2. Calcular saldos por cuenta
     const saldos = {};

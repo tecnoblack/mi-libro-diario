@@ -1303,6 +1303,94 @@ async function confirmarEliminacion() {
         }
     }
 }
+
+    async function generarBalanceGeneral() {
+    const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+    const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+    
+    // 1. Obtener datos de Supabase
+    const { data, error } = await _supabase
+        .from('asientos')
+        .select('*')
+        .eq('periodo', periodo);
+
+    if (error) return;
+
+    // 2. Calcular saldos por cuenta
+    const saldos = {};
+    data.forEach(reg => {
+        if (!saldos[reg.cuenta]) saldos[reg.cuenta] = 0;
+        saldos[reg.cuenta] += (reg.debito || 0) - (reg.credito || 0);
+    });
+
+    // 3. Clasificación según la estructura de las imágenes
+    const categorias = {
+        activo: { titulo: "ACTIVOS", cuentas: {}, total: 0 },
+        pasivo: { titulo: "PASIVOS", cuentas: {}, total: 0 },
+        patrimonio: { titulo: "PATRIMONIO", cuentas: {}, total: 0 }
+    };
+
+    // Lógica de clasificación simple (puedes expandir según tus nombres de cuenta)
+    for (let cuenta in saldos) {
+        let monto = saldos[cuenta];
+        if (monto === 0) continue;
+
+        let nombre = cuenta.toUpperCase();
+        
+        // Clasificación automática básica
+        if (nombre.includes("CAJA") || nombre.includes("BANCO") || nombre.includes("INVENTARIO") || nombre.includes("EQUIPO")) {
+            categorias.activo.cuentas[cuenta] = monto;
+            categorias.activo.total += monto;
+        } else if (nombre.includes("CUENTAS POR PAGAR") || nombre.includes("PRESTAMO") || nombre.includes("DEBITO FISCAL")) {
+            categorias.pasivo.cuentas[cuenta] = Math.abs(monto);
+            categorias.pasivo.total += Math.abs(monto);
+        } else {
+            categorias.patrimonio.cuentas[cuenta] = Math.abs(monto);
+            categorias.patrimonio.total += Math.abs(monto);
+        }
+    }
+
+    renderizarTablaBalance(categorias);
+}
+
+function renderizarTablaBalance(cat) {
+    let html = `
+        <table style="width:100%; border-collapse: collapse; font-family: monospace;">
+            <tr style="background:#f1f5f9; font-weight:bold;"><td colspan="2">ACTIVOS</td></tr>`;
+    
+    for (let c in cat.activo.cuentas) {
+        html += `<tr><td style="padding:5px;">${c}</td><td style="text-align:right;">${cat.activo.cuentas[c].toLocaleString()}</td></tr>`;
+    }
+    
+    html += `
+            <tr style="font-weight:bold; border-top:1px solid #000;"><td>TOTAL ACTIVOS</td><td style="text-align:right;">${cat.activo.total.toLocaleString()}</td></tr>
+            <tr style="height:20px;"></tr>
+            <tr style="background:#f1f5f9; font-weight:bold;"><td colspan="2">PASIVOS</td></tr>`;
+
+    for (let c in cat.pasivo.cuentas) {
+        html += `<tr><td style="padding:5px;">${c}</td><td style="text-align:right;">${cat.pasivo.cuentas[c].toLocaleString()}</td></tr>`;
+    }
+
+    html += `
+            <tr style="font-weight:bold; border-top:1px solid #000;"><td>TOTAL PASIVOS</td><td style="text-align:right;">${cat.pasivo.total.toLocaleString()}</td></tr>
+            <tr style="height:20px;"></tr>
+            <tr style="background:#f1f5f9; font-weight:bold;"><td colspan="2">PATRIMONIO</td></tr>`;
+
+    for (let c in cat.patrimonio.cuentas) {
+        html += `<tr><td style="padding:5px;">${c}</td><td style="text-align:right;">${cat.patrimonio.cuentas[c].toLocaleString()}</td></tr>`;
+    }
+
+    html += `
+            <tr style="font-weight:bold; border-top:1px solid #000;"><td>TOTAL PATRIMONIO</td><td style="text-align:right;">${cat.patrimonio.total.toLocaleString()}</td></tr>
+            <tr style="height:30px;"></tr>
+            <tr style="background:#2563eb; color:white; font-weight:bold;">
+                <td>TOTAL PASIVO + PATRIMONIO</td>
+                <td style="text-align:right;">${(cat.pasivo.total + cat.patrimonio.total).toLocaleString()}</td>
+            </tr>
+        </table>`;
+
+    document.getElementById('contenedor-balance').innerHTML = html;
+    }
     
         </script>
     

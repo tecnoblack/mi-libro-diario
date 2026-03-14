@@ -221,30 +221,24 @@
             <div id="cont-historial-mayor" style="display:none;">
                 <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">MOVIMIENTOS DEL LIBRO MAYOR</div>
                 <div id="tabla-historial-mayor"></div>
-
-                <div id="contenedor-reporte-mes">
-    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-        <button class="etiqueta-btn" onclick="verDiarioDelMes()">📖 Libro Diario</button>
-        <button class="etiqueta-btn" onclick="verMayorDelMes()">📊 Libro Mayor</button>
-    </div>
-                    
-    <div id="tabla-registros"></div>
-</div>
-                
-                <div id="vista-balance" class="seccion-vista">
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        <div class="header-contable">
-            <h2>BALANCE GENERAL</h2>
-            <p id="balance-periodo-header">Periodo: Sin seleccionar</p>
-        </div>
-        
-        <div id="contenedor-balance" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
             </div>
-        
-        <button class="btn-accion-azul" onclick="imprimirBalance()" style="margin-top:20px; width:100%;">Descargar PDF / Imprimir</button>
+        </div>
     </div>
-           </div>
+
+    <div id="vista-balance" class="seccion-vista">
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+            <div class="header-contable">
+                <h2 style="color: var(--azul-pro);">BALANCE GENERAL</h2>
+                <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
+                    PERIODO: <span id="balance-periodo-header" style="font-weight: bold;">Sin seleccionar</span>
+                </div>
+            </div>
+            
+            <div id="contenedor-balance" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 20px;">
+                </div>
+            
+            <button class="btn-accion-azul" onclick="window.print()" style="margin-top:20px; width:100%; background-color: var(--verde-exito);">🖨️ Imprimir Reporte</button>
         </div>
     </div>
     

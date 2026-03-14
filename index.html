@@ -1311,7 +1311,6 @@ async function confirmarEliminacion() {
 
  async function generarBalanceGeneral() {
     try {
-        // 1. Intentar obtener el periodo
         let elementoPeriodo = document.getElementById('textoPeriodoDiario');
         let periodoRaw = elementoPeriodo ? elementoPeriodo.innerText : "";
         
@@ -1320,11 +1319,10 @@ async function confirmarEliminacion() {
         }
 
         let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
-        
         const header = document.getElementById('balance-periodo-header');
         if(header) header.innerText = periodo;
 
-        // 2. Consultar Supabase
+        // CONSULTA A SUPABASE
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -1334,15 +1332,20 @@ async function confirmarEliminacion() {
 
         if (!data || data.length === 0) {
             document.getElementById('contenedor-balance').innerHTML = 
-                "<p style='text-align:center; color:gray; padding:20px;'>No hay asientos registrados para este periodo.</p>";
+                `<div style="text-align:center; padding:20px; color:gray;">
+                    <p>No se encontraron datos para: <b>${periodo}</b></p>
+                    <small>Verifica que el nombre del mes coincida exactamente con el Libro Diario.</small>
+                </div>`;
             return;
         }
 
-        // 3. CALCULAR SALDOS (Esto faltaba en tu código)
+        // --- DIAGNÓSTICO EN CONSOLA ---
+        console.log("Datos recuperados de Supabase:", data.length, "filas");
+        
         const saldos = {};
         data.forEach(reg => {
             if (!saldos[reg.cuenta]) saldos[reg.cuenta] = 0;
-            saldos[reg.cuenta] += (reg.debito || 0) - (reg.credito || 0);
+            saldos[reg.cuenta] += (Number(reg.debito) || 0) - (Number(reg.credito) || 0);
         });
 
         const cat = {
@@ -1356,27 +1359,27 @@ async function confirmarEliminacion() {
             if (monto === 0) continue;
             let n = cuenta.toUpperCase();
 
-            // Clasificación
-            if (n.includes("CAJA") || n.includes("BANCO") || n.includes("INVENTARIO") || n.includes("MOBILIARIO") || n.includes("EQUIPO") || n.includes("VEHICULO") || n.includes("ACTIVO")) {
+            // CLASIFICACIÓN MEJORADA (Más flexible)
+            if (n.includes("CAJA") || n.includes("BANCO") || n.includes("INVENTARIO") || n.includes("MOBILIARIO") || n.includes("EQUIPO") || n.includes("VEHICULO") || n.includes("ACTIVO") || n.includes("EFECTIVO")) {
                 cat.activo.cuentas[cuenta] = monto;
                 cat.activo.total += monto;
-            } else if (n.includes("PAGAR") || n.includes("PRESTAMO") || n.includes("DEBITO FISCAL") || n.includes("PASIVO")) {
+            } else if (n.includes("PAGAR") || n.includes("PRESTAMO") || n.includes("DEBITO FISCAL") || n.includes("PASIVO") || n.includes("RETENCION")) {
                 cat.pasivo.cuentas[cuenta] = Math.abs(monto);
                 cat.pasivo.total += Math.abs(monto);
             } else {
+                // TODO LO QUE NO RECONOZCA VA A PATRIMONIO POR DEFECTO PARA QUE NO SALGA EN BLANCO
                 cat.patrimonio.cuentas[cuenta] = Math.abs(monto);
                 cat.patrimonio.total += Math.abs(monto);
             }
         }
 
-        // 4. Llamar a la función que dibuja la tabla
         renderizarTablaBalance(cat);
 
     } catch (err) {
-        console.error("Error en balance:", err);
+        console.error("Error crítico en balance:", err);
+        document.getElementById('contenedor-balance').innerHTML = "Error al cargar datos.";
     }
-} // <--- ESTA LLAVE FALTABA Y CERRABA TODO
-
+                                               }
 function renderizarTablaBalance(cat) {
     let totalPasPat = cat.pasivo.total + cat.patrimonio.total;
     let html = `

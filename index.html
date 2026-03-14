@@ -349,34 +349,45 @@
 
     function cambiarVista(id) {
     // 1. Ocultar todas las secciones
+    // Buscamos todos los elementos con la clase 'seccion-vista' y les quitamos la clase 'activa'
     document.querySelectorAll('.seccion-vista').forEach(s => s.classList.remove('activa'));
     
     // 2. Mostrar la sección seleccionada
     const vistaDestino = document.getElementById(id);
     if (vistaDestino) {
         vistaDestino.classList.add('activa');
+        // Desplazar al inicio de la página por si la vista anterior era larga
+        window.scrollTo(0, 0);
+    } else {
+        console.error("No se encontró la vista con ID:", id);
+        return; // Salimos si no existe la vista
     }
 
-    // 3. Ocultar el menú lateral (móvil)
+    // 3. Ocultar el menú lateral (útil si añades un sidebar móvil después)
     const sidebar = document.getElementById('sidebar');
     if (sidebar) {
         sidebar.classList.remove('active');
     }
 
-    // --- NUEVO: Cargar datos automáticamente al entrar al Diario o Mayor ---
+    // --- LÓGICA DE CARGA AUTOMÁTICA SEGÚN LA VISTA ---
+
+    // Si entramos al Libro Diario o al Libro Mayor
     if (id === 'vista-diario' || id === 'vista-mayor') {
-        // Esta función se encarga de que si el mes está cerrado ("---"), 
-        // la hoja se vea en blanco automáticamente.
         if (typeof cargarRegistros === 'function') {
             cargarRegistros();
         }
     }
 
-    // Si entramos al historial, cargamos la lista de meses cerrados
-    if (id === 'vista-historial') {
-        if (typeof cargarListaCierres === 'function') {
-            cargarListaCierres();
+    // Si entramos al Balance General
+    if (id === 'vista-balance') {
+        if (typeof generarBalanceGeneral === 'function') {
+            generarBalanceGeneral();
         }
+    }
+
+    // Si regresamos al Menú Principal (opcional: podrías refrescar estados aquí)
+    if (id === 'vista-menu') {
+        // Aquí podrías poner lógica para resetear filtros si lo deseas
     }
     }
 
@@ -1298,57 +1309,55 @@ async function confirmarEliminacion() {
     }
 }
 
-    async function generarBalanceGeneral() {
+ async function generarBalanceGeneral() {
+    // 1. Obtener el periodo actual de la pantalla
     let periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
     let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
     
-    // Intentamos buscar el periodo normal y el archivado
+    // Actualizar el encabezado del balance
+    const header = document.getElementById('balance-periodo-header');
+    if(header) header.innerText = periodo;
+
+    // 2. Consultar Supabase (Buscamos normal o archivado)
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
-        .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`); // Busca ambos casos
+        .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
 
-    if (error) {
-        console.error("Error en Balance:", error);
-        return;
-    }
+    if (error || !data) return;
 
-    // 2. Calcular saldos por cuenta
+    // 3. Sumar saldos por cuenta
     const saldos = {};
     data.forEach(reg => {
         if (!saldos[reg.cuenta]) saldos[reg.cuenta] = 0;
         saldos[reg.cuenta] += (reg.debito || 0) - (reg.credito || 0);
     });
 
-    // 3. Clasificación según la estructura de las imágenes
-    const categorias = {
-        activo: { titulo: "ACTIVOS", cuentas: {}, total: 0 },
-        pasivo: { titulo: "PASIVOS", cuentas: {}, total: 0 },
-        patrimonio: { titulo: "PATRIMONIO", cuentas: {}, total: 0 }
+    // 4. Clasificar (Estructura de tus imágenes)
+    const cat = {
+        activo: { total: 0, cuentas: {} },
+        pasivo: { total: 0, cuentas: {} },
+        patrimonio: { total: 0, cuentas: {} }
     };
 
-    // Lógica de clasificación simple (puedes expandir según tus nombres de cuenta)
     for (let cuenta in saldos) {
         let monto = saldos[cuenta];
         if (monto === 0) continue;
+        let n = cuenta.toUpperCase();
 
-        let nombre = cuenta.toUpperCase();
-        
-        // Clasificación automática básica
-        if (nombre.includes("CAJA") || nombre.includes("BANCO") || nombre.includes("INVENTARIO") || nombre.includes("EQUIPO")) {
-            categorias.activo.cuentas[cuenta] = monto;
-            categorias.activo.total += monto;
-        } else if (nombre.includes("CUENTAS POR PAGAR") || nombre.includes("PRESTAMO") || nombre.includes("DEBITO FISCAL")) {
-            categorias.pasivo.cuentas[cuenta] = Math.abs(monto);
-            categorias.pasivo.total += Math.abs(monto);
+        if (n.includes("CAJA") || n.includes("BANCO") || n.includes("INVENTARIO") || n.includes("MOBILIARIO") || n.includes("EQUIPO") || n.includes("VEHICULO")) {
+            cat.activo.cuentas[cuenta] = monto;
+            cat.activo.total += monto;
+        } else if (n.includes("PAGAR") || n.includes("PRESTAMO") || n.includes("DEBITO FISCAL") || n.includes("PASIVO")) {
+            cat.pasivo.cuentas[cuenta] = Math.abs(monto);
+            cat.pasivo.total += Math.abs(monto);
         } else {
-            categorias.patrimonio.cuentas[cuenta] = Math.abs(monto);
-            categorias.patrimonio.total += Math.abs(monto);
+            cat.patrimonio.cuentas[cuenta] = Math.abs(monto);
+            cat.patrimonio.total += Math.abs(monto);
         }
     }
-
-    renderizarTablaBalance(categorias);
-}
+    renderizarTablaBalance(cat);
+    }
 
 function renderizarTablaBalance(cat) {
     let html = `

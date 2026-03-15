@@ -1338,23 +1338,29 @@ async function confirmarEliminacion() {
         }
 
         // 2. Consulta a Supabase (Buscamos coincidencias exactas y archivadas)
+        // 2. Consulta a Supabase
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
             .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
 
-        if (error) throw error;
+        // CAMBIO AQUÍ: Manejo de error suave para que no te saque al Login
+        if (error) {
+            console.error("Error de Supabase:", error);
+            contenedor.innerHTML = `<div style="color:red; padding:20px;">⚠️ Error de conexión: ${error.message}</div>`;
+            return; 
+        }
 
-        // 3. Si no hay datos, mostrar ayuda visual en lugar de dejarlo en blanco
+        // 3. Si la conexión funcionó pero no encontró nada
         if (!data || data.length === 0) {
             contenedor.innerHTML = `
                 <div style="text-align:center; padding:30px; border:2px dashed #ccc; color:#666;">
-                    <h3>No hay datos para "${periodo}"</h3>
-                    <p>Asegúrate de que los asientos tengan este periodo exacto en la base de datos.</p>
-                    <button onclick="generarBalanceGeneral()" style="padding:10px; cursor:pointer;">🔄 Reintentar</button>
+                    <h3>No hay registros para "${periodo}"</h3>
+                    <p>Revisa que el nombre del mes coincida exactamente con el del Libro Diario.</p>
+                    <button onclick="generarBalanceGeneral()" style="padding:10px; margin-top:10px; cursor:pointer;">🔄 Intentar de nuevo</button>
                 </div>`;
             return;
-        }
+    }
 
         // 4. Procesar saldos netos (Libro Mayor Virtual)
         const mayorVirtual = {};
@@ -1450,12 +1456,19 @@ async function confirmarEliminacion() {
 } // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
+    // 1. Cambiamos la vista primero
     cambiarVista('vista-balance');
     
-    // Forzamos un pequeño retraso para asegurar que el HTML cargó
+    // 2. Esperamos un instante para que el HTML esté listo y ejecutamos
     setTimeout(() => {
-        generarBalanceGeneral();
-    }, 100); 
+        try {
+            generarBalanceGeneral();
+        } catch (e) {
+            console.error("Error al cargar balance:", e);
+            document.getElementById('contenedor-balance').innerHTML = 
+                "<div style='color:red; padding:20px;'>Error al procesar datos. Revisa la consola.</div>";
+        }
+    }, 200);
     }
     
 </script>

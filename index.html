@@ -84,20 +84,21 @@
                 <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
                 <h3>Libro Mayor</h3>
             </div>
-            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
-     onmouseover="this.style.borderColor='#2563eb'" 
-     onmouseout="this.style.borderColor='transparent'"
-     onclick="irABalance()">
-    <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
-    <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
-    <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
-            </div>
         <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
-                <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
-                <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
-            </div>
-        </div>
+        <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
+        <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
     </div>
+
+    <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
+         onmouseover="this.style.borderColor='#2563eb'" 
+         onmouseout="this.style.borderColor='transparent'"
+         onclick="irABalance()">
+        <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
+        <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
+        <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
+    </div>
+
+        </div>
      <div id="vista-diario" class="seccion-vista">
         <div class="contenedor-principal" id="contenedor-diario">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>

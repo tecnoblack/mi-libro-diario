@@ -1308,20 +1308,13 @@ async function confirmarEliminacion() {
     }
 }
 
- async function generarBalanceGeneral() {
+async function generarBalanceGeneral() {
     try {
+        const contenedor = document.getElementById('contenedor-balance');
         let elementoPeriodo = document.getElementById('textoPeriodoDiario');
-        let periodoRaw = elementoPeriodo ? elementoPeriodo.innerText : "";
-        
-        if (!periodoRaw || periodoRaw.includes("Sin asignar")) {
-            periodoRaw = document.getElementById('periodoAsientoManual')?.innerText || "FEBRERO 2026";
-        }
+        let periodo = elementoPeriodo?.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() || "FEBRERO 2026";
 
-        let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
-        const header = document.getElementById('balance-periodo-header');
-        if(header) header.innerText = periodo;
-
-        // CONSULTA A SUPABASE
+        // 1. Obtener datos de Supabase
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -1329,56 +1322,81 @@ async function confirmarEliminacion() {
 
         if (error) throw error;
 
-        if (!data || data.length === 0) {
-            document.getElementById('contenedor-balance').innerHTML = 
-                `<div style="text-align:center; padding:20px; color:gray;">
-                    <p>No se encontraron datos para: <b>${periodo}</b></p>
-                    <small>Verifica que el nombre del mes coincida exactamente con el Libro Diario.</small>
-                </div>`;
-            return;
-        }
-
-        // --- DIAGNÓSTICO EN CONSOLA ---
-        console.log("Datos recuperados de Supabase:", data.length, "filas");
-        
-        const saldos = {};
+        // 2. Agrupar saldos por cuenta
+        const mayorVirtual = {};
         data.forEach(reg => {
-            if (!saldos[reg.cuenta]) saldos[reg.cuenta] = 0;
-            saldos[reg.cuenta] += (Number(reg.debito) || 0) - (Number(reg.credito) || 0);
+            if (!mayorVirtual[reg.cuenta]) {
+                mayorVirtual[reg.cuenta] = { debe: 0, haber: 0 };
+            }
+            mayorVirtual[reg.cuenta].debe += (Number(reg.debito) || 0);
+            mayorVirtual[reg.cuenta].haber += (Number(reg.credito) || 0);
         });
 
-        const cat = {
-            activo: { total: 0, cuentas: {} },
-            pasivo: { total: 0, cuentas: {} },
-            patrimonio: { total: 0, cuentas: {} }
-        };
+        // 3. Crear el HTML de la tabla (Siguiendo tu esquema de "Cuenta | Debe | Haber")
+        let html = `
+            <table style="width:100%; border-collapse: collapse; background: white;">
+                <thead>
+                    <tr style="background: #334155; color: white;">
+                        <th style="padding: 12px; border: 1px solid #333;">CUENTA</th>
+                        <th style="padding: 12px; border: 1px solid #333;">DEBE (Deudor)</th>
+                        <th style="padding: 12px; border: 1px solid #333;">HABER (Acreedor)</th>
+                    </tr>
+                </thead>
+                <tbody>`;
 
-        for (let cuenta in saldos) {
-            let monto = saldos[cuenta];
-            if (monto === 0) continue;
-            let n = cuenta.toUpperCase();
+        let totalDebe = 0;
+        let totalHaber = 0;
 
-            // CLASIFICACIÓN MEJORADA (Más flexible)
-            if (n.includes("CAJA") || n.includes("BANCO") || n.includes("INVENTARIO") || n.includes("MOBILIARIO") || n.includes("EQUIPO") || n.includes("VEHICULO") || n.includes("ACTIVO") || n.includes("EFECTIVO")) {
-                cat.activo.cuentas[cuenta] = monto;
-                cat.activo.total += monto;
-            } else if (n.includes("PAGAR") || n.includes("PRESTAMO") || n.includes("DEBITO FISCAL") || n.includes("PASIVO") || n.includes("RETENCION")) {
-                cat.pasivo.cuentas[cuenta] = Math.abs(monto);
-                cat.pasivo.total += Math.abs(monto);
-            } else {
-                // TODO LO QUE NO RECONOZCA VA A PATRIMONIO POR DEFECTO PARA QUE NO SALGA EN BLANCO
-                cat.patrimonio.cuentas[cuenta] = Math.abs(monto);
-                cat.patrimonio.total += Math.abs(monto);
+        for (let cuenta in mayorVirtual) {
+            const d = mayorVirtual[cuenta].debe;
+            const h = mayorVirtual[cuenta].haber;
+            const saldo = d - h;
+
+            let colDebe = "";
+            let colHaber = "";
+
+            // LÓGICA SEGÚN TUS APUNTES:
+            if (saldo > 0) {
+                colDebe = saldo.toFixed(2);
+                totalDebe += saldo;
+            } else if (saldo < 0) {
+                colHaber = Math.abs(saldo).toFixed(2);
+                totalHaber += Math.abs(saldo);
             }
+
+            html += `
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #cbd5e1;">${cuenta.toUpperCase()}</td>
+                    <td style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; background: #f8fafc;">${colDebe}</td>
+                    <td style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; background: #fffbff;">${colHaber}</td>
+                </tr>`;
         }
 
-        renderizarTablaBalance(cat);
+        // 4. Fila de Totales (Pie del Balance de Comprobación)
+        html += `
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td style="padding: 12px; border: 1px solid #333; text-align: center;">TOTALES</td>
+                    <td style="padding: 12px; border: 1px solid #333; text-align: right;">${totalDebe.toFixed(2)}</td>
+                    <td style="padding: 12px; border: 1px solid #333; text-align: right;">${totalHaber.toFixed(2)}</td>
+                </tr>
+            </tbody>
+        </table>`;
+
+        // 5. Validación de Partida Doble
+        if (Math.abs(totalDebe - totalHaber) > 0.01) {
+            html += `<p style="color:red; font-weight:bold; text-align:center;">⚠️ BALANCE DESCUADRADO</p>`;
+        } else {
+            html += `<p style="color:green; font-weight:bold; text-align:center;">✅ PARTIDA DOBLE VERIFICADA</p>`;
+        }
+
+        contenedor.innerHTML = html;
 
     } catch (err) {
-        console.error("Error crítico en balance:", err);
-        document.getElementById('contenedor-balance').innerHTML = "Error al cargar datos.";
+        console.error(err);
+        document.getElementById('contenedor-balance').innerHTML = "Error al generar balance.";
     }
-                                               }
+    }
+    
 function renderizarTablaBalance(cat) {
     const contenedor = document.getElementById('contenedor-balance');
     

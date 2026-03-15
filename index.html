@@ -1450,11 +1450,12 @@ async function confirmarEliminacion() {
 } // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
-    // 1. Cambia la pantalla a la vista del balance
     cambiarVista('vista-balance');
     
-    // 2. Ejecuta la función que suma todo y dibuja la tabla de 5 columnas
-    generarBalanceGeneral();
+    // Forzamos un pequeño retraso para asegurar que el HTML cargó
+    setTimeout(() => {
+        generarBalanceGeneral();
+    }, 100); 
     }
     
 </script>

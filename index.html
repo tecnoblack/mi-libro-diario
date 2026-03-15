@@ -1427,6 +1427,8 @@ async function confirmarEliminacion() {
 
     function renderizarTablaComprobacion(mayor) {
     const contenedor = document.getElementById('contenedor-balance');
+    if (!contenedor) return;
+
     let sumaDebe = 0;
     let sumaHaber = 0;
 
@@ -1443,12 +1445,10 @@ async function confirmarEliminacion() {
             </thead>
             <tbody>`;
 
-    // Ordenar cuentas alfabéticamente
     const nombresOrdenados = Object.keys(mayor).sort();
 
     nombresOrdenados.forEach(nombre => {
         const info = mayor[nombre];
-        // Calculamos el saldo neto (según tus apuntes de saldo deudor/acreedor)
         const saldoFinal = info.debeTotal - info.haberTotal;
         
         let debeDisplay = "";
@@ -1472,7 +1472,6 @@ async function confirmarEliminacion() {
             </tr>`;
     });
 
-    // Fila de TOTALES (como la línea rosa de tu dibujo)
     html += `
             </tbody>
             <tfoot>
@@ -1484,7 +1483,6 @@ async function confirmarEliminacion() {
             </tfoot>
         </table>`;
 
-    // Verificación de cuadre
     const diferencia = Math.abs(sumaDebe - sumaHaber);
     if (diferencia > 0.01) {
         html += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
@@ -1493,7 +1491,7 @@ async function confirmarEliminacion() {
     }
 
     contenedor.innerHTML = html;
-                        }
+} // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
     // 1. Cambia la pantalla a la vista del balance

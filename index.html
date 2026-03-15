@@ -84,11 +84,6 @@
                 <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
                 <h3>Libro Mayor</h3>
             </div>
-            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" 
-     onclick="cambiarVista('vista-balance'); generarBalanceGeneral();">
-    <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
-    <h3>Balance General</h3>
-            </div>
         <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
                 <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
                 <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
@@ -221,24 +216,16 @@
             <div id="cont-historial-mayor" style="display:none;">
                 <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">MOVIMIENTOS DEL LIBRO MAYOR</div>
                 <div id="tabla-historial-mayor"></div>
-            </div>
-        </div>
-    </div>
 
-    <div id="vista-balance" class="seccion-vista">
-        <div class="contenedor-principal">
-            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <div class="header-contable">
-                <h2 style="color: var(--azul-pro);">BALANCE GENERAL</h2>
-                <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
-                    PERIODO: <span id="balance-periodo-header" style="font-weight: bold;">Sin seleccionar</span>
-                </div>
+                <div id="contenedor-reporte-mes">
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="etiqueta-btn" onclick="verDiarioDelMes()">📖 Libro Diario</button>
+        <button class="etiqueta-btn" onclick="verMayorDelMes()">📊 Libro Mayor</button>
+    </div>
+                    
+    <div id="tabla-registros"></div>
+</div>
             </div>
-            
-            <div id="contenedor-balance" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 20px;">
-                </div>
-            
-            <button class="btn-accion-azul" onclick="window.print()" style="margin-top:20px; width:100%; background-color: var(--verde-exito);">🖨️ Imprimir Reporte</button>
         </div>
     </div>
     
@@ -349,123 +336,130 @@
 
     function cambiarVista(id) {
     // 1. Ocultar todas las secciones
-    // Buscamos todos los elementos con la clase 'seccion-vista' y les quitamos la clase 'activa'
     document.querySelectorAll('.seccion-vista').forEach(s => s.classList.remove('activa'));
     
     // 2. Mostrar la sección seleccionada
     const vistaDestino = document.getElementById(id);
     if (vistaDestino) {
         vistaDestino.classList.add('activa');
-        // Desplazar al inicio de la página por si la vista anterior era larga
-        window.scrollTo(0, 0);
-    } else {
-        console.error("No se encontró la vista con ID:", id);
-        return; // Salimos si no existe la vista
     }
 
-    // 3. Ocultar el menú lateral (útil si añades un sidebar móvil después)
+    // 3. Ocultar el menú lateral (móvil)
     const sidebar = document.getElementById('sidebar');
     if (sidebar) {
         sidebar.classList.remove('active');
     }
 
-    // --- LÓGICA DE CARGA AUTOMÁTICA SEGÚN LA VISTA ---
-
-    // Si entramos al Libro Diario o al Libro Mayor
+    // --- NUEVO: Cargar datos automáticamente al entrar al Diario o Mayor ---
     if (id === 'vista-diario' || id === 'vista-mayor') {
+        // Esta función se encarga de que si el mes está cerrado ("---"), 
+        // la hoja se vea en blanco automáticamente.
         if (typeof cargarRegistros === 'function') {
             cargarRegistros();
         }
     }
 
-    // Si entramos al Balance General
-    if (id === 'vista-balance') {
-        if (typeof generarBalanceGeneral === 'function') {
-            generarBalanceGeneral();
+    // Si entramos al historial, cargamos la lista de meses cerrados
+    if (id === 'vista-historial') {
+        if (typeof cargarListaCierres === 'function') {
+            cargarListaCierres();
         }
     }
-
-    // Si regresamos al Menú Principal (opcional: podrías refrescar estados aquí)
-    if (id === 'vista-menu') {
-        // Aquí podrías poner lógica para resetear filtros si lo deseas
-    }
     }
 
-    async function asignarRefInteligente(inputCuenta) {
-    // 1. Tomamos el valor del input, no el innerText
-    const nombreCuenta = inputCuenta.value.trim().toUpperCase();
-    if (nombreCuenta === "") return;
-    
-    // 2. Buscamos la fila actual y el input de Referencia
-    const filaActual = inputCuenta.closest('tr');
-    const inputRef = filaActual.querySelector('input[placeholder="Ref"], .input-ref');
-    
-    if (!inputRef) return; // Si no hay donde escribir la ref, salimos
-
-    // 3. Consultar si esta cuenta ya tiene una referencia (nota: usamos 'referencia' o la columna que tengas en tu DB)
-    const { data: historial } = await _supabase
-        .from('asientos')
-        .select('referencia') 
-        .eq('cuenta', nombreCuenta)
-        .limit(1);
-
-    if (historial && historial.length > 0 && historial[0].referencia) {
-        inputRef.value = historial[0].referencia; // Reasigna la misma Ref
+    async function asignarRefInteligente(elemento) {
+    // 1. Limpieza y validación: Si no hay cuenta o es el texto por defecto, no hace nada
+    const nombreCuenta = elemento.innerText.trim();
+    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") {
         return;
     }
 
-    // 4. Si es una cuenta nueva, buscar la Ref global más alta
-    const { data: todos } = await _supabase.from('asientos').select('referencia');
-    let maxGlobal = 0;
+    const filaActual = elemento.closest('tr');
+    const celdaRefActual = filaActual.querySelector('.col-ref');
     
-    if (todos) {
-        const numeros = todos.map(a => parseInt(a.referencia)).filter(n => !isNaN(n));
-        maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-    }
-
-    // 5. Verificamos las filas que ya están en pantalla para que no se repita en el mismo asiento
+    // 2. BUSQUEDA EN PANTALLA (Prioridad alta): Evita peticiones innecesarias a Supabase
+    const filas = document.querySelectorAll('#cuerpo-tabla tr');
     let maxEnPantalla = 0;
-    const filas = document.querySelectorAll('#contenedor-filas tr');
+    let refEncontradaEnPantalla = null;
+
     filas.forEach(f => {
-        const inputR = f.querySelector('input[placeholder="Ref"], .input-ref');
-        if (inputR && inputR.value) {
-            const num = parseInt(inputR.value);
-            if (!isNaN(num)) maxEnPantalla = Math.max(maxEnPantalla, num);
+        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim();
+        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
+
+        if (!isNaN(refEnFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
+            // Si la cuenta ya existe en otra fila de esta misma sesión
+            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
+                refEnEncontradaEnPantalla = refEnFila;
+            }
         }
     });
 
-    // Asignamos el número que sea mayor + 1
-    inputRef.value = Math.max(maxGlobal, maxEnPantalla) + 1;
+    // Si ya la encontramos en pantalla, la asignamos y cortamos aquí
+    if (refEncontradaEnPantalla !== null) {
+        celdaRefActual.innerText = refEncontradaEnPantalla;
+        return;
+    }
+
+    // 3. BUSQUEDA EN HISTORIAL (Supabase): Solo si es una cuenta "nueva" en esta sesión
+    try {
+        const { data: historial } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
+
+        if (historial && historial.length > 0) {
+            celdaRefActual.innerText = historial[0].ref;
+            return;
+        }
+
+        // 4. SI ES TOTALMENTE NUEVA: Calcular el siguiente correlativo global
+        const { data: todos } = await _supabase
+            .from('asientos')
+            .select('ref');
+
+        let maxGlobal = 0;
+        if (todos) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
+        }
+
+        // El nuevo número es el máximo entre base de datos y pantalla + 1
+        celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
+
+    } catch (error) {
+        console.error("Error al asignar Ref:", error);
+    }
     }
     
     function agregarFila() {
     const contenedor = document.getElementById('contenedor-filas');
     if (!contenedor) return;
 
-    // Formato para que Supabase no dé error (YYYY-MM-DD)
-    const hoy = new Date().toISOString().split('T')[0]; 
+    // Obtener la fecha actual en formato local (DD/MM/YYYY)
+    // Si prefieres el formato ISO (YYYY-MM-DD), usa: new Date().toISOString().split('T')[0]
+    const hoy = new Date();
+    const fechaAuto = hoy.toLocaleDateString('es-ES'); 
 
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 
 
     nuevaFila.innerHTML = `
-        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${hoy}</td>
+        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
-            oninput="actualizarTotales();" 
-            onblur="asignarRefInteligente(this); ejecutarLogicaIVA();"></td>
-        
-        <td class="col-ref" style="padding:10px; border:1px solid #e2e8f0; text-align:center; font-weight:bold; background:#f8fafc;"></td>
-        
+            oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
+        <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
         <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="actualizarTotales();">0</td>
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
         <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="actualizarTotales();">0</td>
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
             <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
         </td>
     `;
     contenedor.appendChild(nuevaFila);
-                }
+    }
 
     function ejecutarLogicaIVA() {
     actualizarTotales();
@@ -573,45 +567,27 @@ async function guardarAsiento() {
         let datos = [];
         const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
 
-        // --- INICIO DEL BUCLE MODIFICADO ---
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
+            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
             const refFila = f.querySelector('.col-ref').innerText.trim();
-            
-            // CAPTURA Y CORRECCIÓN DE FECHA
-            let fechaFila = f.querySelector('.val-fecha').innerText.trim();
-            
-            // Lógica de conversión para evitar el error "out of range"
-            if (fechaFila && fechaFila.includes('/')) {
-                let partes = fechaFila.split('/');
-                // Convierte DD/MM/YYYY a YYYY-MM-DD
-                fechaFila = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
-            } else if (!fechaFila || fechaFila === "") {
-                fechaFila = new Date().toISOString().split('T')[0]; // Fecha de hoy segura
-            }
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaFila, // Enviamos la fecha ya corregida
-                    cuenta: cuenta, 
-                    ref: refFila, 
-                    debito: d, 
-                    credito: c, 
-                    periodo: periodoActivo, 
-                    descripcion: glosa
+                    fecha: fechaFila, cuenta: cuenta, ref: refFila, 
+                    debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
                 });
             }
         });
-        // --- FIN DEL BUCLE MODIFICADO ---
 
         if (datos.length === 0) {
             Swal.fire("Error", "La tabla está vacía o faltan cuentas.", "error");
             return;
         }
 
-        // 3. Validar Cuadre
+        // 3. Validar Cuadre usando los IDs correctos
         const elTD = document.getElementById('totalDebito');
         const elTC = document.getElementById('totalCredito');
 
@@ -637,18 +613,19 @@ async function guardarAsiento() {
         document.getElementById('contenedor-filas').innerHTML = '';
         if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
         
-        if (typeof agregarFila === 'function') agregarFila(); 
-        if (typeof actualizarTotales === 'function') actualizarTotales();
+        agregarFila(); 
+        actualizarTotales();
 
     } catch (e) {
         console.error("Error al guardar:", e);
+        // Si Swal falla por alguna razón, usamos alert normal para que no haya errores silenciosos
         if (typeof Swal !== 'undefined') {
             Swal.fire("Error", "Fallo técnico: " + e.message, "error");
         } else {
             alert("Error al guardar: " + e.message);
         }
     }
-                }
+}
     
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
@@ -1307,146 +1284,7 @@ async function confirmarEliminacion() {
         }
     }
 }
-
-async function generarBalanceGeneral() {
-    try {
-        const contenedor = document.getElementById('contenedor-balance');
-        let elementoPeriodo = document.getElementById('textoPeriodoDiario');
-        let periodo = elementoPeriodo?.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() || "FEBRERO 2026";
-
-        // 1. Obtener datos de Supabase
-        const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
-
-        if (error) throw error;
-
-        // 2. Agrupar saldos por cuenta
-        const mayorVirtual = {};
-        data.forEach(reg => {
-            if (!mayorVirtual[reg.cuenta]) {
-                mayorVirtual[reg.cuenta] = { debe: 0, haber: 0 };
-            }
-            mayorVirtual[reg.cuenta].debe += (Number(reg.debito) || 0);
-            mayorVirtual[reg.cuenta].haber += (Number(reg.credito) || 0);
-        });
-
-        // 3. Crear el HTML de la tabla (Siguiendo tu esquema de "Cuenta | Debe | Haber")
-        let html = `
-            <table style="width:100%; border-collapse: collapse; background: white;">
-                <thead>
-                    <tr style="background: #334155; color: white;">
-                        <th style="padding: 12px; border: 1px solid #333;">CUENTA</th>
-                        <th style="padding: 12px; border: 1px solid #333;">DEBE (Deudor)</th>
-                        <th style="padding: 12px; border: 1px solid #333;">HABER (Acreedor)</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-        let totalDebe = 0;
-        let totalHaber = 0;
-
-        for (let cuenta in mayorVirtual) {
-            const d = mayorVirtual[cuenta].debe;
-            const h = mayorVirtual[cuenta].haber;
-            const saldo = d - h;
-
-            let colDebe = "";
-            let colHaber = "";
-
-            // LÓGICA SEGÚN TUS APUNTES:
-            if (saldo > 0) {
-                colDebe = saldo.toFixed(2);
-                totalDebe += saldo;
-            } else if (saldo < 0) {
-                colHaber = Math.abs(saldo).toFixed(2);
-                totalHaber += Math.abs(saldo);
-            }
-
-            html += `
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #cbd5e1;">${cuenta.toUpperCase()}</td>
-                    <td style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; background: #f8fafc;">${colDebe}</td>
-                    <td style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; background: #fffbff;">${colHaber}</td>
-                </tr>`;
-        }
-
-        // 4. Fila de Totales (Pie del Balance de Comprobación)
-        html += `
-                <tr style="background: #f1f5f9; font-weight: bold;">
-                    <td style="padding: 12px; border: 1px solid #333; text-align: center;">TOTALES</td>
-                    <td style="padding: 12px; border: 1px solid #333; text-align: right;">${totalDebe.toFixed(2)}</td>
-                    <td style="padding: 12px; border: 1px solid #333; text-align: right;">${totalHaber.toFixed(2)}</td>
-                </tr>
-            </tbody>
-        </table>`;
-
-        // 5. Validación de Partida Doble
-        if (Math.abs(totalDebe - totalHaber) > 0.01) {
-            html += `<p style="color:red; font-weight:bold; text-align:center;">⚠️ BALANCE DESCUADRADO</p>`;
-        } else {
-            html += `<p style="color:green; font-weight:bold; text-align:center;">✅ PARTIDA DOBLE VERIFICADA</p>`;
-        }
-
-        contenedor.innerHTML = html;
-
-    } catch (err) {
-        console.error(err);
-        document.getElementById('contenedor-balance').innerHTML = "Error al generar balance.";
-    }
-    }
     
-function renderizarTablaBalance(cat) {
-    const contenedor = document.getElementById('contenedor-balance');
-    
-    // Si los totales son 0, avisamos en pantalla
-    if (cat.activo.total === 0 && cat.pasivo.total === 0 && cat.patrimonio.total === 0) {
-        contenedor.innerHTML = `
-            <div style="text-align:center; padding:20px; border:2px dashed #ccc;">
-                <p>⚠️ No hay saldos para mostrar en este periodo.</p>
-                <small>Asegúrate de tener asientos guardados y que los nombres de las cuentas sean correctos.</small>
-            </div>`;
-        return;
-    }
-
-    let html = `
-        <table style="width:100%; border-collapse: collapse;">
-            <tr style="background:#2563eb; color:white;"><th colspan="2" style="padding:10px;">ACTIVOS</th></tr>`;
-    
-    for (let c in cat.activo.cuentas) {
-        html += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${c}</td><td style="text-align:right; padding:8px;">${cat.activo.cuentas[c].toFixed(2)}</td></tr>`;
-    }
-    html += `<tr style="font-weight:bold; background:#f1f5f9;"><td>TOTAL ACTIVOS</td><td style="text-align:right;">${cat.activo.total.toFixed(2)}</td></tr>`;
-
-    html += `<tr style="background:#1e40af; color:white;"><th colspan="2" style="padding:10px; border-top:20px solid white;">PASIVOS</th></tr>`;
-    for (let c in cat.pasivo.cuentas) {
-        html += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${c}</td><td style="text-align:right; padding:8px;">${cat.pasivo.cuentas[c].toFixed(2)}</td></tr>`;
-    }
-    html += `<tr style="font-weight:bold; background:#f1f5f9;"><td>TOTAL PASIVOS</td><td style="text-align:right;">${cat.pasivo.total.toFixed(2)}</td></tr>`;
-
-    html += `<tr style="background:#0f172a; color:white;"><th colspan="2" style="padding:10px; border-top:20px solid white;">PATRIMONIO</th></tr>`;
-    for (let c in cat.patrimonio.cuentas) {
-        html += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${c}</td><td style="text-align:right; padding:8px;">${cat.patrimonio.cuentas[c].toFixed(2)}</td></tr>`;
-    }
-    html += `<tr style="font-weight:bold; background:#f1f5f9;"><td>TOTAL PATRIMONIO</td><td style="text-align:right;">${cat.patrimonio.total.toFixed(2)}</td></tr>`;
-
-    // Verificación de la Ecuación Contable
-    const totalPasivoPatrimonio = cat.pasivo.total + cat.patrimonio.total;
-    html += `
-        <tr style="background:#e2e8f0; font-weight:bold; border-top:2px solid #000;">
-            <td style="padding:10px;">TOTAL PASIVO + PATRIMONIO</td>
-            <td style="text-align:right; padding:10px;">${totalPasivoPatrimonio.toFixed(2)}</td>
-        </tr>
-    </table>`;
-
-    if (Math.abs(cat.activo.total - totalPasivoPatrimonio) > 0.1) {
-        html += `<p style="color:red; text-align:center; font-weight:bold; margin-top:10px;">⚠️ EL BALANCE NO ESTÁ CUADRADO</p>`;
-    }
-
-    contenedor.innerHTML = html;
-    }
-
         </script>
     
 <div id="modal-periodo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">

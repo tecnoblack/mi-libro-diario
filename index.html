@@ -335,14 +335,13 @@
     }
 
     async function asignarRefInteligente(elemento) {
-    // Si usas un <input>, cambia .innerText por .value
-    const nombreCuenta = elemento.innerText.trim(); 
-    if (!nombreCuenta) return;
+    const nombreCuenta = elemento.innerText.trim();
+    if (nombreCuenta === "") return;
 
     const filaActual = elemento.closest('tr');
     const celdaRefActual = filaActual.querySelector('.col-ref');
 
-    // 1. Verificar si la cuenta ya existe en la Base de Datos
+    // 1. Buscar si la cuenta ya existe en la Base de Datos
     const { data: historial } = await _supabase
         .from('asientos')
         .select('ref')
@@ -354,51 +353,36 @@
         return;
     }
 
-    // 2. Si no está en BD, buscamos en la PANTALLA
-    const filas = document.querySelectorAll('#cuerpo-tabla tr');
+    // 2. Si no está en BD, buscar en las otras filas que están en pantalla actualmente
+    const filas = document.querySelectorAll('.fila-asiento');
     let maxEnPantalla = 0;
-    let refPropia = null;
+    let refEncontradaEnPantalla = null;
 
     filas.forEach(f => {
-        if (f === filaActual) return; // Saltamos la fila que estamos editando
-
-        const elCuenta = f.querySelector('.txt-cuenta');
-        const elRef = f.querySelector('.col-ref');
+        if (f === filaActual) return; // No compararse consigo misma
+        const nFila = f.querySelector('.txt-cuenta').innerText.trim();
+        const rFila = parseInt(f.querySelector('.col-ref').innerText);
         
-        if (!elCuenta || !elRef) return;
-
-        const nFila = elCuenta.innerText.trim();
-        const textoRef = elRef.innerText.trim();
-        const rFila = parseInt(textoRef, 10);
-
         if (!isNaN(rFila)) {
             maxEnPantalla = Math.max(maxEnPantalla, rFila);
-            // Si otra fila en pantalla tiene la misma cuenta, copiamos su ref
-            if (nFila === nombreCuenta) {
-                refPropia = rFila;
-            }
+            if (nFila === nombreCuenta) refEncontradaEnPantalla = rFila;
         }
     });
 
-    if (refPropia !== null) {
-        celdaRefActual.innerText = refPropia;
+    if (refEncontradaEnPantalla !== null) {
+        celdaRefActual.innerText = refEncontradaEnPantalla;
         return;
     }
 
-    // 3. Si no está en pantalla, buscamos el número MÁXIMO en la Base de Datos
-    // Esto es mucho más eficiente que traer toda la tabla
-    const { data: maxBD } = await _supabase
-        .from('asientos')
-        .select('ref')
-        .order('ref', { ascending: false })
-        .limit(1);
-
+    // 3. Si es una cuenta totalmente nueva, buscar el máximo global en la BD para seguir la secuencia
+    const { data: todos } = await _supabase.from('asientos').select('ref');
     let maxGlobal = 0;
-    if (maxBD && maxBD.length > 0) {
-        maxGlobal = parseInt(maxBD[0].ref, 10) || 0;
+    if (todos && todos.length > 0) {
+        const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+        maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
     }
 
-    // 4. Asignamos el nuevo número
+    // Asignar el nuevo número correlativo
     celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
     }
     
@@ -414,19 +398,14 @@
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 
 
-    nuevaFila.innerHTML = `
-        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
-        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
-            oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
-        <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
-        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
-        <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
-        </td>
-    `;
+    // Ejemplo de cómo deberías crear la celda en tu función agregarFila
+nuevaFila.innerHTML = `
+    <td class="val-fecha">${fechaHoy}</td>
+    <td class="txt-cuenta" contenteditable="true" onblur="asignarRefInteligente(this)"></td>
+    <td class="col-ref"></td>
+    <td class="val-debito" contenteditable="true">0</td>
+    <td class="val-credito" contenteditable="true">0</td>
+`;
     contenedor.appendChild(nuevaFila);
     }
 

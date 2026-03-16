@@ -232,30 +232,15 @@
 
     <div id="vista-balance" class="seccion-vista">
     <div class="contenedor-principal">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <button class="btn-accion-azul" onclick="window.print()" style="background-color: #059669;">🖨️ Imprimir Reporte</button>
+        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+        <div class="header-contable">
+            <h1 id="balanceEmpresaNombre">COMERCIAL A B C, C.A.</h1>
+            <p>RIF: <span id="balanceEmpresaRif">J-00000000-0</span></p>
+            <p><b>BALANCE DE COMPROBACIÓN</b></p>
+            <div class="linea-periodo">PERÍODO: <span id="balance-periodo-header">Cargando...</span></div>
         </div>
-
-        <div class="header-contable" style="border: 2px solid #000; padding: 15px; text-align: center; margin-bottom: 20px; background: white;">
-            <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">COMERCIAL A B C, C.A.</h1>
-            <p style="margin: 5px 0;">RIF: J-00000000-0</p>
-            <h2 style="margin: 10px 0; text-decoration: underline;">BALANCE DE COMPROBACIÓN</h2>
-            <div style="font-weight: bold; margin-top: 10px;">
-                PERIODO: <span id="balance-periodo-header">Cargando...</span>
+        <div id="contenedor-balance" style="overflow-x: auto;">
             </div>
-        </div>
-
-        <div id="contenedor-balance" style="overflow-x: auto; background: white; border-radius: 8px;">
-            <p style="text-align: center; padding: 40px; color: #64748b;">
-                Haga clic en el botón para generar los saldos...
-            </p>
-        </div>
-
-        <div style="margin-top: 30px; display: flex; justify-content: space-around; text-align: center;">
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Preparado por</div>
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Revisado por</div>
-        </div>
     </div>
     </div>
     
@@ -1317,73 +1302,43 @@ async function confirmarEliminacion() {
 
     async function generarBalanceGeneral() {
     const contenedor = document.getElementById('contenedor-balance');
-    if (!contenedor) return alert("No se encontró el contenedor-balance en el HTML");
+    const periodo = document.getElementById('textoPeriodoDiario').innerText.replace("PERIODO:", "").trim();
+    
+    document.getElementById('balance-periodo-header').innerText = periodo;
+    contenedor.innerHTML = "<p style='text-align:center;'>Calculando saldos...</p>";
 
     try {
-        contenedor.innerHTML = "<div style='text-align:center; padding:20px;'>🔍 Buscando registros en la base de datos...</div>";
+        const { data, error } = await _supabase.from('asientos').select('*').eq('periodo', periodo);
+        if (error) throw error;
 
-        // 1. Identificar periodo
-        let periodoRaw = document.getElementById('textoPeriodoDiario')?.innerText || 
-                         document.getElementById('periodoAsientoManual')?.innerText || "";
-        
-        // Si no encuentra periodo en el texto, usamos un prompt para que tú lo escribas
-        let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
-        
-        if (!periodo) {
-            periodo = prompt("No detecté el periodo automáticamente. Escribe el mes y año (Ej: FEBRERO 2026):");
-        }
-
-        if(document.getElementById('balance-periodo-header')) {
-            document.getElementById('balance-periodo-header').innerText = periodo;
-        }
-
-        // 2. Consulta a Supabase (Buscamos coincidencias exactas y archivadas)
-        // 2. Consulta a Supabase
-        const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
-
-        // CAMBIO AQUÍ: Manejo de error suave para que no te saque al Login
-        if (error) {
-            console.error("Error de Supabase:", error);
-            contenedor.innerHTML = `<div style="color:red; padding:20px;">⚠️ Error de conexión: ${error.message}</div>`;
-            return; 
-        }
-
-        // 3. Si la conexión funcionó pero no encontró nada
         if (!data || data.length === 0) {
-            contenedor.innerHTML = `
-                <div style="text-align:center; padding:30px; border:2px dashed #ccc; color:#666;">
-                    <h3>No hay registros para "${periodo}"</h3>
-                    <p>Revisa que el nombre del mes coincida exactamente con el del Libro Diario.</p>
-                    <button onclick="generarBalanceGeneral()" style="padding:10px; margin-top:10px; cursor:pointer;">🔄 Intentar de nuevo</button>
-                </div>`;
+            contenedor.innerHTML = "<div style='text-align:center; padding:20px;'>No hay datos en este periodo.</div>";
             return;
-    }
+        }
 
-        // 4. Procesar saldos netos (Libro Mayor Virtual)
-        const mayorVirtual = {};
-        data.forEach(reg => {
-            const c = reg.cuenta.toUpperCase().trim();
-            if (!mayorVirtual[c]) {
-                mayorVirtual[c] = { 
-                    fecha: reg.fecha || "-", 
-                    referencia: reg.ref || reg.referencia || "-", 
-                    debeTotal: 0, 
-                    haberTotal: 0 
-                };
-            }
-            mayorVirtual[c].debeTotal += (Number(reg.debito) || 0);
-            mayorVirtual[c].haberTotal += (Number(reg.credito) || 0);
+        // --- LÓGICA DE SUMA ---
+        const saldos = {};
+        data.forEach(as => {
+            if (!saldos[as.cuenta]) saldos[as.cuenta] = { d: 0, c: 0, ref: as.ref };
+            saldos[as.cuenta].d += as.debito;
+            saldos[as.cuenta].c += as.credito;
         });
 
-        // 5. Dibujar la tabla de 5 columnas
-        renderizarTablaComprobacion(mayorVirtual);
+        // --- DIBUJAR TABLA ---
+        let tabla = `<table><thead><tr><th>REF</th><th>CUENTA</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+        let td = 0, tc = 0;
 
-    } catch (err) {
-        console.error("Error en Balance:", err);
-        contenedor.innerHTML = `<div style="color:red; padding:20px;">Error técnico: ${err.message}</div>`;
+        for (const c in saldos) {
+            const s = saldos[c];
+            td += s.d; tc += s.c;
+            tabla += `<tr><td>${s.ref}</td><td>${c}</td><td>${s.d.toFixed(2)}</td><td>${s.c.toFixed(2)}</td></tr>`;
+        }
+
+        tabla += `<tr class="fila-totales-libro"><td colspan="2">TOTALES</td><td>${td.toFixed(2)}</td><td>${tc.toFixed(2)}</td></tr></tbody></table>`;
+        contenedor.innerHTML = tabla;
+
+    } catch (e) {
+        contenedor.innerHTML = "Error al cargar datos.";
     }
     }
     
@@ -1456,19 +1411,17 @@ async function confirmarEliminacion() {
 } // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
-    // 1. Primero mostramos la pantalla del balance
+    // 1. Cambiamos la vista
     cambiarVista('vista-balance');
     
-    // 2. Esperamos un instante para que el HTML esté listo y ejecutamos
+    // 2. Ponemos los mismos nombres del encabezado que tienes en el Diario
+    document.getElementById('balanceEmpresaNombre').innerText = document.getElementById('empresaNombre').innerText;
+    document.getElementById('balanceEmpresaRif').innerText = document.getElementById('empresaRif').innerText;
+
+    // 3. Ejecutamos la carga de datos
     setTimeout(() => {
-        try {
-            generarBalanceGeneral();
-        } catch (e) {
-            console.error("Error al cargar balance:", e);
-            document.getElementById('contenedor-balance').innerHTML = 
-                "<div style='color:red; padding:20px;'>Error al procesar datos. Revisa la consola.</div>";
-        }
-    }, 300);
+        generarBalanceGeneral();
+    }, 200);
     }
     
 </script>

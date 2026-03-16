@@ -335,69 +335,71 @@
     }
 
     async function asignarRefInteligente(elemento) {
-    // 1. Limpieza y validación: Si no hay cuenta o es el texto por defecto, no hace nada
-    const nombreCuenta = elemento.innerText.trim();
-    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") {
-        return;
-    }
+    // Si usas un <input>, cambia .innerText por .value
+    const nombreCuenta = elemento.innerText.trim(); 
+    if (!nombreCuenta) return;
 
     const filaActual = elemento.closest('tr');
     const celdaRefActual = filaActual.querySelector('.col-ref');
-    
-    // 2. BUSQUEDA EN PANTALLA (Prioridad alta): Evita peticiones innecesarias a Supabase
+
+    // 1. Verificar si la cuenta ya existe en la Base de Datos
+    const { data: historial } = await _supabase
+        .from('asientos')
+        .select('ref')
+        .eq('cuenta', nombreCuenta)
+        .limit(1);
+
+    if (historial && historial.length > 0) {
+        celdaRefActual.innerText = historial[0].ref;
+        return;
+    }
+
+    // 2. Si no está en BD, buscamos en la PANTALLA
     const filas = document.querySelectorAll('#cuerpo-tabla tr');
     let maxEnPantalla = 0;
-    let refEncontradaEnPantalla = null;
+    let refPropia = null;
 
     filas.forEach(f => {
-        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim();
-        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
+        if (f === filaActual) return; // Saltamos la fila que estamos editando
 
-        if (!isNaN(refEnFila)) {
-            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
-            // Si la cuenta ya existe en otra fila de esta misma sesión
-            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
-                refEnEncontradaEnPantalla = refEnFila;
+        const elCuenta = f.querySelector('.txt-cuenta');
+        const elRef = f.querySelector('.col-ref');
+        
+        if (!elCuenta || !elRef) return;
+
+        const nFila = elCuenta.innerText.trim();
+        const textoRef = elRef.innerText.trim();
+        const rFila = parseInt(textoRef, 10);
+
+        if (!isNaN(rFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, rFila);
+            // Si otra fila en pantalla tiene la misma cuenta, copiamos su ref
+            if (nFila === nombreCuenta) {
+                refPropia = rFila;
             }
         }
     });
 
-    // Si ya la encontramos en pantalla, la asignamos y cortamos aquí
-    if (refEncontradaEnPantalla !== null) {
-        celdaRefActual.innerText = refEncontradaEnPantalla;
+    if (refPropia !== null) {
+        celdaRefActual.innerText = refPropia;
         return;
     }
 
-    // 3. BUSQUEDA EN HISTORIAL (Supabase): Solo si es una cuenta "nueva" en esta sesión
-    try {
-        const { data: historial } = await _supabase
-            .from('asientos')
-            .select('ref')
-            .eq('cuenta', nombreCuenta)
-            .limit(1);
+    // 3. Si no está en pantalla, buscamos el número MÁXIMO en la Base de Datos
+    // Esto es mucho más eficiente que traer toda la tabla
+    const { data: maxBD } = await _supabase
+        .from('asientos')
+        .select('ref')
+        .order('ref', { ascending: false })
+        .limit(1);
 
-        if (historial && historial.length > 0) {
-            celdaRefActual.innerText = historial[0].ref;
-            return;
-        }
-
-        // 4. SI ES TOTALMENTE NUEVA: Calcular el siguiente correlativo global
-        const { data: todos } = await _supabase
-            .from('asientos')
-            .select('ref');
-
-        let maxGlobal = 0;
-        if (todos) {
-            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-        }
-
-        // El nuevo número es el máximo entre base de datos y pantalla + 1
-        celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
-
-    } catch (error) {
-        console.error("Error al asignar Ref:", error);
+    let maxGlobal = 0;
+    if (maxBD && maxBD.length > 0) {
+        maxGlobal = parseInt(maxBD[0].ref, 10) || 0;
     }
+
+    // 4. Asignamos el nuevo número
+    celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
     }
     
     function agregarFila() {
@@ -538,13 +540,27 @@ async function guardarAsiento() {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
-            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
+            const fechaFilaOriginal = f.querySelector('.val-fecha').innerText.trim(); // "14/3/2026"
             const refFila = f.querySelector('.col-ref').innerText.trim();
+
+            // --- CORRECCIÓN DE FECHA ---
+            let fechaISO = fechaFilaOriginal;
+            if (fechaFilaOriginal.includes('/')) {
+                const partes = fechaFilaOriginal.split('/');
+                // Aseguramos formato YYYY-MM-DD (Ej: 2026-03-14)
+                fechaISO = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+            }
+            // ---------------------------
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaFila, cuenta: cuenta, ref: refFila, 
-                    debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
+                    fecha: fechaISO, // Usamos la fecha ya transformada
+                    cuenta: cuenta, 
+                    ref: refFila, 
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo, 
+                    descripcion: glosa
                 });
             }
         });
@@ -563,8 +579,9 @@ async function guardarAsiento() {
             return;
         }
 
-        const tD = parseFloat(elTD.innerText) || 0;
-        const tC = parseFloat(elTC.innerText) || 0;
+        // Limpiamos los textos de puntos/comas antes de convertir a número para el cuadre
+        const tD = parseFloat(elTD.innerText.replace(/\./g, '').replace(',', '.')) || 0;
+        const tC = parseFloat(elTC.innerText.replace(/\./g, '').replace(',', '.')) || 0;
 
         if (Math.abs(tD - tC) > 0.01) {
             Swal.fire("Error", `El asiento no cuadra. Diferencia: ${(Math.abs(tD - tC)).toFixed(2)}`, "error");
@@ -577,22 +594,26 @@ async function guardarAsiento() {
 
         // 5. Éxito
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
-        document.getElementById('contenedor-filas').innerHTML = '';
-        if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
         
-        agregarFila(); 
-        actualizarTotales();
+        // Limpieza de interfaz
+        const contenedor = document.getElementById('contenedor-filas');
+        if (contenedor) contenedor.innerHTML = '';
+        if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
+        
+        // Reiniciar tabla
+        if (typeof agregarFila === 'function') agregarFila(); 
+        if (typeof actualizarTotales === 'function') actualizarTotales();
 
     } catch (e) {
         console.error("Error al guardar:", e);
-        // Si Swal falla por alguna razón, usamos alert normal para que no haya errores silenciosos
+        const mensajeError = e.message || "Error desconocido";
         if (typeof Swal !== 'undefined') {
-            Swal.fire("Error", "Fallo técnico: " + e.message, "error");
+            Swal.fire("Error", "Fallo técnico: " + mensajeError, "error");
         } else {
-            alert("Error al guardar: " + e.message);
+            alert("Error al guardar: " + mensajeError);
         }
     }
-}
+    }
     
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

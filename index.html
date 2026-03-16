@@ -1456,7 +1456,7 @@ async function confirmarEliminacion() {
 } // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
-    // 1. Cambiamos la vista primero
+    // 1. Primero mostramos la pantalla del balance
     cambiarVista('vista-balance');
     
     // 2. Esperamos un instante para que el HTML esté listo y ejecutamos
@@ -1468,7 +1468,7 @@ async function confirmarEliminacion() {
             document.getElementById('contenedor-balance').innerHTML = 
                 "<div style='color:red; padding:20px;'>Error al procesar datos. Revisa la consola.</div>";
         }
-    }, 200);
+    }, 300);
     }
     
 </script>

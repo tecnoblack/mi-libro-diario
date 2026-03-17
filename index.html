@@ -542,61 +542,75 @@ function asignarRefInteligente(elemento) {
     asignarRefInteligente();
 }
 
-    function ejecutarLogicaIVA() {
+   function ejecutarLogicaIVA() {
     actualizarTotales();
-    // CAMBIO 1: Ahora usamos 'contenedor-filas' en lugar de 'cuerpo-tabla'
     const filas = document.querySelectorAll('#contenedor-filas tr');
     let tieneFiscal = false, filaDinero = null, monto = 0, esIngreso = false;
     
+    // 1. PRIMER PASO: Detectar si hay cuenta "Fiscal" y de dónde sale el dinero
     filas.forEach(f => {
         const celdaCuenta = f.querySelector('.txt-cuenta');
-        if (!celdaCuenta) return; // Seguridad por si la fila está vacía
+        if (!celdaCuenta) return;
         
         const c = celdaCuenta.innerText.toLowerCase().trim();
         if (c.includes('fiscal')) tieneFiscal = true;
         
+        // Identificar Caja o Banco para tomar el monto total (Base + IVA)
         if (c === 'caja' || c === 'banco' || c === 'caja chica') {
             const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
             const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
             if (d > 0 || cr > 0) { 
                 filaDinero = f; 
                 monto = d || cr; 
-                esIngreso = d > 0; 
+                esIngreso = d > 0; // Si el dinero entra al Debe, es un ingreso (Venta)
             }
         }
     });
 
+    // Si falta alguno de estos elementos, no hacemos nada
     if (!tieneFiscal || !filaDinero || monto === 0) return;
     
-    const neto = (monto / 1.16).toFixed(2), iva = (monto - neto).toFixed(2);
+    // 2. SEGUNDO PASO: Cálculos (Asumiendo IVA 16%)
+    const neto = (monto / 1.16).toFixed(2);
+    const iva = (monto - neto).toFixed(2);
     
+    // 3. TERCER PASO: Repartir montos en las filas
     filas.forEach(f => {
         const celdaCuenta = f.querySelector('.txt-cuenta');
+        const campoDebito = f.querySelector('.val-debito');
+        const campoCredito = f.querySelector('.val-credito');
+        
         if (!celdaCuenta) return;
 
         const n = celdaCuenta.innerText.toLowerCase().trim();
+
         if (n.includes('fiscal')) {
+            // Ponemos el monto del IVA
             if (esIngreso) { 
-                f.querySelector('.val-credito').innerText = iva; 
-                f.querySelector('.val-debito').innerText = "0"; 
+                campoCredito.innerText = iva; 
+                campoDebito.innerText = "0"; 
             } else { 
-                f.querySelector('.val-debito').innerText = iva; 
-                f.querySelector('.val-credito').innerText = "0"; 
+                campoDebito.innerText = iva; 
+                campoCredito.innerText = "0"; 
             }
-            asignarRefInteligente(f.querySelector('.txt-cuenta'));
+            // Actualizamos el REF de la fila de IVA
+            asignarRefInteligente(celdaCuenta);
         } else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
+            // Ponemos el monto Neto (el gasto o la venta sin IVA)
             if (esIngreso) { 
-                f.querySelector('.val-credito').innerText = neto; 
-                f.querySelector('.val-debito').innerText = "0"; 
+                campoCredito.innerText = neto; 
+                campoDebito.innerText = "0"; 
             } else { 
-                f.querySelector('.val-debito').innerText = neto; 
-                f.querySelector('.val-credito').innerText = "0"; 
+                campoDebito.innerText = neto; 
+                campoCredito.innerText = "0"; 
             }
-            asignarRefInteligente(f.querySelector('.txt-cuenta'));
+            // Actualizamos el REF de la fila de Mercancía/Venta
+            asignarRefInteligente(celdaCuenta);
         }
     });
+    
     actualizarTotales();
-    }
+}
 
 function actualizarTotales() {
     let deb = 0, cre = 0;

@@ -435,10 +435,38 @@ async function asignarRefInteligente(elemento) {
         console.error("Error al asignar Ref:", error);
     }
 }
+
+    function asignarRefInteligente() {
+    const filas = document.querySelectorAll('#contenedor-filas tr');
+    let mapaCuentas = {}; // Aquí guardamos: "NOMBRE CUENTA": NUMERO_REF
+    let contadorGlobal = 1;
+
+    filas.forEach(fila => {
+        const celdaNombre = fila.querySelector('.txt-cuenta');
+        const celdaRef = fila.querySelector('.col-ref');
+        if (!celdaNombre || !celdaRef) return;
+
+        const nombre = celdaNombre.innerText.trim().toUpperCase();
+
+        if (nombre !== "") {
+            // Si la cuenta ya existe en el mapa, usamos su número asignado
+            if (mapaCuentas[nombre]) {
+                celdaRef.innerText = mapaCuentas[nombre];
+            } else {
+                // Si es nueva, le damos el siguiente número disponible
+                mapaCuentas[nombre] = contadorGlobal;
+                celdaRef.innerText = contadorGlobal;
+                contadorGlobal++;
+            }
+        } else {
+            // Si la celda está vacía, limpiamos el REF
+            celdaRef.innerText = "";
+        }
+    });
+}
     
-   function agregarFila() {
+  function agregarFila() {
     const ahora = new Date();
-    // Formato visual para el usuario
     const fechaAuto = ahora.getDate() + '/' + (ahora.getMonth() + 1) + '/' + ahora.getFullYear();
     const tabla = document.getElementById('contenedor-filas');
     const nuevaFila = document.createElement('tr');
@@ -453,10 +481,13 @@ async function asignarRefInteligente(elemento) {
         <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales();">0</td>
         <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales();">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales(); asignarRefInteligente();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
         </td>
     `;
     tabla.appendChild(nuevaFila);
+    
+    // Ejecutamos una vez para asegurar que si hay filas vacías no se rompa el orden
+    asignarRefInteligente();
 }
 
     function ejecutarLogicaIVA() {

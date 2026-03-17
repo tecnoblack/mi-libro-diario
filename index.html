@@ -335,7 +335,6 @@
     }
 
     async function asignarRefInteligente(elemento) {
-    if (!elemento) return;
     const nombreCuenta = elemento.innerText.trim();
     if (nombreCuenta === "") return;
 
@@ -354,16 +353,15 @@
         return;
     }
 
-    // 2. Buscar en las otras filas que están en pantalla
+    // 2. Si no está en BD, buscar en las otras filas que están en pantalla actualmente
     const filas = document.querySelectorAll('.fila-asiento');
     let maxEnPantalla = 0;
     let refEncontradaEnPantalla = null;
 
     filas.forEach(f => {
-        if (f === filaActual) return; 
+        if (f === filaActual) return; // No compararse consigo misma
         const nFila = f.querySelector('.txt-cuenta').innerText.trim();
-        const textoRef = f.querySelector('.col-ref').innerText.trim();
-        const rFila = parseInt(textoRef);
+        const rFila = parseInt(f.querySelector('.col-ref').innerText);
         
         if (!isNaN(rFila)) {
             maxEnPantalla = Math.max(maxEnPantalla, rFila);
@@ -376,7 +374,7 @@
         return;
     }
 
-    // 3. Buscar el máximo global en la BD
+    // 3. Si es una cuenta totalmente nueva, buscar el máximo global en la BD para seguir la secuencia
     const { data: todos } = await _supabase.from('asientos').select('ref');
     let maxGlobal = 0;
     if (todos && todos.length > 0) {
@@ -384,12 +382,8 @@
         maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
     }
 
-    // --- EL CAMBIO CLAVE ---
-    // Calculamos el nuevo número
-    let nuevoNumero = Math.max(maxGlobal, maxEnPantalla) + 1;
-    
-    // Si por alguna razón da error o es el primero, forzamos que sea 1
-    celdaRefActual.innerText = isNaN(nuevoNumero) || nuevoNumero === 0 ? 1 : nuevoNumero;
+    // Asignar el nuevo número correlativo
+    celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
     }
     
     function agregarFila() {

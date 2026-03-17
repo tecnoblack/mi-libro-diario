@@ -233,6 +233,35 @@
 <script>
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
+
+    let diccionarioCuentasGlobal = {};
+
+    async function cargarDiccionarioCuentas() {
+    try {
+        // Traemos cuenta y ref de todos tus registros guardados
+        const { data, error } = await _supabase
+            .from('registros')
+            .select('cuenta, ref');
+
+        if (error) throw error;
+
+        // Limpiamos y llenamos nuestra memoria
+        data.forEach(reg => {
+            if (reg.cuenta && reg.ref) {
+                const nombre = reg.cuenta.trim().toUpperCase();
+                const numRef = parseInt(reg.ref);
+                
+                // Si la cuenta no está o encontramos un REF más actualizado, lo guardamos
+                if (!diccionarioCuentasGlobal[nombre] || numRef > 0) {
+                    diccionarioCuentasGlobal[nombre] = numRef;
+                }
+            }
+        });
+        console.log("Folios cargados correctamente:", diccionarioCuentasGlobal);
+    } catch (err) {
+        console.error("Error al cargar el historial de folios:", err);
+    }
+}
     
     // --- LÓGICA DE SEGURIDAD (DISPOSITIVO ÚNICO) ---
     function getDeviceId() {
@@ -295,7 +324,9 @@
         document.getElementById('banner-suscripcion').style.display = 'block';
         return;
     }
-    
+
+await cargarDiccionarioCuentas();
+        
     cambiarVista('vista-menu');
     }
     
@@ -436,34 +467,30 @@ async function asignarRefInteligente(elemento) {
     }
 }
 
-    function asignarRefInteligente() {
-    const filas = document.querySelectorAll('#contenedor-filas tr');
-    let mapaCuentas = {}; 
-    let contadorGlobal = 1;
+  function asignarRefInteligente(elemento) {
+    const fila = elemento.parentElement.parentElement;
+    const celdaNombre = fila.querySelector('.txt-cuenta');
+    const celdaRef = fila.querySelector('.col-ref');
+    
+    const nombre = celdaNombre.innerText.trim().toUpperCase();
 
-    filas.forEach(fila => {
-        const celdaNombre = fila.querySelector('.txt-cuenta');
-        const celdaRef = fila.querySelector('.col-ref');
+    if (nombre === "") {
+        celdaRef.innerText = "";
+        return;
+    }
+
+    // 1. ¿Ya existe en la memoria maestra (historial de Supabase)?
+    if (diccionarioCuentasGlobal[nombre]) {
+        celdaRef.innerText = diccionarioCuentasGlobal[nombre];
+    } else {
+        // 2. Si es una cuenta NUEVA que nunca has usado en la vida:
+        // Buscamos el número más alto que exista y le sumamos 1
+        const maxRef = Math.max(0, ...Object.values(diccionarioCuentasGlobal), 0);
+        const nuevoRef = maxRef + 1;
         
-        if (!celdaNombre || !celdaRef) return;
-
-        // .trim() quita espacios accidentales y .toUpperCase() ignora si es minúscula
-        const nombre = celdaNombre.innerText.trim().toUpperCase();
-
-        if (nombre !== "") {
-            if (mapaCuentas[nombre]) {
-                // Si ya existe, le pone el número que ya guardamos
-                celdaRef.innerText = mapaCuentas[nombre];
-            } else {
-                // Si es nueva, guarda el nuevo número en el mapa
-                mapaCuentas[nombre] = contadorGlobal;
-                celdaRef.innerText = contadorGlobal;
-                contadorGlobal++;
-            }
-        } else {
-            celdaRef.innerText = "";
-        }
-    });
+        celdaRef.innerText = nuevoRef;
+        diccionarioCuentasGlobal[nombre] = nuevoRef; // La guardamos para la próxima
+    }
 }
     
   function agregarFila() {

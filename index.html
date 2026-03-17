@@ -366,38 +366,74 @@
     }
     }
 
-   async function asignarRefInteligente(elemento) {
-    const nombreCuenta = elemento.innerText.trim();
-    if (nombreCuenta === "") return;
-    const filaActual = elemento.closest('tr');
-    const celdaRefActual = filaActual.querySelector('.col-ref');
-
-    const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
-    if (historial && historial.length > 0) {
-        celdaRefActual.innerText = historial[0].ref;
+async function asignarRefInteligente(elemento) {
+    // 1. Limpieza y validación
+    const nombreCuenta = elemento.innerText.trim().toUpperCase();
+    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "SELECCIONE CUENTA...") {
         return;
     }
 
-    const { data: todos } = await _supabase.from('asientos').select('ref');
-    let maxGlobal = 0;
-    if (todos) {
-        const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-        maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-    }
+    const filaActual = elemento.closest('tr');
+    const celdaRefActual = filaActual.querySelector('.col-ref');
+    
+    // 2. BUSQUEDA EN PANTALLA
+    // Cambié '#cuerpo-tabla tr' por '.fila-asiento' para que coincida con tu funcion agregarFila
+    const filas = document.querySelectorAll('.fila-asiento'); 
+    let maxEnPantalla = 0;
+    let refEncontradaEnPantalla = null;
 
-    const filas = document.querySelectorAll('.fila-asiento');
-    let maxEnPantalla = 0, refPropia = null;
     filas.forEach(f => {
-        if (f === filaActual) return;
-        const nFila = f.querySelector('.txt-cuenta').innerText.trim();
-        const rFila = parseInt(f.querySelector('.col-ref').innerText);
-        if (!isNaN(rFila)) {
-            maxEnPantalla = Math.max(maxEnPantalla, rFila);
-            if (nFila === nombreCuenta) refPropia = rFila;
+        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim().toUpperCase();
+        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
+
+        if (!isNaN(refEnFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
+            // Si la cuenta ya existe en otra fila (que no sea la que estoy escribiendo)
+            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
+                refEncontradaEnPantalla = refEnFila;
+            }
         }
     });
 
-    celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
+    // Si ya existe en pantalla, usamos ese mismo REF
+    if (refEncontradaEnPantalla !== null) {
+        celdaRefActual.innerText = refEncontradaEnPantalla;
+        return;
+    }
+
+    // 3. BUSQUEDA EN HISTORIAL (Supabase)
+    try {
+        // Buscamos si la cuenta existe en la tabla 'asientos'
+        const { data: historial } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
+
+        if (historial && historial.length > 0) {
+            celdaRefActual.innerText = historial[0].ref;
+            return;
+        }
+
+        // 4. SI ES TOTALMENTE NUEVA: Obtener el máximo global
+        const { data: todos } = await _supabase
+            .from('asientos')
+            .select('ref');
+
+        let maxGlobal = 0;
+        if (todos && todos.length > 0) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
+        }
+
+        // LÓGICA FINAL: El máximo de todo + 1. 
+        // Si maxGlobal es 0 y maxEnPantalla es 0, el resultado será 1.
+        const nuevoRef = Math.max(maxGlobal, maxEnPantalla) + 1;
+        celdaRefActual.innerText = nuevoRef;
+
+    } catch (error) {
+        console.error("Error al asignar Ref:", error);
+    }
 }
     
    function agregarFila() {

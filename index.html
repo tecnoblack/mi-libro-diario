@@ -1360,42 +1360,41 @@ async function confirmarEliminacion() {
     }
 }
 
-   async function generarBalance() {
-    try {
-        // Mostramos un mensaje de carga
-        const contenedor = document.getElementById('contenedor-balance');
-        contenedor.innerHTML = '<p style="text-align:center;">Generando saldos desde el Mayor...</p>';
+ async function generarBalance() {
+    // 1. Referencias a tu HTML según la foto
+    const contenedor = document.getElementById('contenedor-balance');
+    const elementoPeriodo = document.getElementById('balance-periodo-header');
 
-        // 1. Obtenemos los datos de Supabase
-        const { data, error } = await _supabase.from('asientos').select('*');
-        
-        if (error) throw error;
-        if (!data || data.length === 0) {
-            contenedor.innerHTML = '<p style="text-align:center;">No hay datos para mostrar en el balance.</p>';
-            return;
+    try {
+        // Actualizar periodo inmediatamente
+        if(elementoPeriodo) {
+            const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            const f = new Date();
+            elementoPeriodo.innerText = `${meses[f.getMonth()]} ${f.getFullYear()}`;
         }
 
-        const resumenCuentas = {};
+        contenedor.innerHTML = '<p style="text-align:center;">Calculando saldos...</p>';
 
-        // 2. Procesamos los datos con cuidado
+        // 2. Traer datos de Supabase
+        const { data, error } = await _supabase.from('asientos').select('*');
+        if (error) throw error;
+
+        const cuentas = {};
+
+        // 3. Procesar datos asegurando que sean números
         data.forEach(reg => {
-            const nombre = reg.cuenta ? reg.cuenta.trim() : "Cuenta sin nombre";
-            const ref = reg.ref || "S/R";
+            const nom = reg.cuenta || "Sin nombre";
+            if (!cuentas[nom]) cuentas[nom] = { ref: reg.ref || "-", d: 0, h: 0 };
             
-            if (!resumenCuentas[nombre]) {
-                resumenCuentas[nombre] = { ref: ref, debe: 0, haber: 0 };
-            }
-            
-            // Forzamos que los valores sean números para evitar el "Error al procesar"
-            resumenCuentas[nombre].debe += parseFloat(reg.debito) || 0;
-            resumenCuentas[nombre].haber += parseFloat(reg.credito) || 0;
+            cuentas[nom].d += parseFloat(reg.debito) || 0;
+            cuentas[nom].h += parseFloat(reg.credito) || 0;
         });
 
-        // 3. Construimos el HTML (Declaramos la variable para evitar errores previos)
+        // 4. Construir la tabla (Variable declarada para evitar el error 'html is not defined')
         let tablaHtml = `
-            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <table style="width: 100%; border-collapse: collapse;">
                 <thead>
-                    <tr style="background-color: #2563eb; color: white;">
+                    <tr style="background: #2563eb; color: white;">
                         <th style="padding: 10px; border: 1px solid #ddd;">REF</th>
                         <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">CUENTA</th>
                         <th style="padding: 10px; border: 1px solid #ddd;">DEUDOR</th>
@@ -1405,52 +1404,38 @@ async function confirmarEliminacion() {
                 <tbody>
         `;
 
-        let totalDebeGlobal = 0;
-        let totalHaberGlobal = 0;
+        let tDebe = 0, tHaber = 0;
 
-        // 4. Calculamos Saldos Finales
-        Object.keys(resumenCuentas).forEach(nombre => {
-            const cuenta = resumenCuentas[nombre];
-            const saldo = cuenta.debe - cuenta.haber;
-            
-            let deudor = "";
-            let acreedor = "";
+        Object.keys(cuentas).forEach(nom => {
+            const c = cuentas[nom];
+            const saldo = c.d - c.h;
+            let deudor = "", acreedor = "";
 
-            if (saldo > 0) {
-                deudor = saldo.toFixed(2);
-                totalDebeGlobal += saldo;
-            } else if (saldo < 0) {
-                acreedor = Math.abs(saldo).toFixed(2);
-                totalHaberGlobal += Math.abs(saldo);
-            }
+            if (saldo > 0) { deudor = saldo.toFixed(2); tDebe += saldo; }
+            else if (saldo < 0) { acreedor = Math.abs(saldo).toFixed(2); tHaber += Math.abs(saldo); }
 
             tablaHtml += `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${cuenta.ref}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${nombre}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${deudor}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${acreedor}</td>
-                </tr>
-            `;
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">${c.ref}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${nom}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align:right;">${deudor}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align:right;">${acreedor}</td>
+                </tr>`;
         });
 
-        // 5. Fila de Sumas Iguales
         tablaHtml += `
-                <tr style="background-color: #f8fafc; font-weight: bold;">
-                    <td colspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: right;">SUMAS IGUALES:</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${totalDebeGlobal.toFixed(2)}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${totalHaberGlobal.toFixed(2)}</td>
+                <tr style="background: #eee; font-weight: bold;">
+                    <td colspan="2" style="padding: 10px; text-align: right;">TOTAL:</td>
+                    <td style="padding: 10px; text-align: right;">${tDebe.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right;">${tHaber.toFixed(2)}</td>
                 </tr>
             </tbody>
-        </table>
-        `;
+        </table>`;
 
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
-        console.error("Error detallado:", err);
-        document.getElementById('contenedor-balance').innerHTML = 
-            `<p style="color:red; text-align:center;">Error: ${err.message}. Verifica que la tabla en Supabase tenga datos.</p>`;
+        contenedor.innerHTML = `<p style="color:red; text-align:center;">Error: ${err.message}</p>`;
     }
 }
     

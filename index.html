@@ -301,7 +301,7 @@
         else verificarPerfil(data.user.id);
     }
 
-    async function verificarPerfil(userId) {
+   async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
     const { data: perfil, error } = await _supabase
         .from('perfiles')
@@ -336,10 +336,14 @@
         return;
     }
 
-await cargarDiccionarioCuentas();
+    // --- AQUÍ HACEMOS LAS CARGAS INICIALES DE DATOS ---
+    await cargarDiccionarioCuentas();
+    
+    // AGREGAMOS ESTA LÍNEA PARA EL NÚMERO DE ASIENTO:
+    await actualizarNumeroAsientoAutomatico(); 
         
     cambiarVista('vista-menu');
-    }
+}
     
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }

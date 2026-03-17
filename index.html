@@ -59,7 +59,7 @@
 </head>
 <body>
 
-     <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
+    <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
 
     <div id="vista-login" class="seccion-vista activa">
         <div class="contenedor-login">
@@ -84,33 +84,32 @@
                 <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
                 <h3>Libro Mayor</h3>
             </div>
-        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
-        <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
-        <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
+                <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
+            </div>
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
+                 onmouseover="this.style.borderColor='#2563eb'" 
+                 onmouseout="this.style.borderColor='transparent'"
+                 onclick="irABalance()">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
+                <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
+                <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
+            </div>
+        </div>
     </div>
 
-    <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
-         onmouseover="this.style.borderColor='#2563eb'" 
-         onmouseout="this.style.borderColor='transparent'"
-         onclick="irABalance()">
-        <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
-        <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
-        <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
-    </div>
-            
-        </div>
-        </div>
-     <div id="vista-diario" class="seccion-vista">
+    <div id="vista-diario" class="seccion-vista">
         <div class="contenedor-principal" id="contenedor-diario">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-<div class="header-contable">
-    <h1 id="empresaNombre" contenteditable="true">COMERCIAL A B C, C.A.</h1>
-    <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
-    <p><b>LIBRO DIARIO</b></p>
-    <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
-        PERIODO: <span id="textoPeriodoDiario" style="font-weight: bold;">Sin asignar</span>
-    </div>
-</div>
+            <div class="header-contable">
+                <h1 id="empresaNombre" contenteditable="true">COMERCIAL A B C, C.A.</h1>
+                <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
+                <p><b>LIBRO DIARIO</b></p>
+                <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
+                    PERIODO: <span id="textoPeriodoDiario" style="font-weight: bold;">Sin asignar</span>
+                </div>
+            </div>
             <div style="margin-bottom: 15px;">
                 <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
                 <button id="btnConfirmarBorrado" class="btn-accion-azul" style="display:none; background-color: var(--rojo-error);" onclick="confirmarEliminacion()">Confirmar Eliminación</button>
@@ -149,10 +148,10 @@
                 <label><b>Descripción del Asiento (Glosa):</b></label>
                 <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
             </div>
-        <button type="button" onclick="agregarFila()" class="btn-primario">
-    <i class="fas fa-plus"></i> Añadir Fila
-</button>
-            <table id="tabla-registros">
+            <button type="button" onclick="agregarFila()" class="btn-primario">
+                <i class="fas fa-plus"></i> Añadir Fila
+            </button>
+            <table>
                 <thead>
                     <tr>
                         <th style="width: 15%;">FECHA</th>
@@ -165,98 +164,68 @@
                 <tbody id="contenedor-filas"></tbody>
             </table>
             <div class="totales-seccion">
-    <span>TOTAL ASIENTO</span>
-    <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
+                <span>TOTAL ASIENTO</span>
+                <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
             </div>
             <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
             <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()">Guardar Asiento</button>
         </div>
     </div>
 
-<div id="vista-historial" class="seccion-vista">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-    <div>
-        <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
-        <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
-    </div>
-    <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s;">
-        <span>🔒</span> Finalizar y Cerrar Mes
-    </button>
-    </div>
-    
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        
-        <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+    <div id="vista-historial" class="seccion-vista">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
             <div>
-                <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
-                <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">ESPERANDO SELECCIÓN...</h2>
+                <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
+                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
             </div>
-            <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);">+</button>
+            <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span>🔒</span> Finalizar y Cerrar Mes
+            </button>
         </div>
-
-        <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
-        <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;">
+        
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+            <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
+                    <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">ESPERANDO SELECCIÓN...</h2>
+                </div>
+                <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px;">+</button>
             </div>
-        
-        <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
-    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
-    <div style="display: flex; gap: 10px;">
-        <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
-        <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
-    </div>
-</div>
 
-</div>
-<div id="vista-historial-detalle" class="seccion-vista">
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-historial')">← Volver a la lista</button>
-        <h2 id="tituloHistorialMes" style="text-align:center; color:var(--azul-pro); text-transform:uppercase;">HISTORIAL</h2>
-        
-        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-            <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('diario')" style="flex:1;">📖 Libro Diario</button>
-            <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('mayor')" style="flex:1; background-color:#64748b;">🏦 Libro Mayor</button>
-        </div>
-
-        <div id="cont-historial-diario">
-            <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">REGISTROS DEL LIBRO DIARIO</div>
-            <div id="tabla-historial-diario"></div>
-        </div>
-
-        <div id="cont-historial-mayor" style="display:none;">
-            <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">MOVIMIENTOS DEL LIBRO MAYOR</div>
-            <div id="tabla-historial-mayor"></div>
+            <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
+            <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;"></div>
+            
+            <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
+                <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
+                    <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
     <div id="vista-balance" class="seccion-vista">
-    <div class="contenedor-principal">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <button class="btn-accion-azul" onclick="window.print()" style="background-color: #059669;">🖨️ Imprimir Reporte</button>
-        </div>
+        <div class="contenedor-principal">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+                <button class="btn-accion-azul" onclick="window.print()" style="background-color: #059669;">🖨️ Imprimir Reporte</button>
+            </div>
 
-        <div class="header-contable" style="border: 2px solid #000; padding: 15px; text-align: center; margin-bottom: 20px; background: white;">
-            <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">COMERCIAL A B C, C.A.</h1>
-            <p style="margin: 5px 0;">RIF: J-00000000-0</p>
-            <h2 style="margin: 10px 0; text-decoration: underline;">BALANCE DE COMPROBACIÓN</h2>
-            <div style="font-weight: bold; margin-top: 10px;">
-                PERIODO: <span id="balance-periodo-header">Cargando...</span>
+            <div class="header-contable" style="border: 2px solid #000; padding: 15px; text-align: center; margin-bottom: 20px; background: white;">
+                <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">COMERCIAL A B C, C.A.</h1>
+                <p style="margin: 5px 0;">RIF: J-00000000-0</p>
+                <h2 style="margin: 10px 0; text-decoration: underline;">BALANCE DE COMPROBACIÓN</h2>
+                <div style="font-weight: bold; margin-top: 10px;">
+                    PERIODO: <span id="balance-periodo-header">Cargando...</span>
+                </div>
+            </div>
+
+            <div id="contenedor-balance" style="overflow-x: auto; background: white; border-radius: 8px;">
+                <p style="text-align: center; padding: 40px; color: #64748b;">Haga clic para generar saldos...</p>
             </div>
         </div>
-
-        <div id="contenedor-balance" style="overflow-x: auto; background: white; border-radius: 8px;">
-            <p style="text-align: center; padding: 40px; color: #64748b;">
-                Haga clic en el botón para generar los saldos...
-            </p>
-        </div>
-
-        <div style="margin-top: 30px; display: flex; justify-content: space-around; text-align: center;">
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Preparado por</div>
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Revisado por</div>
-        </div>
-    </div>
     </div>
     
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

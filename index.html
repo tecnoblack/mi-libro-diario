@@ -521,33 +521,25 @@ function actualizarTotales() {
         let datos = [];
         const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
 
-        // Usamos for...of para poder usar "await" dentro del bucle
-        for (let f of filas) {
-            const elCuenta = f.querySelector('.txt-cuenta');
-            const cuenta = elCuenta.innerText.trim();
+        filas.forEach(f => {
+            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
-            const fechaFilaOriginal = f.querySelector('.val-fecha').innerText.trim();
-            
-            let elRef = f.querySelector('.col-ref');
-            let refFila = elRef.innerText.trim();
-
-            // --- SEGURIDAD DE REF: Si está vacía al momento de guardar, la calculamos ---
-            if (cuenta !== "" && refFila === "") {
-                await asignarRefInteligente(elCuenta);
-                refFila = elRef.innerText.trim(); // Actualizamos la variable con el valor recién asignado
-            }
+            const fechaFilaOriginal = f.querySelector('.val-fecha').innerText.trim(); // "14/3/2026"
+            const refFila = f.querySelector('.col-ref').innerText.trim();
 
             // --- CORRECCIÓN DE FECHA ---
             let fechaISO = fechaFilaOriginal;
             if (fechaFilaOriginal.includes('/')) {
                 const partes = fechaFilaOriginal.split('/');
+                // Aseguramos formato YYYY-MM-DD (Ej: 2026-03-14)
                 fechaISO = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
             }
+            // ---------------------------
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaISO, 
+                    fecha: fechaISO, // Usamos la fecha ya transformada
                     cuenta: cuenta, 
                     ref: refFila, 
                     debito: d, 
@@ -556,14 +548,14 @@ function actualizarTotales() {
                     descripcion: glosa
                 });
             }
-        }
+        });
 
         if (datos.length === 0) {
             Swal.fire("Error", "La tabla está vacía o faltan cuentas.", "error");
             return;
         }
 
-        // 3. Validar Cuadre
+        // 3. Validar Cuadre usando los IDs correctos
         const elTD = document.getElementById('totalDebito');
         const elTC = document.getElementById('totalCredito');
 
@@ -572,6 +564,7 @@ function actualizarTotales() {
             return;
         }
 
+        // Limpiamos los textos de puntos/comas antes de convertir a número para el cuadre
         const tD = parseFloat(elTD.innerText.replace(/\./g, '').replace(',', '.')) || 0;
         const tC = parseFloat(elTC.innerText.replace(/\./g, '').replace(',', '.')) || 0;
 
@@ -587,10 +580,12 @@ function actualizarTotales() {
         // 5. Éxito
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
         
+        // Limpieza de interfaz
         const contenedor = document.getElementById('contenedor-filas');
         if (contenedor) contenedor.innerHTML = '';
         if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
         
+        // Reiniciar tabla
         if (typeof agregarFila === 'function') agregarFila(); 
         if (typeof actualizarTotales === 'function') actualizarTotales();
 
@@ -603,7 +598,7 @@ function actualizarTotales() {
             alert("Error al guardar: " + mensajeError);
         }
     }
-                              }
+    }
     
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

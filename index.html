@@ -398,70 +398,40 @@
     }
 
     async function asignarRefInteligente(elemento) {
-    // 1. Limpieza y validación: Si no hay cuenta o es el texto por defecto, no hace nada
     const nombreCuenta = elemento.innerText.trim();
-    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") {
-        return;
-    }
-
+    if (nombreCuenta === "") return;
     const filaActual = elemento.closest('tr');
     const celdaRefActual = filaActual.querySelector('.col-ref');
     
-    // 2. BUSQUEDA EN PANTALLA (Prioridad alta): Evita peticiones innecesarias a Supabase
-    const filas = document.querySelectorAll('#cuerpo-tabla tr');
-    let maxEnPantalla = 0;
-    let refEncontradaEnPantalla = null;
-
-    filas.forEach(f => {
-        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim();
-        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
-
-        if (!isNaN(refEnFila)) {
-            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
-            // Si la cuenta ya existe en otra fila de esta misma sesión
-            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
-                refEnEncontradaEnPantalla = refEnFila;
-            }
-        }
-    });
-
-    // Si ya la encontramos en pantalla, la asignamos y cortamos aquí
-    if (refEncontradaEnPantalla !== null) {
-        celdaRefActual.innerText = refEncontradaEnPantalla;
+    // Buscar en historial de la base de datos
+    const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
+    if (historial && historial.length > 0) {
+        celdaRefActual.innerText = historial[0].ref;
         return;
     }
-
-    // 3. BUSQUEDA EN HISTORIAL (Supabase): Solo si es una cuenta "nueva" en esta sesión
-    try {
-        const { data: historial } = await _supabase
-            .from('asientos')
-            .select('ref')
-            .eq('cuenta', nombreCuenta)
-            .limit(1);
-
-        if (historial && historial.length > 0) {
-            celdaRefActual.innerText = historial[0].ref;
-            return;
-        }
-
-        // 4. SI ES TOTALMENTE NUEVA: Calcular el siguiente correlativo global
-        const { data: todos } = await _supabase
-            .from('asientos')
-            .select('ref');
-
-        let maxGlobal = 0;
-        if (todos) {
-            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-        }
-
-        // El nuevo número es el máximo entre base de datos y pantalla + 1
-        celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
-
-    } catch (error) {
-        console.error("Error al asignar Ref:", error);
+    
+    // Buscar el máximo global en la BD para asignar un nuevo número
+    const { data: todos } = await _supabase.from('asientos').select('ref');
+    let maxGlobal = 0;
+    if (todos) {
+        const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+        maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
     }
-    }
+    
+    // Buscar en la tabla actual por si la cuenta se repite en el mismo asiento
+    const filas = document.querySelectorAll('#cuerpo-tabla tr');
+    let maxEnPantalla = 0, refPropia = null;
+    filas.forEach(f => {
+        const nFila = f.querySelector('.txt-cuenta').innerText.trim();
+        const rFila = parseInt(f.querySelector('.col-ref').innerText);
+        if (!isNaN(rFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, rFila);
+            if (nFila === nombreCuenta) refPropia = rFila;
+        }
+    });
+    
+    celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
+}
     
     function agregarFila() {
     const contenedor = document.getElementById('contenedor-filas');
@@ -469,8 +439,8 @@
 
     // Obtener la fecha actual en formato local (DD/MM/YYYY)
     // Si prefieres el formato ISO (YYYY-MM-DD), usa: new Date().toISOString().split('T')[0]
-    const hoy = new Date();
-    const fechaAuto = hoy.toLocaleDateString('es-ES'); 
+const ahora = new Date();
+const fechaAuto = ahora.getDate() + '/' + (ahora.getMonth() + 1) + '/' + ahora.getFullYear();
 
     const nuevaFila = document.createElement('tr');
     nuevaFila.className = "fila-asiento"; 

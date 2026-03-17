@@ -438,28 +438,29 @@ async function asignarRefInteligente(elemento) {
 
     function asignarRefInteligente() {
     const filas = document.querySelectorAll('#contenedor-filas tr');
-    let mapaCuentas = {}; // Aquí guardamos: "NOMBRE CUENTA": NUMERO_REF
+    let mapaCuentas = {}; 
     let contadorGlobal = 1;
 
     filas.forEach(fila => {
         const celdaNombre = fila.querySelector('.txt-cuenta');
         const celdaRef = fila.querySelector('.col-ref');
+        
         if (!celdaNombre || !celdaRef) return;
 
+        // .trim() quita espacios accidentales y .toUpperCase() ignora si es minúscula
         const nombre = celdaNombre.innerText.trim().toUpperCase();
 
         if (nombre !== "") {
-            // Si la cuenta ya existe en el mapa, usamos su número asignado
             if (mapaCuentas[nombre]) {
+                // Si ya existe, le pone el número que ya guardamos
                 celdaRef.innerText = mapaCuentas[nombre];
             } else {
-                // Si es nueva, le damos el siguiente número disponible
+                // Si es nueva, guarda el nuevo número en el mapa
                 mapaCuentas[nombre] = contadorGlobal;
                 celdaRef.innerText = contadorGlobal;
                 contadorGlobal++;
             }
         } else {
-            // Si la celda está vacía, limpiamos el REF
             celdaRef.innerText = "";
         }
     });

@@ -61,141 +61,204 @@
 
     <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
 
-<div id="vista-login" class="seccion-vista activa">
-    <div class="contenedor-login">
-        <h2 style="color: var(--azul-pro);">ACCESO AL SISTEMA</h2>
-        <input type="email" id="login-email" class="input-login" placeholder="Correo Electrónico">
-        <input type="password" id="login-pass" class="input-login" placeholder="Contraseña">
-        <button class="btn-accion-azul" style="width: 100%; padding: 15px; margin-top: 10px;" onclick="iniciarSesion()">Entrar</button>
+    <div id="vista-login" class="seccion-vista activa">
+        <div class="contenedor-login">
+            <h2 style="color: var(--azul-pro);">ACCESO AL SISTEMA</h2>
+            <input type="email" id="login-email" class="input-login" placeholder="Correo Electrónico">
+            <input type="password" id="login-pass" class="input-login" placeholder="Contraseña">
+            <button class="btn-accion-azul" style="width: 100%; padding: 15px; margin-top: 10px;" onclick="iniciarSesion()">Entrar</button>
+        </div>
     </div>
-</div>
 
-<div id="vista-menu" class="seccion-vista">
-    <div style="text-align: right; padding: 10px;">
-        <button onclick="cerrarSesion()" style="border:none; background:none; color:red; cursor:pointer;">Cerrar Sesión ✕</button>
-    </div>
-    <h1 style="text-align:center; margin-top: 40px; color: var(--azul-pro);">App Contable</h1>
-    
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; max-width: 600px; margin: 50px auto; padding: 20px;">
-        
-        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-diario')">
-            <span style="font-size: 50px; display: block; margin-bottom: 10px;">📖</span>
-            <h3>Libro Diario</h3>
+    <div id="vista-menu" class="seccion-vista">
+        <div style="text-align: right; padding: 10px;">
+            <button onclick="cerrarSesion()" style="border:none; background:none; color:red; cursor:pointer;">Cerrar Sesión ✕</button>
         </div>
-
-        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-mayor'); cargarCuentasSelect();">
-            <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
-            <h3>Libro Mayor</h3>
-        </div>
-
-        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
-            <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
-            <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
-        </div>
-
-        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
-             onmouseover="this.style.borderColor='#2563eb'" 
-             onmouseout="this.style.borderColor='transparent'"
-             onclick="irABalance()">
-            <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
-            <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
-            <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
-        </div>
-            
-    </div> </div> <div id="vista-diario" class="seccion-vista">
-    <div class="contenedor-principal" id="contenedor-diario">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        <div class="header-contable">
-            <h1 id="empresaNombre" contenteditable="true">COMERCIAL A B C, C.A.</h1>
-            <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
-            <p><b>LIBRO DIARIO</b></p>
-            <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
-                PERIODO: <span id="textoPeriodoDiario" style="font-weight: bold;">Sin asignar</span>
+        <h1 style="text-align:center; margin-top: 40px; color: var(--azul-pro);">App Contable</h1>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-diario')">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">📖</span>
+                <h3>Libro Diario</h3>
             </div>
-        </div>
-        <div style="margin-bottom: 15px;">
-            <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
-            <button id="btnConfirmarBorrado" class="btn-accion-azul" style="display:none; background-color: var(--rojo-error);" onclick="confirmarEliminacion()">Confirmar Eliminación</button>
-            <button id="btnCancelarBorrado" class="btn-regresar" style="display:none; margin-bottom:0;" onclick="cancelarModoBorrado()">Cancelar</button>
-        </div>
-        <div id="tabla-registros">Cargando registros...</div>
-        <button id="btn-abrir-modal" class="btn-flotante" onclick="abrirRegistroNuevo()">+</button>
+            <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-mayor'); cargarCuentasSelect();">
+                <span style="font-size: 50px; display: block; margin-bottom: 10px;">🏦</span>
+                <h3>Libro Mayor</h3>
+            </div>
+        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;" onclick="cambiarVista('vista-historial')">
+        <span style="font-size: 50px; display: block; margin-bottom: 10px;">📁</span>
+        <h3 style="color: var(--azul-pro);">Historial de Cierres</h3>
     </div>
-</div>
 
-<div id="vista-mayor" class="seccion-vista">
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        <div class="header-contable">
-            <h1 id="mayorEmpresaNombre">COMERCIAL A B C, C.A.</h1>
-            <p>RIF: <span id="mayorEmpresaRif">J-00000000-0</span></p>
-            <p><b>LIBRO MAYOR</b></p>
-            <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">Esperando selección...</span></div>
+    <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; transition: 0.3s;" 
+         onmouseover="this.style.borderColor='#2563eb'" 
+         onmouseout="this.style.borderColor='transparent'"
+         onclick="irABalance()">
+        <span style="font-size: 50px; display: block; margin-bottom: 10px;">⚖️</span>
+        <h3 style="color: #1e293b; margin: 0;">Balance de Comprobación</h3>
+        <small style="color: #64748b;">Saldos Deudores y Acreedores</small>
+    </div>
+            
         </div>
-        <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
-            <select id="select-cuenta-mayor" style="padding:12px; width:100%; max-width:300px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
-            <button type="button" class="btn-accion-azul" onclick="generarMayor()" style="margin-top: 10px;">Consultar</button>
         </div>
-        <div id="resultado-mayor" style="overflow-x: auto;"></div>
+     <div id="vista-diario" class="seccion-vista">
+        <div class="contenedor-principal" id="contenedor-diario">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+<div class="header-contable">
+    <h1 id="empresaNombre" contenteditable="true">COMERCIAL A B C, C.A.</h1>
+    <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
+    <p><b>LIBRO DIARIO</b></p>
+    <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
+        PERIODO: <span id="textoPeriodoDiario" style="font-weight: bold;">Sin asignar</span>
     </div>
 </div>
+            <div style="margin-bottom: 15px;">
+                <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
+                <button id="btnConfirmarBorrado" class="btn-accion-azul" style="display:none; background-color: var(--rojo-error);" onclick="confirmarEliminacion()">Confirmar Eliminación</button>
+                <button id="btnCancelarBorrado" class="btn-regresar" style="display:none; margin-bottom:0;" onclick="cancelarModoBorrado()">Cancelar</button>
+            </div>
+            <div id="tabla-registros">Cargando registros...</div>
+            <button id="btn-abrir-modal" class="btn-flotante" onclick="abrirRegistroNuevo()">+</button>
+        </div>
+    </div>
 
-<div id="vista-registro" class="seccion-vista">
-    <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-diario')">✕ Cancelar</button>
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2 id="periodoAsientoManual" contenteditable="true" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
-            <small>Complete los datos del asiento</small>
+    <div id="vista-mayor" class="seccion-vista">
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+            <div class="header-contable">
+                <h1 id="mayorEmpresaNombre">COMERCIAL A B C, C.A.</h1>
+                <p>RIF: <span id="mayorEmpresaRif">J-00000000-0</span></p>
+                <p><b>LIBRO MAYOR</b></p>
+                <div class="linea-periodo">PERÍODO: <span id="mayorPeriodoHeader">Esperando selección...</span></div>
+            </div>
+            <div style="text-align: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
+                <select id="select-cuenta-mayor" style="padding:12px; width:100%; max-width:300px; border:1px solid #ccc; border-radius:6px; font-size: 16px;"></select>
+                <button type="button" class="btn-accion-azul" onclick="generarMayor()" style="margin-top: 10px;">Consultar</button>
+            </div>
+            <div id="resultado-mayor" style="overflow-x: auto;"></div>
         </div>
-        <div style="margin-bottom: 20px;">
-            <label><b>Descripción del Asiento (Glosa):</b></label>
-            <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
-        </div>
-        <button type="button" onclick="agregarFila()" class="btn-primario">Añadir Fila</button>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 15%;">FECHA</th>
-                    <th style="width: 45%;">CUENTA</th>
-                    <th style="width: 10%;">REF</th>
-                    <th style="width: 15%;">DÉBITO</th>
-                    <th style="width: 15%;">CRÉDITO</th>
-                </tr>
-            </thead>
-            <tbody id="contenedor-filas"></tbody>
-        </table>
-        <div class="totales-seccion">
-            <span>TOTAL ASIENTO</span>
-            <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
-        </div>
-        <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()">Guardar Asiento</button>
     </div>
-</div>
+
+    <div id="vista-registro" class="seccion-vista">
+        <div class="contenedor-principal">
+            <button class="btn-regresar" onclick="cambiarVista('vista-diario')">✕ Cancelar</button>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 id="periodoAsientoManual" contenteditable="true" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
+                <small>Complete los datos del asiento</small>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label><b>Descripción del Asiento (Glosa):</b></label>
+                <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
+            </div>
+        <button type="button" onclick="agregarFila()" class="btn-primario">
+    <i class="fas fa-plus"></i> Añadir Fila
+</button>
+            <table id="tabla-registros">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">FECHA</th>
+                        <th style="width: 45%;">CUENTA</th>
+                        <th style="width: 10%;">REF</th>
+                        <th style="width: 15%;">DÉBITO</th>
+                        <th style="width: 15%;">CRÉDITO</th>
+                    </tr>
+                </thead>
+                <tbody id="contenedor-filas"></tbody>
+            </table>
+            <div class="totales-seccion">
+    <span>TOTAL ASIENTO</span>
+    <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
+            </div>
+            <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
+            <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()">Guardar Asiento</button>
+        </div>
+    </div>
 
 <div id="vista-historial" class="seccion-vista">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+    <div>
+        <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
+        <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
+    </div>
+    <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s;">
+        <span>🔒</span> Finalizar y Cerrar Mes
+    </button>
+    </div>
+    
     <div class="contenedor-principal">
         <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
-            <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 10px; border-radius: 8px; border: none; cursor: pointer;">Finalizar Mes</button>
+        
+        <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
+                <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">ESPERANDO SELECCIÓN...</h2>
+            </div>
+            <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);">+</button>
         </div>
-        <div id="lista-meses-historial"></div>
+
+        <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
+        <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;">
+            </div>
+        
+        <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
+    <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
+        <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
     </div>
 </div>
 
-<div id="vista-balance" class="seccion-vista">
+</div>
+<div id="vista-historial-detalle" class="seccion-vista">
     <div class="contenedor-principal">
-        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-        <div class="header-contable">
-            <h1 id="balanceEmpresaNombre">COMERCIAL A B C, C.A.</h1>
-            <p>RIF: <span id="balanceEmpresaRif">J-00000000-0</span></p>
-            <p><b>BALANCE DE COMPROBACIÓN</b></p>
-            <div class="linea-periodo">PERÍODO: <span id="balance-periodo-header">Cargando...</span></div>
+        <button class="btn-regresar" onclick="cambiarVista('vista-historial')">← Volver a la lista</button>
+        <h2 id="tituloHistorialMes" style="text-align:center; color:var(--azul-pro); text-transform:uppercase;">HISTORIAL</h2>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('diario')" style="flex:1;">📖 Libro Diario</button>
+            <button class="btn-accion-azul" onclick="cambiarSubVistaHistorial('mayor')" style="flex:1; background-color:#64748b;">🏦 Libro Mayor</button>
         </div>
-        <div id="contenedor-balance" style="overflow-x: auto;"></div>
-    </div>
-    </div>
 
+        <div id="cont-historial-diario">
+            <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">REGISTROS DEL LIBRO DIARIO</div>
+            <div id="tabla-historial-diario"></div>
+        </div>
+
+        <div id="cont-historial-mayor" style="display:none;">
+            <div style="background:#f8fafc; padding:10px; border-radius:5px; margin-bottom:10px; font-weight:bold; text-align:center;">MOVIMIENTOS DEL LIBRO MAYOR</div>
+            <div id="tabla-historial-mayor"></div>
+        </div>
+    </div>
+</div>
+
+    <div id="vista-balance" class="seccion-vista">
+    <div class="contenedor-principal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+            <button class="btn-accion-azul" onclick="window.print()" style="background-color: #059669;">🖨️ Imprimir Reporte</button>
+        </div>
+
+        <div class="header-contable" style="border: 2px solid #000; padding: 15px; text-align: center; margin-bottom: 20px; background: white;">
+            <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">COMERCIAL A B C, C.A.</h1>
+            <p style="margin: 5px 0;">RIF: J-00000000-0</p>
+            <h2 style="margin: 10px 0; text-decoration: underline;">BALANCE DE COMPROBACIÓN</h2>
+            <div style="font-weight: bold; margin-top: 10px;">
+                PERIODO: <span id="balance-periodo-header">Cargando...</span>
+            </div>
+        </div>
+
+        <div id="contenedor-balance" style="overflow-x: auto; background: white; border-radius: 8px;">
+            <p style="text-align: center; padding: 40px; color: #64748b;">
+                Haga clic en el botón para generar los saldos...
+            </p>
+        </div>
+
+        <div style="margin-top: 30px; display: flex; justify-content: space-around; text-align: center;">
+            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Preparado por</div>
+            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px;">Revisado por</div>
+        </div>
+    </div>
+    </div>
+    
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
@@ -335,55 +398,69 @@
     }
 
     async function asignarRefInteligente(elemento) {
+    // 1. Limpieza y validación: Si no hay cuenta o es el texto por defecto, no hace nada
     const nombreCuenta = elemento.innerText.trim();
-    if (nombreCuenta === "") return;
-
-    const filaActual = elemento.closest('tr');
-    const celdaRefActual = filaActual.querySelector('.col-ref');
-
-    // 1. Buscar si la cuenta ya existe en la Base de Datos
-    const { data: historial } = await _supabase
-        .from('asientos')
-        .select('ref')
-        .eq('cuenta', nombreCuenta)
-        .limit(1);
-
-    if (historial && historial.length > 0) {
-        celdaRefActual.innerText = historial[0].ref;
+    if (!nombreCuenta || nombreCuenta === "" || nombreCuenta === "Seleccione cuenta...") {
         return;
     }
 
-    // 2. Si no está en BD, buscar en las otras filas que están en pantalla actualmente
-    const filas = document.querySelectorAll('.fila-asiento');
+    const filaActual = elemento.closest('tr');
+    const celdaRefActual = filaActual.querySelector('.col-ref');
+    
+    // 2. BUSQUEDA EN PANTALLA (Prioridad alta): Evita peticiones innecesarias a Supabase
+    const filas = document.querySelectorAll('#cuerpo-tabla tr');
     let maxEnPantalla = 0;
     let refEncontradaEnPantalla = null;
 
     filas.forEach(f => {
-        if (f === filaActual) return; // No compararse consigo misma
-        const nFila = f.querySelector('.txt-cuenta').innerText.trim();
-        const rFila = parseInt(f.querySelector('.col-ref').innerText);
-        
-        if (!isNaN(rFila)) {
-            maxEnPantalla = Math.max(maxEnPantalla, rFila);
-            if (nFila === nombreCuenta) refEncontradaEnPantalla = rFila;
+        const cuentaEnFila = f.querySelector('.txt-cuenta')?.innerText.trim();
+        const refEnFila = parseInt(f.querySelector('.col-ref')?.innerText);
+
+        if (!isNaN(refEnFila)) {
+            maxEnPantalla = Math.max(maxEnPantalla, refEnFila);
+            // Si la cuenta ya existe en otra fila de esta misma sesión
+            if (cuentaEnFila === nombreCuenta && f !== filaActual) {
+                refEnEncontradaEnPantalla = refEnFila;
+            }
         }
     });
 
+    // Si ya la encontramos en pantalla, la asignamos y cortamos aquí
     if (refEncontradaEnPantalla !== null) {
         celdaRefActual.innerText = refEncontradaEnPantalla;
         return;
     }
 
-    // 3. Si es una cuenta totalmente nueva, buscar el máximo global en la BD para seguir la secuencia
-    const { data: todos } = await _supabase.from('asientos').select('ref');
-    let maxGlobal = 0;
-    if (todos && todos.length > 0) {
-        const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
-        maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
-    }
+    // 3. BUSQUEDA EN HISTORIAL (Supabase): Solo si es una cuenta "nueva" en esta sesión
+    try {
+        const { data: historial } = await _supabase
+            .from('asientos')
+            .select('ref')
+            .eq('cuenta', nombreCuenta)
+            .limit(1);
 
-    // Asignar el nuevo número correlativo
-    celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
+        if (historial && historial.length > 0) {
+            celdaRefActual.innerText = historial[0].ref;
+            return;
+        }
+
+        // 4. SI ES TOTALMENTE NUEVA: Calcular el siguiente correlativo global
+        const { data: todos } = await _supabase
+            .from('asientos')
+            .select('ref');
+
+        let maxGlobal = 0;
+        if (todos) {
+            const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
+            maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
+        }
+
+        // El nuevo número es el máximo entre base de datos y pantalla + 1
+        celdaRefActual.innerText = Math.max(maxGlobal, maxEnPantalla) + 1;
+
+    } catch (error) {
+        console.error("Error al asignar Ref:", error);
+    }
     }
     
     function agregarFila() {
@@ -399,19 +476,18 @@
     nuevaFila.className = "fila-asiento"; 
 
     nuevaFila.innerHTML = `
-    <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
-    <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
-        oninput="ejecutarLogicaIVA(); actualizarTotales();" 
-        onblur="asignarRefInteligente(this);"></td>
-    <td contenteditable="false" class="col-ref" style="padding:10px; border:1px solid #e2e8f0; background-color: #f8fafc;"></td>
-    <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-        oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
-    <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-        oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
-    <td style="text-align:center; border:1px solid #e2e8f0;">
-        <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
-    </td>
-`;
+        <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
+        <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
+            oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
+        <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
+        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
+        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
+            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
+        <td style="text-align:center; border:1px solid #e2e8f0;">
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
+        </td>
+    `;
     contenedor.appendChild(nuevaFila);
     }
 
@@ -504,7 +580,7 @@ function actualizarTotales() {
         div.innerHTML = html;
     }
 
-        async function guardarAsiento() {
+async function guardarAsiento() {
     try {
         // 1. Verificar Periodo
         const elPeriodo = document.getElementById('textoPeriodoDiario');
@@ -525,27 +601,13 @@ function actualizarTotales() {
             const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
-            const fechaFilaOriginal = f.querySelector('.val-fecha').innerText.trim(); // "14/3/2026"
+            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
             const refFila = f.querySelector('.col-ref').innerText.trim();
-
-            // --- CORRECCIÓN DE FECHA ---
-            let fechaISO = fechaFilaOriginal;
-            if (fechaFilaOriginal.includes('/')) {
-                const partes = fechaFilaOriginal.split('/');
-                // Aseguramos formato YYYY-MM-DD (Ej: 2026-03-14)
-                fechaISO = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
-            }
-            // ---------------------------
 
             if (cuenta && (d > 0 || c > 0)) {
                 datos.push({ 
-                    fecha: fechaISO, // Usamos la fecha ya transformada
-                    cuenta: cuenta, 
-                    ref: refFila, 
-                    debito: d, 
-                    credito: c, 
-                    periodo: periodoActivo, 
-                    descripcion: glosa
+                    fecha: fechaFila, cuenta: cuenta, ref: refFila, 
+                    debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
                 });
             }
         });
@@ -564,9 +626,8 @@ function actualizarTotales() {
             return;
         }
 
-        // Limpiamos los textos de puntos/comas antes de convertir a número para el cuadre
-        const tD = parseFloat(elTD.innerText.replace(/\./g, '').replace(',', '.')) || 0;
-        const tC = parseFloat(elTC.innerText.replace(/\./g, '').replace(',', '.')) || 0;
+        const tD = parseFloat(elTD.innerText) || 0;
+        const tC = parseFloat(elTC.innerText) || 0;
 
         if (Math.abs(tD - tC) > 0.01) {
             Swal.fire("Error", `El asiento no cuadra. Diferencia: ${(Math.abs(tD - tC)).toFixed(2)}`, "error");
@@ -579,26 +640,22 @@ function actualizarTotales() {
 
         // 5. Éxito
         await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
+        document.getElementById('contenedor-filas').innerHTML = '';
+        if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
         
-        // Limpieza de interfaz
-        const contenedor = document.getElementById('contenedor-filas');
-        if (contenedor) contenedor.innerHTML = '';
-        if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
-        
-        // Reiniciar tabla
-        if (typeof agregarFila === 'function') agregarFila(); 
-        if (typeof actualizarTotales === 'function') actualizarTotales();
+        agregarFila(); 
+        actualizarTotales();
 
     } catch (e) {
         console.error("Error al guardar:", e);
-        const mensajeError = e.message || "Error desconocido";
+        // Si Swal falla por alguna razón, usamos alert normal para que no haya errores silenciosos
         if (typeof Swal !== 'undefined') {
-            Swal.fire("Error", "Fallo técnico: " + mensajeError, "error");
+            Swal.fire("Error", "Fallo técnico: " + e.message, "error");
         } else {
-            alert("Error al guardar: " + mensajeError);
+            alert("Error al guardar: " + e.message);
         }
     }
-    }
+}
     
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
@@ -1260,43 +1317,73 @@ async function confirmarEliminacion() {
 
     async function generarBalanceGeneral() {
     const contenedor = document.getElementById('contenedor-balance');
-    const periodo = document.getElementById('textoPeriodoDiario').innerText.replace("PERIODO:", "").trim();
-    
-    document.getElementById('balance-periodo-header').innerText = periodo;
-    contenedor.innerHTML = "<p style='text-align:center;'>Calculando saldos...</p>";
+    if (!contenedor) return alert("No se encontró el contenedor-balance en el HTML");
 
     try {
-        const { data, error } = await _supabase.from('asientos').select('*').eq('periodo', periodo);
-        if (error) throw error;
+        contenedor.innerHTML = "<div style='text-align:center; padding:20px;'>🔍 Buscando registros en la base de datos...</div>";
 
-        if (!data || data.length === 0) {
-            contenedor.innerHTML = "<div style='text-align:center; padding:20px;'>No hay datos en este periodo.</div>";
-            return;
+        // 1. Identificar periodo
+        let periodoRaw = document.getElementById('textoPeriodoDiario')?.innerText || 
+                         document.getElementById('periodoAsientoManual')?.innerText || "";
+        
+        // Si no encuentra periodo en el texto, usamos un prompt para que tú lo escribas
+        let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
+        
+        if (!periodo) {
+            periodo = prompt("No detecté el periodo automáticamente. Escribe el mes y año (Ej: FEBRERO 2026):");
         }
 
-        // --- LÓGICA DE SUMA ---
-        const saldos = {};
-        data.forEach(as => {
-            if (!saldos[as.cuenta]) saldos[as.cuenta] = { d: 0, c: 0, ref: as.ref };
-            saldos[as.cuenta].d += as.debito;
-            saldos[as.cuenta].c += as.credito;
+        if(document.getElementById('balance-periodo-header')) {
+            document.getElementById('balance-periodo-header').innerText = periodo;
+        }
+
+        // 2. Consulta a Supabase (Buscamos coincidencias exactas y archivadas)
+        // 2. Consulta a Supabase
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
+
+        // CAMBIO AQUÍ: Manejo de error suave para que no te saque al Login
+        if (error) {
+            console.error("Error de Supabase:", error);
+            contenedor.innerHTML = `<div style="color:red; padding:20px;">⚠️ Error de conexión: ${error.message}</div>`;
+            return; 
+        }
+
+        // 3. Si la conexión funcionó pero no encontró nada
+        if (!data || data.length === 0) {
+            contenedor.innerHTML = `
+                <div style="text-align:center; padding:30px; border:2px dashed #ccc; color:#666;">
+                    <h3>No hay registros para "${periodo}"</h3>
+                    <p>Revisa que el nombre del mes coincida exactamente con el del Libro Diario.</p>
+                    <button onclick="generarBalanceGeneral()" style="padding:10px; margin-top:10px; cursor:pointer;">🔄 Intentar de nuevo</button>
+                </div>`;
+            return;
+    }
+
+        // 4. Procesar saldos netos (Libro Mayor Virtual)
+        const mayorVirtual = {};
+        data.forEach(reg => {
+            const c = reg.cuenta.toUpperCase().trim();
+            if (!mayorVirtual[c]) {
+                mayorVirtual[c] = { 
+                    fecha: reg.fecha || "-", 
+                    referencia: reg.ref || reg.referencia || "-", 
+                    debeTotal: 0, 
+                    haberTotal: 0 
+                };
+            }
+            mayorVirtual[c].debeTotal += (Number(reg.debito) || 0);
+            mayorVirtual[c].haberTotal += (Number(reg.credito) || 0);
         });
 
-        // --- DIBUJAR TABLA ---
-        let tabla = `<table><thead><tr><th>REF</th><th>CUENTA</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-        let td = 0, tc = 0;
+        // 5. Dibujar la tabla de 5 columnas
+        renderizarTablaComprobacion(mayorVirtual);
 
-        for (const c in saldos) {
-            const s = saldos[c];
-            td += s.d; tc += s.c;
-            tabla += `<tr><td>${s.ref}</td><td>${c}</td><td>${s.d.toFixed(2)}</td><td>${s.c.toFixed(2)}</td></tr>`;
-        }
-
-        tabla += `<tr class="fila-totales-libro"><td colspan="2">TOTALES</td><td>${td.toFixed(2)}</td><td>${tc.toFixed(2)}</td></tr></tbody></table>`;
-        contenedor.innerHTML = tabla;
-
-    } catch (e) {
-        contenedor.innerHTML = "Error al cargar datos.";
+    } catch (err) {
+        console.error("Error en Balance:", err);
+        contenedor.innerHTML = `<div style="color:red; padding:20px;">Error técnico: ${err.message}</div>`;
     }
     }
     
@@ -1369,17 +1456,19 @@ async function confirmarEliminacion() {
 } // <--- CIERRE CORRECTO DE LA FUNCIÓN
 
     function irABalance() {
-    // 1. Cambiamos la vista
+    // 1. Primero mostramos la pantalla del balance
     cambiarVista('vista-balance');
     
-    // 2. Ponemos los mismos nombres del encabezado que tienes en el Diario
-    document.getElementById('balanceEmpresaNombre').innerText = document.getElementById('empresaNombre').innerText;
-    document.getElementById('balanceEmpresaRif').innerText = document.getElementById('empresaRif').innerText;
-
-    // 3. Ejecutamos la carga de datos
+    // 2. Esperamos un instante para que el HTML esté listo y ejecutamos
     setTimeout(() => {
-        generarBalanceGeneral();
-    }, 200);
+        try {
+            generarBalanceGeneral();
+        } catch (e) {
+            console.error("Error al cargar balance:", e);
+            document.getElementById('contenedor-balance').innerHTML = 
+                "<div style='color:red; padding:20px;'>Error al procesar datos. Revisa la consola.</div>";
+        }
+    }, 300);
     }
     
 </script>

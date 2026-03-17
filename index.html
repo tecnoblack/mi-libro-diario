@@ -645,42 +645,43 @@ async function generarMayor() {
         agregarFila();
     }
 
+    async function activarDesdeHistorial(mesSeleccionado) {
+    const input = document.getElementById('input-periodo-nuevo');
+    if (input) {
+        // 1. Le pone el nombre del mes al input que tu código ya usa
+        input.value = mesSeleccionado; 
+        
+        // 2. Ejecuta tu función original de asignación
+        await ejecutarAsignacionDesdeHistorial(); 
+    } else {
+        console.error("No se encontró el input-periodo-nuevo");
+    }
+}
     // 4. FUNCIÓN PARA ASIGNAR MES
     async function ejecutarAsignacionDesdeHistorial() {
-        const input = document.getElementById('input-periodo-nuevo');
-        const nuevoMes = input.value.trim().toUpperCase();
-
-        if (!nuevoMes) {
-            alert("Por favor, ingresa un nombre para el periodo.");
-            return;
-        }
-
         try {
-            // Actualizamos la tabla 'empresa' que acabamos de crear
-            const { error } = await _supabase
-                .from('empresa')
-                .update({ "periodo_actual": nuevoMes })
-                .eq('id', 1); // Siempre actualizamos la fila 1
+        // Actualizamos en la base de datos (Tabla Empresa)
+        const { error } = await _supabase
+            .from('empresa')
+            .update({ "periodo_actual": nuevoMes })
+            .eq('id', 1);
 
-            if (error) throw error;
+        if (error) throw error;
 
-            // Actualizamos visualmente las etiquetas en la pantalla
-            const IDs = ['periodoSeleccionadoHistorial', 'textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual'];
-            IDs.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = nuevoMes;
-            });
+        // Actualizamos todos los textos de periodo en la pantalla
+        const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+        IDs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = nuevoMes;
+        });
 
-            alert("✅ ¡Configuración Guardada! Periodo: " + nuevoMes);
-            cerrarModalPeriodo();
-            cambiarVista('vista-diario');
-
-        } catch (err) {
-            console.error("Error:", err);
-            alert("Error al sincronizar con la tabla empresa: " + err.message);
-        }
+        Swal.fire("Periodo Activo", "Ahora estás trabajando en: " + nuevoMes, "success");
+        
+    } catch (err) {
+        console.error("Error al activar:", err);
+        alert("Error al sincronizar periodo: " + err.message);
     }
-
+}
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
     try {
@@ -1337,6 +1338,48 @@ async function confirmarEliminacion() {
         }
     }, 300);
     }
+
+    async function cargarHistorial() {
+    const contenedor = document.getElementById('lista-meses-historial');
+    if (!contenedor) return;
+    
+    contenedor.innerHTML = '<p style="text-align:center;">Cargando historial...</p>';
+
+    try {
+        const { data: cierres, error } = await _supabase
+            .from('cierres')
+            .select('*')
+            .order('creado_at', { ascending: false });
+
+        if (error) throw error;
+
+        let html = '';
+        cierres.forEach(c => {
+            // Este bloque HTML es el que evita que se vea "mocho"
+            html += `
+            <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0; color: #2563eb; text-transform: uppercase; font-size: 1.1rem;">${c.mes}</h3>
+                    <small style="color: #64748b;">Finalizado el: ${new Date(c.creado_at).toLocaleDateString()}</small>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="activarDesdeHistorial('${c.mes}')" 
+                            style="background: #f1f5f9; color: #1e293b; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                        Activar
+                    </button>
+                    <button onclick="verDetalleReporte('diario')" 
+                            style="background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                        Ver Libro
+                    </button>
+                </div>
+            </div>`;
+        });
+        contenedor.innerHTML = html;
+    } catch (e) {
+        console.error("Error cargando historial:", e);
+        contenedor.innerHTML = '<p style="color:red; text-align:center;">Error al cargar datos.</p>';
+    }
+}
     
 </script>
 

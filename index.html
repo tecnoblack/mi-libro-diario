@@ -141,9 +141,10 @@
         <div class="contenedor-principal">
             <button class="btn-regresar" onclick="cambiarVista('vista-diario')">✕ Cancelar</button>
             <div style="text-align: center; margin-bottom: 20px;">
-                <h2 id="periodoAsientoManual" contenteditable="true" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
-                <small>Complete los datos del asiento</small>
-            </div>
+    <h2 id="periodoAsientoManual" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
+    <h3 id="num-asiento-header" style="margin: 5px 0; color: var(--azul-pro);">ASIENTO Nº ...</h3> 
+    <small>Complete los datos del asiento</small>
+</div>
             <div style="margin-bottom: 20px;">
                 <label><b>Descripción del Asiento (Glosa):</b></label>
                 <input type="text" id="resumenAsiento" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:4px; margin-top:5px;" placeholder="Ej. Venta de mercancía...">
@@ -234,6 +235,10 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
 
+document.addEventListener('DOMContentLoaded', () => {
+    // Esto hace que el número aparezca apenas cargue la página
+    actualizarNumeroAsientoAutomatico();
+    
     let diccionarioCuentasGlobal = {};
 
  async function cargarDiccionarioCuentas() {
@@ -1549,6 +1554,34 @@ async function confirmarEliminacion() {
     } catch (e) {
         console.error("Error historial:", e);
         contenedor.innerHTML = '<p style="color:red; text-align:center;">Error al cargar datos.</p>';
+    }
+}
+
+async function actualizarNumeroAsientoAutomatico() {
+    try {
+        // Consultamos el asiento_id más alto
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('asiento_id')
+            .order('asiento_id', { ascending: false })
+            .limit(1);
+
+        if (error) throw error;
+
+        let proximoNumero = 1;
+        if (data && data.length > 0 && data[0].asiento_id !== null) {
+            proximoNumero = parseInt(data[0].asiento_id) + 1;
+        }
+
+        // Buscamos el elemento donde muestras "ASIENTO Nº X" y lo actualizamos
+        const headerAsiento = document.getElementById('num-asiento-header'); 
+        if (headerAsiento) {
+            headerAsiento.innerText = `ASIENTO Nº ${proximoNumero}`;
+            // Guardamos el número en una variable global para usarla al guardar
+            window.numAsientoActual = proximoNumero;
+        }
+    } catch (err) {
+        console.error("Error al obtener correlativo:", err);
     }
 }
     

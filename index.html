@@ -551,80 +551,56 @@ function asignarRefInteligente(elemento) {
     tabla.appendChild(nuevaFila);
 }
 
-   function ejecutarLogicaIVA() {
+function ejecutarLogicaIVA() {
     actualizarTotales();
     const filas = document.querySelectorAll('#contenedor-filas tr');
-    let tieneFiscal = false;
-    let filaDinero = null;
-    let monto = 0;
-    let esIngreso = false;
+    let tieneFiscal = false, filaDinero = null, montoTotal = 0, esIngreso = false;
     
-    // 1. Buscamos las piezas
+    // 1. Buscamos la fila del dinero (Caja/Banco) para saber el total
     filas.forEach(f => {
-        const celdaCuenta = f.querySelector('.txt-cuenta');
-        if (!celdaCuenta) return; 
-        
-        const c = celdaCuenta.innerText.toLowerCase().trim();
-        
-        // Detectar si hay cuenta con la palabra "fiscal"
+        const c = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
         if (c.includes('fiscal')) tieneFiscal = true;
         
-        // Detectar Caja o Banco y obtener el monto
         if (c === 'caja' || c === 'banco' || c === 'caja chica') {
-            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
-            const cr = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
-            
+            const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+            const cr = parseFloat(f.querySelector('.val-credito').innerText) || 0;
             if (d > 0 || cr > 0) { 
                 filaDinero = f; 
-                monto = d > 0 ? d : cr; 
+                montoTotal = d || cr; 
                 esIngreso = d > 0; 
             }
         }
     });
 
-    // Si no están todos los elementos, no ejecutamos el resto
-    if (!tieneFiscal || !filaDinero || monto === 0) return;
+    if (!tieneFiscal || !filaDinero || montoTotal === 0) return;
     
-    // 2. Cálculos
-    const neto = (monto / 1.16).toFixed(2);
-    const iva = (monto - neto).toFixed(2);
+    const neto = (montoTotal / 1.16).toFixed(2);
+    const iva = (montoTotal - neto).toFixed(2);
     
-    // 3. Aplicar resultados a las filas
+    // 2. Repartir montos SOLO en celdas que estén en 0 o vacías
     filas.forEach(f => {
-        const celdaCuenta = f.querySelector('.txt-cuenta');
-        if (!celdaCuenta) return;
+        const n = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
+        const celdaD = f.querySelector('.val-debito');
+        const celdaC = f.querySelector('.val-credito');
 
-        const n = celdaCuenta.innerText.toLowerCase().trim();
-        const campoDebito = f.querySelector('.val-debito');
-        const campoCredito = f.querySelector('.val-credito');
+        // Función auxiliar para saber si una celda se puede auto-rellenar
+        const estaVacia = (celda) => {
+            const val = celda.innerText.trim();
+            return val === "0" || val === "" || val === "0.00";
+        };
 
         if (n.includes('fiscal')) {
-            if (esIngreso) { 
-                campoCredito.innerText = iva; 
-                campoDebito.innerText = "0"; 
-            } else { 
-                campoDebito.innerText = iva; 
-                campoCredito.innerText = "0"; 
-            }
-            // Esto actualiza el REF automáticamente para la cuenta fiscal
-            asignarRefInteligente(celdaCuenta);
+            if (esIngreso && estaVacia(celdaC)) celdaC.innerText = iva;
+            else if (!esIngreso && estaVacia(celdaD)) celdaD.innerText = iva;
         } 
         else if (n !== '' && n !== 'caja' && n !== 'banco' && n !== 'caja chica') {
-            if (esIngreso) { 
-                campoCredito.innerText = neto; 
-                campoDebito.innerText = "0"; 
-            } else { 
-                campoDebito.innerText = neto; 
-                campoCredito.innerText = "0"; 
-            }
-            // Esto actualiza el REF automáticamente para Mercancía/Venta
-            asignarRefInteligente(celdaCuenta);
+            if (esIngreso && estaVacia(celdaC)) celdaC.innerText = neto;
+            else if (!esIngreso && estaVacia(celdaD)) celdaD.innerText = neto;
         }
     });
-
     actualizarTotales();
 }
-
+    
 function actualizarTotales() {
     let deb = 0, cre = 0;
     

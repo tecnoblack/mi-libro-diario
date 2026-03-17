@@ -468,28 +468,41 @@ async function asignarRefInteligente(elemento) {
 }
 
   function asignarRefInteligente(elemento) {
-    const fila = elemento.parentElement.parentElement;
-    const celdaNombre = fila.querySelector('.txt-cuenta');
+    const fila = elemento.closest('tr');
     const celdaRef = fila.querySelector('.col-ref');
-    
-    const nombre = celdaNombre.innerText.trim().toUpperCase();
+    const nombre = elemento.innerText.trim().toUpperCase();
 
     if (nombre === "") {
         celdaRef.innerText = "";
         return;
     }
 
-    // 1. ¿Ya existe en la memoria maestra (historial de Supabase)?
+    // 1. Buscamos si la cuenta ya tiene un número en nuestra memoria
     if (diccionarioCuentasGlobal[nombre]) {
         celdaRef.innerText = diccionarioCuentasGlobal[nombre];
     } else {
-        // 2. Si es una cuenta NUEVA que nunca has usado en la vida:
-        // Buscamos el número más alto que exista y le sumamos 1
-        const maxRef = Math.max(0, ...Object.values(diccionarioCuentasGlobal), 0);
-        const nuevoRef = maxRef + 1;
+        // 2. Si no existe (como te pasa ahora), buscamos el número más alto usado en la tabla actual
+        let maxRef = 0;
         
-        celdaRef.innerText = nuevoRef;
-        diccionarioCuentasGlobal[nombre] = nuevoRef; // La guardamos para la próxima
+        // Revisamos todas las filas que ya tienen un número puesto
+        document.querySelectorAll('.col-ref').forEach(ref => {
+            const valor = parseInt(ref.innerText);
+            if (!isNaN(valor) && valor > maxRef) maxRef = valor;
+        });
+
+        // 3. También revisamos nuestro diccionario global por si acaso
+        const valoresDiccionario = Object.values(diccionarioCuentasGlobal);
+        if (valoresDiccionario.length > 0) {
+            const maxDic = Math.max(...valoresDiccionario);
+            if (maxDic > maxRef) maxRef = maxDic;
+        }
+
+        // 4. Asignamos el siguiente número (si todo es 0, empezará en 1)
+        const nuevoFolio = maxRef + 1;
+        celdaRef.innerText = nuevoFolio;
+        
+        // Guardamos en el diccionario para que se repita si la vuelves a usar
+        diccionarioCuentasGlobal[nombre] = nuevoFolio;
     }
 }
     

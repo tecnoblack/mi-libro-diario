@@ -334,31 +334,29 @@
     }
     }
 
-    async function asignarRefInteligente(elemento) {
+   async function asignarRefInteligente(elemento) {
     const nombreCuenta = elemento.innerText.trim();
     if (nombreCuenta === "") return;
     const filaActual = elemento.closest('tr');
     const celdaRefActual = filaActual.querySelector('.col-ref');
-    
-    // Buscar en historial de la base de datos
+
     const { data: historial } = await _supabase.from('asientos').select('ref').eq('cuenta', nombreCuenta).limit(1);
     if (historial && historial.length > 0) {
         celdaRefActual.innerText = historial[0].ref;
         return;
     }
-    
-    // Buscar el máximo global en la BD para asignar un nuevo número
+
     const { data: todos } = await _supabase.from('asientos').select('ref');
     let maxGlobal = 0;
     if (todos) {
         const numeros = todos.map(a => parseInt(a.ref)).filter(n => !isNaN(n));
         maxGlobal = numeros.length > 0 ? Math.max(...numeros) : 0;
     }
-    
-    // Buscar en la tabla actual por si la cuenta se repite en el mismo asiento
-    const filas = document.querySelectorAll('#cuerpo-tabla tr');
+
+    const filas = document.querySelectorAll('.fila-asiento');
     let maxEnPantalla = 0, refPropia = null;
     filas.forEach(f => {
+        if (f === filaActual) return;
         const nFila = f.querySelector('.txt-cuenta').innerText.trim();
         const rFila = parseInt(f.querySelector('.col-ref').innerText);
         if (!isNaN(rFila)) {
@@ -366,37 +364,32 @@
             if (nFila === nombreCuenta) refPropia = rFila;
         }
     });
-    
+
     celdaRefActual.innerText = refPropia || (Math.max(maxGlobal, maxEnPantalla) + 1);
 }
     
-    function agregarFila() {
-    const contenedor = document.getElementById('contenedor-filas');
-    if (!contenedor) return;
-
-    // Obtener la fecha actual en formato local (DD/MM/YYYY)
-    // Si prefieres el formato ISO (YYYY-MM-DD), usa: new Date().toISOString().split('T')[0]
-const ahora = new Date();
-const fechaAuto = ahora.getDate() + '/' + (ahora.getMonth() + 1) + '/' + ahora.getFullYear();
-
+   function agregarFila() {
+    const ahora = new Date();
+    // Formato visual para el usuario
+    const fechaAuto = ahora.getDate() + '/' + (ahora.getMonth() + 1) + '/' + ahora.getFullYear();
+    const tabla = document.getElementById('contenedor-filas');
     const nuevaFila = document.createElement('tr');
-    nuevaFila.className = "fila-asiento"; 
+    nuevaFila.className = 'fila-asiento';
 
     nuevaFila.innerHTML = `
         <td contenteditable="true" class="val-fecha" style="padding:10px; border:1px solid #e2e8f0;">${fechaAuto}</td>
         <td contenteditable="true" class="txt-cuenta" style="padding:10px; border:1px solid #e2e8f0; min-width:200px;" 
-            oninput="ejecutarLogicaIVA(); asignarRefInteligente(this); actualizarTotales();"></td>
-        <td contenteditable="true" class="col-ref" style="padding:10px; border:1px solid #e2e8f0;"></td>
-        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
-        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" 
-            oninput="ejecutarLogicaIVA(); actualizarTotales();">0</td>
+            oninput="actualizarTotales();" 
+            onblur="asignarRefInteligente(this)"></td>
+        <td class="col-ref" style="padding:10px; border:1px solid #e2e8f0; background:#f8fafc; font-weight:bold; text-align:center;"></td>
+        <td contenteditable="true" class="val-debito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales();">0</td>
+        <td contenteditable="true" class="val-credito" style="padding:10px; border:1px solid #e2e8f0; text-align:right;" oninput="actualizarTotales();">0</td>
         <td style="text-align:center; border:1px solid #e2e8f0;">
-            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer; font-size:18px;">✕</button>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); actualizarTotales();" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
         </td>
     `;
-    contenedor.appendChild(nuevaFila);
-    }
+    tabla.appendChild(nuevaFila);
+}
 
     function ejecutarLogicaIVA() {
     actualizarTotales();
@@ -489,79 +482,46 @@ function actualizarTotales() {
 
 async function guardarAsiento() {
     try {
-        // 1. Verificar Periodo
-        const elPeriodo = document.getElementById('textoPeriodoDiario');
-        const periodoRaw = elPeriodo ? elPeriodo.innerText : "";
-        const periodoActivo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
-
-        if (!periodoActivo || periodoActivo === "Sin asignar" || periodoActivo.toUpperCase().includes("SIN PERIODO") || periodoActivo.includes("---")) {
-            Swal.fire("Aviso", "Primero activa un periodo en el Historial", "warning");
-            return;
+        const periodoActivo = document.getElementById('textoPeriodoDiario').innerText.replace(/Periodo:|PERIODO:/gi, "").trim();
+        if (!periodoActivo || periodoActivo.includes("---")) {
+            Swal.fire("Aviso", "Seleccione un periodo en el Historial", "warning"); return;
         }
 
-        // 2. Recolectar datos
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
-        const glosa = document.getElementById('resumenAsiento') ? document.getElementById('resumenAsiento').value : "";
+        const glosa = document.getElementById('resumenAsiento')?.value || "";
 
-        filas.forEach(f => {
-            const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+        for (let f of filas) {
+            const elCuenta = f.querySelector('.txt-cuenta');
+            const cuenta = elCuenta.innerText.trim();
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
-            const fechaFila = f.querySelector('.val-fecha').innerText.trim();
-            const refFila = f.querySelector('.col-ref').innerText.trim();
+            const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
+            let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
+                // Si no hay REF, la calculamos rápido
+                if (celdaRef.innerText.trim() === "") await asignarRefInteligente(elCuenta);
+
+                // TRADUCCIÓN PARA EL BALANCE (De DD/MM/YYYY a YYYY-MM-DD)
+                let fechaEnvio = fechaRaw;
+                if (fechaRaw.includes('/')) {
+                    const p = fechaRaw.split('/');
+                    fechaEnvio = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+                }
+
                 datos.push({ 
-                    fecha: fechaFila, cuenta: cuenta, ref: refFila, 
+                    fecha: fechaEnvio, cuenta: cuenta, ref: celdaRef.innerText, 
                     debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
                 });
             }
-        });
-
-        if (datos.length === 0) {
-            Swal.fire("Error", "La tabla está vacía o faltan cuentas.", "error");
-            return;
         }
 
-        // 3. Validar Cuadre usando los IDs correctos
-        const elTD = document.getElementById('totalDebito');
-        const elTC = document.getElementById('totalCredito');
-
-        if (!elTD || !elTC) {
-            Swal.fire("Error", "No se encontraron los totales en pantalla.", "error");
-            return;
-        }
-
-        const tD = parseFloat(elTD.innerText) || 0;
-        const tC = parseFloat(elTC.innerText) || 0;
-
-        if (Math.abs(tD - tC) > 0.01) {
-            Swal.fire("Error", `El asiento no cuadra. Diferencia: ${(Math.abs(tD - tC)).toFixed(2)}`, "error");
-            return;
-        }
-
-        // 4. Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
-
-        // 5. Éxito
-        await Swal.fire("Éxito", "Asiento guardado correctamente", "success");
-        document.getElementById('contenedor-filas').innerHTML = '';
-        if(document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = '';
-        
-        agregarFila(); 
-        actualizarTotales();
-
-    } catch (e) {
-        console.error("Error al guardar:", e);
-        // Si Swal falla por alguna razón, usamos alert normal para que no haya errores silenciosos
-        if (typeof Swal !== 'undefined') {
-            Swal.fire("Error", "Fallo técnico: " + e.message, "error");
-        } else {
-            alert("Error al guardar: " + e.message);
-        }
-    }
+        await Swal.fire("Éxito", "Asiento guardado", "success");
+        location.reload();
+    } catch (e) { Swal.fire("Error", e.message, "error"); }
 }
     
     async function cargarCuentasSelect() {

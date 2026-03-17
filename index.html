@@ -1262,18 +1262,23 @@ async function confirmarEliminacion() {
     let sumaDebe = 0;
     let sumaHaber = 0;
 
-    let html = `
-        <table style="width:100%; border-collapse: collapse; font-family: 'Courier New', monospace; border: 2px solid #000; background: white;">
-            <thead>
-                <tr style="background-color: #f1f5f9;">
-                    <th style="border: 1px solid #000; padding: 8px; width: 15%;">Fecha</th>
-                    <th style="border: 1px solid #000; padding: 8px; width: 45%; text-align: left;">Cuentas</th>
-                    <th style="border: 1px solid #000; padding: 8px; width: 10%;">Ref</th>
-                    <th style="border: 1px solid #000; padding: 8px; width: 15%;">Debe</th>
-                    <th style="border: 1px solid #000; padding: 8px; width: 15%;">Haber</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    html += `
+<div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
+    <div style="text-align: left;">
+        <h3 style="margin: 0; color: #2563eb; text-transform: uppercase; font-size: 1.1rem;">${c.mes}</h3>
+        <small style="color: #64748b;">Finalizado el: ${new Date(c.creado_at).toLocaleDateString()}</small>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;
+        <button onclick="activarDesdeHistorial('${c.mes}')" 
+                style="background: #f1f5f9; color: #1e293b; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
+            Activar
+        </button>
+        <button onclick="verDetalleReporte('diario')" 
+                style="background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
+            Ver Libro
+        </button>
+    </div>
+</div>`;
 
     const nombresOrdenados = Object.keys(mayor).sort();
 
@@ -1356,23 +1361,18 @@ async function confirmarEliminacion() {
         cierres.forEach(c => {
             html += `
             <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
-                <div style="flex: 1; text-align: left;">
+                <div style="text-align: left;">
                     <h3 style="margin: 0; color: #2563eb; text-transform: uppercase; font-size: 1.1rem;">${c.mes}</h3>
                     <small style="color: #64748b;">Finalizado el: ${new Date(c.creado_at).toLocaleDateString()}</small>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <button onclick="activarDesdeHistorial('${c.mes}')" 
-                            style="background: #f1f5f9; color: #1e293b; border: none; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
-                        Activar
-                    </button>
-                    <button onclick="verDetalleReporte('diario')" 
-                            style="background: #2563eb; color: white; border: none; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
-                        Ver Libro
-                    </button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="activarDesdeHistorial('${c.mes}')" style="background: #f1f5f9; color: #1e293b; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">Activar</button>
+                    <button onclick="verDetalleReporte('diario')" style="background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">Ver Libro</button>
                 </div>
             </div>`;
         });
         contenedor.innerHTML = html;
+
     } catch (e) {
         console.error("Error historial:", e);
         contenedor.innerHTML = '<p style="color:red; text-align:center;">Error al cargar datos.</p>';

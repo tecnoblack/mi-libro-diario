@@ -236,39 +236,40 @@
 
     let diccionarioCuentasGlobal = {};
 
-   async function cargarDiccionarioCuentas() {
+ async function cargarDiccionarioCuentas() {
     try {
-        console.log("Intentando cargar historial de folios...");
+        // IMPORTANTE: Limpiamos antes de empezar
+        diccionarioCuentasGlobal = {}; 
         
-        // 1. Traemos TODOS los registros guardados
+        // Consultamos la tabla correcta: 'asientos'
         const { data, error } = await _supabase
-            .from('registros')
+            .from('asientos') 
             .select('cuenta, ref');
 
         if (error) {
-            console.error("Error de Supabase:", error.message);
+            console.error("Error al conectar con la tabla asientos:", error.message);
             return;
         }
 
         if (data && data.length > 0) {
-            // 2. Llenamos el diccionario con lo que existe en la DB
             data.forEach(reg => {
                 if (reg.cuenta && reg.ref) {
-                    const nombreLimpio = reg.cuenta.trim().toUpperCase();
-                    const numRef = parseInt(reg.ref);
+                    const nombreCuenta = reg.cuenta.trim().toUpperCase();
+                    const valorRef = parseInt(reg.ref);
                     
-                    // Si la cuenta no existe en el diccionario o el ref es válido, guardamos
-                    if (!diccionarioCuentasGlobal[nombreLimpio] || numRef > 0) {
-                        diccionarioCuentasGlobal[nombreLimpio] = numRef;
+                    // Si encontramos un REF válido (mayor a 0), lo guardamos
+                    if (!isNaN(valorRef) && valorRef > 0) {
+                        // Guardamos el REF más alto encontrado para esa cuenta
+                        if (!diccionarioCuentasGlobal[nombreCuenta] || valorRef > diccionarioCuentasGlobal[nombreCuenta]) {
+                            diccionarioCuentasGlobal[nombreCuenta] = valorRef;
+                        }
                     }
                 }
             });
-            console.log("Diccionario cargado con éxito:", diccionarioCuentasGlobal);
-        } else {
-            console.log("No se encontraron registros previos en la base de datos.");
+            console.log("Memoria de folios sincronizada:", diccionarioCuentasGlobal);
         }
     } catch (err) {
-        console.error("Error inesperado al cargar folios:", err);
+        console.error("Error inesperado:", err);
     }
 }
     
@@ -476,7 +477,7 @@ async function asignarRefInteligente(elemento) {
     }
 }
 
-  function asignarRefInteligente(elemento) {
+function asignarRefInteligente(elemento) {
     const fila = elemento.closest('tr');
     const celdaRef = fila.querySelector('.col-ref');
     const nombre = elemento.innerText.trim().toUpperCase();
@@ -486,32 +487,35 @@ async function asignarRefInteligente(elemento) {
         return;
     }
 
-    // 1. Buscamos si la cuenta ya tiene un número en nuestra memoria
+    // 1. BUSCAR EN EL HISTORIAL REAL (Lo que cargamos de Supabase)
     if (diccionarioCuentasGlobal[nombre]) {
         celdaRef.innerText = diccionarioCuentasGlobal[nombre];
-    } else {
-        // 2. Si no existe (como te pasa ahora), buscamos el número más alto usado en la tabla actual
-        let maxRef = 0;
-        
-        // Revisamos todas las filas que ya tienen un número puesto
-        document.querySelectorAll('.col-ref').forEach(ref => {
-            const valor = parseInt(ref.innerText);
-            if (!isNaN(valor) && valor > maxRef) maxRef = valor;
-        });
+        return; 
+    }
 
-        // 3. También revisamos nuestro diccionario global por si acaso
-        const valoresDiccionario = Object.values(diccionarioCuentasGlobal);
-        if (valoresDiccionario.length > 0) {
-            const maxDic = Math.max(...valoresDiccionario);
-            if (maxDic > maxRef) maxRef = maxDic;
+    // 2. BUSCAR EN OTRAS FILAS DEL MISMO ASIENTO (Por si la acabas de escribir arriba)
+    const filas = document.querySelectorAll('#contenedor-filas tr');
+    for (let f of filas) {
+        const n = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
+        const r = f.querySelector('.col-ref').innerText.trim();
+        if (n === nombre && r !== "" && f !== fila) {
+            celdaRef.innerText = r;
+            return;
         }
+    }
 
-        // 4. Asignamos el siguiente número (si todo es 0, empezará en 1)
-        const nuevoFolio = maxRef + 1;
-        celdaRef.innerText = nuevoFolio;
-        
-        // Guardamos en el diccionario para que se repita si la vuelves a usar
-        diccionarioCuentasGlobal[nombre] = nuevoFolio;
+    // 3. SI ES UNA CUENTA TOTALMENTE NUEVA
+    // Solo si quieres que auto-calcule el siguiente, si no, deja celdaRef.innerText = "";
+    let maxRef = 0;
+    Object.values(diccionarioCuentasGlobal).forEach(v => {
+        if (parseInt(v) > maxRef) maxRef = parseInt(v);
+    });
+    
+    if (maxRef > 0) {
+        celdaRef.innerText = maxRef + 1;
+    } else {
+        // Si no hay nada en el historial, no ponemos 1 por defecto, mejor que tú lo pongas
+        celdaRef.innerText = ""; 
     }
 }
     

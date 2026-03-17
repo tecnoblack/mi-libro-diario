@@ -1360,77 +1360,106 @@ async function confirmarEliminacion() {
     }
 }
 
-    async function generarBalanceGeneral() {
-    const contenedor = document.getElementById('contenedor-balance');
-    if (!contenedor) return alert("No se encontró el contenedor-balance en el HTML");
-
+   async function generarBalance() {
     try {
-        contenedor.innerHTML = "<div style='text-align:center; padding:20px;'>🔍 Buscando registros en la base de datos...</div>";
+        // 1. Obtenemos todos los asientos de Supabase (la misma fuente del Mayor)
+        const { data, error } = await _supabase.from('asientos').select('*');
+        if (error) throw error;
 
-        // 1. Identificar periodo
-        let periodoRaw = document.getElementById('textoPeriodoDiario')?.innerText || 
-                         document.getElementById('periodoAsientoManual')?.innerText || "";
-        
-        // Si no encuentra periodo en el texto, usamos un prompt para que tú lo escribas
-        let periodo = periodoRaw.replace(/Periodo:|PERIODO:|HISTORIAL:/gi, "").trim();
-        
-        if (!periodo) {
-            periodo = prompt("No detecté el periodo automáticamente. Escribe el mes y año (Ej: FEBRERO 2026):");
-        }
+        // 2. Agrupamos por cuenta y sumamos los Débitos y Créditos
+        const resumenCuentas = {};
 
-        if(document.getElementById('balance-periodo-header')) {
-            document.getElementById('balance-periodo-header').innerText = periodo;
-        }
-
-        // 2. Consulta a Supabase (Buscamos coincidencias exactas y archivadas)
-        // 2. Consulta a Supabase
-        const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .or(`periodo.eq."${periodo}",periodo.eq."ARCHIVADO_${periodo}"`);
-
-        // CAMBIO AQUÍ: Manejo de error suave para que no te saque al Login
-        if (error) {
-            console.error("Error de Supabase:", error);
-            contenedor.innerHTML = `<div style="color:red; padding:20px;">⚠️ Error de conexión: ${error.message}</div>`;
-            return; 
-        }
-
-        // 3. Si la conexión funcionó pero no encontró nada
-        if (!data || data.length === 0) {
-            contenedor.innerHTML = `
-                <div style="text-align:center; padding:30px; border:2px dashed #ccc; color:#666;">
-                    <h3>No hay registros para "${periodo}"</h3>
-                    <p>Revisa que el nombre del mes coincida exactamente con el del Libro Diario.</p>
-                    <button onclick="generarBalanceGeneral()" style="padding:10px; margin-top:10px; cursor:pointer;">🔄 Intentar de nuevo</button>
-                </div>`;
-            return;
-    }
-
-        // 4. Procesar saldos netos (Libro Mayor Virtual)
-        const mayorVirtual = {};
-        data.forEach(reg => {
-            const c = reg.cuenta.toUpperCase().trim();
-            if (!mayorVirtual[c]) {
-                mayorVirtual[c] = { 
-                    fecha: reg.fecha || "-", 
-                    referencia: reg.ref || reg.referencia || "-", 
-                    debeTotal: 0, 
-                    haberTotal: 0 
+        data.forEach(registro => {
+            const nombre = registro.cuenta;
+            if (!resumenCuentas[nombre]) {
+                resumenCuentas[nombre] = { 
+                    ref: registro.ref, 
+                    totalDebito: 0, 
+                    totalCredito: 0 
                 };
             }
-            mayorVirtual[c].debeTotal += (Number(reg.debito) || 0);
-            mayorVirtual[c].haberTotal += (Number(reg.credito) || 0);
+            resumenCuentas[nombre].totalDebito += parseFloat(registro.debito) || 0;
+            resumenCuentas[nombre].totalCredito += parseFloat(registro.credito) || 0;
         });
 
-        // 5. Dibujar la tabla de 5 columnas
-        renderizarTablaComprobacion(mayorVirtual);
+        // 3. Declaramos la variable "html" (¡Esto quita el error rojo!)
+        let html = `
+            <table style="width: 100%; border-collapse: collapse; text-align: center; margin-top: 20px;">
+                <thead>
+                    <tr style="background-color: var(--azul-pro, #2563eb); color: white;">
+                        <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">CUENTA</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">DEBE</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">HABER</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        let sumaTotalDebe = 0;
+        let sumaTotalHaber = 0;
+
+        // Convertimos las cuentas en una lista y las ordenamos por su número REF (1, 2, 3...)
+        const cuentasOrdenadas = Object.keys(resumenCuentas).sort((a, b) => {
+            return parseInt(resumenCuentas[a].ref) - parseInt(resumenCuentas[b].ref);
+        });
+
+        // 4. Calculamos el saldo final y lo ubicamos en la columna correcta
+        cuentasOrdenadas.forEach(cuenta => {
+            const datos = resumenCuentas[cuenta];
+            
+            // Lógica del Mayor: Débitos menos Créditos
+            const saldoFinal = datos.totalDebito - datos.totalCredito;
+            
+            let celdaDebe = "";
+            let celdaHaber = "";
+
+            if (saldoFinal > 0) {
+                // Saldo Deudor -> Va por el Debe
+                celdaDebe = saldoFinal.toFixed(2);
+                sumaTotalDebe += saldoFinal;
+            } else if (saldoFinal < 0) {
+                // Saldo Acreedor -> Va por el Haber (convertido a positivo con Math.abs)
+                celdaHaber = Math.abs(saldoFinal).toFixed(2);
+                sumaTotalHaber += Math.abs(saldoFinal);
+            } else {
+                // Si da 0 exacto, la cuenta está saldada
+                celdaDebe = "0.00";
+                celdaHaber = "0.00";
+            }
+
+            // Agregamos la fila (SIN contenteditable, por lo que es de solo lectura)
+            html += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${datos.ref}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: left; font-weight: 500;">${cuenta}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${celdaDebe}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${celdaHaber}</td>
+                </tr>
+            `;
+        });
+
+        // 5. Agregamos la fila de Sumas Iguales para verificar que cuadre
+        const colorCuadre = sumaTotalDebe.toFixed(2) === sumaTotalHaber.toFixed(2) ? "green" : "red";
+        
+        html += `
+                <tr style="font-weight: bold; background-color: #f0f2f5;">
+                    <td colspan="2" style="border: 1px solid #ccc; padding: 10px; text-align: right;">TOTAL SUMAS IGUALES:</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color: ${colorCuadre};">${sumaTotalDebe.toFixed(2)}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color: ${colorCuadre};">${sumaTotalHaber.toFixed(2)}</td>
+                </tr>
+            </tbody>
+        </table>
+        `;
+
+        // 6. Inyectamos el HTML terminado en el documento
+        document.getElementById('contenedor-balance').innerHTML = html;
 
     } catch (err) {
-        console.error("Error en Balance:", err);
-        contenedor.innerHTML = `<div style="color:red; padding:20px;">Error técnico: ${err.message}</div>`;
+        console.error("Error al generar el balance:", err);
+        document.getElementById('contenedor-balance').innerHTML = `<p style="color:red; text-align:center;">Error técnico: ${err.message}</p>`;
     }
-    }
+}
     
     function renderizarTablaComprobacion(mayor) {
     const contenedor = document.getElementById('contenedor-balance');

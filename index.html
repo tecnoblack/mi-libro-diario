@@ -236,30 +236,39 @@
 
     let diccionarioCuentasGlobal = {};
 
-    async function cargarDiccionarioCuentas() {
+   async function cargarDiccionarioCuentas() {
     try {
-        // Traemos cuenta y ref de todos tus registros guardados
+        console.log("Intentando cargar historial de folios...");
+        
+        // 1. Traemos TODOS los registros guardados
         const { data, error } = await _supabase
             .from('registros')
             .select('cuenta, ref');
 
-        if (error) throw error;
+        if (error) {
+            console.error("Error de Supabase:", error.message);
+            return;
+        }
 
-        // Limpiamos y llenamos nuestra memoria
-        data.forEach(reg => {
-            if (reg.cuenta && reg.ref) {
-                const nombre = reg.cuenta.trim().toUpperCase();
-                const numRef = parseInt(reg.ref);
-                
-                // Si la cuenta no está o encontramos un REF más actualizado, lo guardamos
-                if (!diccionarioCuentasGlobal[nombre] || numRef > 0) {
-                    diccionarioCuentasGlobal[nombre] = numRef;
+        if (data && data.length > 0) {
+            // 2. Llenamos el diccionario con lo que existe en la DB
+            data.forEach(reg => {
+                if (reg.cuenta && reg.ref) {
+                    const nombreLimpio = reg.cuenta.trim().toUpperCase();
+                    const numRef = parseInt(reg.ref);
+                    
+                    // Si la cuenta no existe en el diccionario o el ref es válido, guardamos
+                    if (!diccionarioCuentasGlobal[nombreLimpio] || numRef > 0) {
+                        diccionarioCuentasGlobal[nombreLimpio] = numRef;
+                    }
                 }
-            }
-        });
-        console.log("Folios cargados correctamente:", diccionarioCuentasGlobal);
+            });
+            console.log("Diccionario cargado con éxito:", diccionarioCuentasGlobal);
+        } else {
+            console.log("No se encontraron registros previos en la base de datos.");
+        }
     } catch (err) {
-        console.error("Error al cargar el historial de folios:", err);
+        console.error("Error inesperado al cargar folios:", err);
     }
 }
     

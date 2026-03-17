@@ -487,36 +487,34 @@ function asignarRefInteligente(elemento) {
         return;
     }
 
-    // 1. BUSCAR EN EL HISTORIAL REAL (Lo que cargamos de Supabase)
+    // 1. Si la cuenta ya existe en la memoria, poner su número y salir
     if (diccionarioCuentasGlobal[nombre]) {
         celdaRef.innerText = diccionarioCuentasGlobal[nombre];
-        return; 
+        return;
     }
 
-    // 2. BUSCAR EN OTRAS FILAS DEL MISMO ASIENTO (Por si la acabas de escribir arriba)
-    const filas = document.querySelectorAll('#contenedor-filas tr');
-    for (let f of filas) {
-        const n = f.querySelector('.txt-cuenta').innerText.trim().toUpperCase();
-        const r = f.querySelector('.col-ref').innerText.trim();
-        if (n === nombre && r !== "" && f !== fila) {
-            celdaRef.innerText = r;
-            return;
-        }
+    // 2. Si es una cuenta NUEVA, vamos a buscar el máximo de verdad:
+    let maximoEncontrado = 0;
+
+    // Revisamos el diccionario (lo que viene de Supabase)
+    const valoresHistorial = Object.values(diccionarioCuentasGlobal);
+    if (valoresHistorial.length > 0) {
+        maximoEncontrado = Math.max(...valoresHistorial.map(v => parseInt(v) || 0));
     }
 
-    // 3. SI ES UNA CUENTA TOTALMENTE NUEVA
-    // Solo si quieres que auto-calcule el siguiente, si no, deja celdaRef.innerText = "";
-    let maxRef = 0;
-    Object.values(diccionarioCuentasGlobal).forEach(v => {
-        if (parseInt(v) > maxRef) maxRef = parseInt(v);
+    // Revisamos también lo que tienes escrito en pantalla ahora mismo
+    document.querySelectorAll('.col-ref').forEach(celda => {
+        const num = parseInt(celda.innerText) || 0;
+        if (num > maximoEncontrado) maximoEncontrado = num;
     });
+
+    // 3. El nuevo número es el máximo + 1
+    const nuevoNumero = maximoEncontrado + 1;
     
-    if (maxRef > 0) {
-        celdaRef.innerText = maxRef + 1;
-    } else {
-        // Si no hay nada en el historial, no ponemos 1 por defecto, mejor que tú lo pongas
-        celdaRef.innerText = ""; 
-    }
+    celdaRef.innerText = nuevoNumero;
+    
+    // IMPORTANTE: Guardarlo en la memoria de inmediato para que no se repita
+    diccionarioCuentasGlobal[nombre] = nuevoNumero;
 }
     
   function agregarFila() {

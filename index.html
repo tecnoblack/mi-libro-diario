@@ -665,6 +665,11 @@ async function guardarAsiento() {
             Swal.fire("Aviso", "Seleccione un periodo en el Historial", "warning"); return;
         }
 
+        // --- CAMBIO CLAVE: Obtener el número de asiento del encabezado ---
+        const headerTexto = document.getElementById('num-asiento-header').innerText;
+        const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
+        // ----------------------------------------------------------------
+
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
@@ -689,17 +694,35 @@ async function guardarAsiento() {
                 }
 
                 datos.push({ 
-                    fecha: fechaEnvio, cuenta: cuenta, ref: celdaRef.innerText, 
-                    debito: d, credito: c, periodo: periodoActivo, descripcion: glosa
+                    asiento_id: numeroAsientoActual, // <--- AHORA SÍ se guarda el número
+                    fecha: fechaEnvio, 
+                    cuenta: cuenta, 
+                    ref: celdaRef.innerText, 
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo, 
+                    descripcion: glosa
                 });
             }
         }
 
+        if (datos.length === 0) {
+            Swal.fire("Aviso", "El asiento está vacío o no tiene montos", "warning");
+            return;
+        }
+
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
-        await Swal.fire("Éxito", "Asiento guardado", "success");
-        location.reload();
-    } catch (e) { Swal.fire("Error", e.message, "error"); }
+
+        await Swal.fire("Éxito", `Asiento Nº ${numeroAsientoActual} guardado`, "success");
+        
+        // En lugar de reload, podrías limpiar la tabla y llamar al siguiente número:
+        // await actualizarNumeroAsientoAutomatico(); 
+        location.reload(); 
+
+    } catch (e) { 
+        Swal.fire("Error", e.message, "error"); 
+    }
 }
     
     async function cargarCuentasSelect() {

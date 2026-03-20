@@ -244,25 +244,38 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
 
-// Este código se ejecuta solo al abrir la página
 document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { session }, error } = await _supabase.auth.getSession();
+    const estadoTexto = document.getElementById('estado-carga');
+    
+    try {
+        // 1. Iniciamos la verificación
+        const { data: { session }, error } = await _supabase.auth.getSession();
 
-    if (error) {
-        console.error("Error recuperando sesión:", error);
-        return;
-    }
-
-    if (session) {
-        // Si hay sesión guardada, entra directo verificando el perfil
-        console.log("Sesión activa detectada para:", session.user.email);
-        verificarPerfil(session.user.id);
-    } else {
-        // Si no hay sesión, se queda en el login
-        console.log("No hay sesión previa.");
-        cambiarVista('vista-login');
+        if (session) {
+            estadoTexto.innerText = "Sincronizando perfiles...";
+            await verificarPerfil(session.user.id);
+            // La función verificarPerfil ya carga el diccionario y la empresa
+        } else {
+            // Si no hay sesión, vamos al login directamente
+            cambiarVista('vista-login');
+            ocultarSplash();
+        }
+    } catch (err) {
+        console.error("Error al iniciar:", err);
+        ocultarSplash();
     }
 });
+
+// Función para desaparecer la pantalla de carga suavemente
+function ocultarSplash() {
+    const splash = document.getElementById('pantalla-carga');
+    if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(() => {
+            splash.style.display = 'none';
+        }, 500); // Coincide con la transición de 0.5s
+    }
+}
     
     let diccionarioCuentasGlobal = {};
 
@@ -332,8 +345,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
    async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
+    const estadoTexto = document.getElementById('estado-carga'); // Para mostrar progreso en la splash
     
     try {
+        if (estadoTexto) estadoTexto.innerText = "Verificando perfil...";
+
         const { data: perfil, error } = await _supabase
             .from('perfiles')
             .select('*')
@@ -343,6 +359,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error) throw error;
         
         if (!perfil) {
+            if (estadoTexto) estadoTexto.innerText = "Error de perfil";
+            ocultarSplash(); // Quitamos la carga para mostrar el error
             Swal.fire("Error", "El usuario no tiene perfil. Contacta al administrador.", "error");
             await _supabase.auth.signOut();
             cambiarVista('vista-login');
@@ -353,6 +371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!perfil.last_device_id) {
             await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
         } else if (perfil.last_device_id !== currentDevice) {
+            ocultarSplash(); // Quitamos la carga para mostrar el error
             await Swal.fire({
                 title: "Acceso Denegado",
                 text: "Esta cuenta ya está vinculada a otro dispositivo.",
@@ -365,11 +384,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // --- Control de Suscripción ---
         if (!perfil.suscripcion_activa) {
-            document.getElementById('banner-suscripcion').style.display = 'block';
-            // Si la suscripción es obligatoria para entrar, añade un return aquí
+            const banner = document.getElementById('banner-suscripcion');
+            if (banner) banner.style.display = 'block';
         }
 
-        // --- Cargas Iniciales (Para que todo funcione al entrar) ---
+        // --- Cargas Iniciales (Actualizando el texto de la Splash) ---
+        if (estadoTexto) estadoTexto.innerText = "Cargando datos contables...";
+        
         // 1. Cargar el nombre de la empresa y el RIF en los encabezados
         await cargarDatosEmpresaVisual(); 
         
@@ -377,14 +398,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         await cargarDiccionarioCuentas();
         await actualizarNumeroAsientoAutomatico(); 
         
-        // 3. Entrar directamente al menú
+        // 3. Todo listo: Entrar al menú y QUITAR la pantalla de carga
         cambiarVista('vista-menu');
+        
+        // ESPERAMOS UN MOMENTO PARA QUE LA VISTA CAMBIE Y LUEGO QUITAMOS EL SPLASH
+        setTimeout(() => {
+            ocultarSplash();
+        }, 800); 
 
     } catch (err) {
         console.error("Error en verificación:", err);
+        ocultarSplash(); // Importante: si algo falla, quitar la splash para ver el error
         Swal.fire("Error de sistema", err.message, "error");
+        cambiarVista('vista-login');
     }
-                }
+   }
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
@@ -1740,6 +1768,16 @@ async function actualizarNumeroAsientoAutomatico() {
         console.error("Error al cargar encabezados:", err);
     }
     }
+
+function ocultarSplash() {
+    const splash = document.getElementById('pantalla-carga');
+    if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(() => {
+            splash.style.display = 'none';
+        }, 500); // 0.5 segundos de desvanecimiento
+    }
+}
     
 </script>
 

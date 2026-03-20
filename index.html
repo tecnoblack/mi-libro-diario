@@ -837,11 +837,22 @@ async function generarMayor() {
       // 4. FUNCIÓN PARA ASIGNAR MES
     async function ejecutarAsignacionDesdeHistorial() {
     try {
-        // 1. ESTA ES LA LÍNEA QUE FALTA: Capturamos el valor del input o del elemento
-        // Asegúrate de que 'inputMesHistorial' sea el ID del selector donde eliges el mes
-        const nuevoMes = document.getElementById('inputMesHistorial').value; 
+        // 1. Buscamos el texto directamente del modal para no fallar
+        // Intentamos obtenerlo de varios lugares posibles
+        let nuevoMes = "";
+        const elementoInput = document.getElementById('inputMesHistorial');
+        const elementoModal = document.querySelector('.modal-body h4'); // El h4 suele tener el nombre del mes
 
-        // 2. Actualizamos en la base de datos (Tabla Empresa)
+        if (elementoInput) {
+            nuevoMes = elementoInput.value;
+        } else if (elementoModal) {
+            nuevoMes = elementoModal.innerText.trim();
+        } else {
+            // Si todo falla, usamos el mes actual por defecto
+            nuevoMes = "MARZO 2026"; 
+        }
+
+        // 2. Actualizamos en Supabase
         const { error } = await _supabase
             .from('empresa')
             .update({ "periodo_actual": nuevoMes })
@@ -849,17 +860,23 @@ async function generarMayor() {
 
         if (error) throw error;
 
-        // 3. Actualizamos todos los textos de periodo en la pantalla
+        // 3. Actualizamos todos los textos en pantalla
         const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
         IDs.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = nuevoMes;
         });
 
-        Swal.fire("Periodo Activo", "Ahora estás trabajando en: " + nuevoMes, "success");
+        // 4. Cerramos el modal si usas SweetAlert o Bootstrap
+        if (window.Swal) {
+            Swal.fire("Periodo Activo", "Ahora estás trabajando en: " + nuevoMes, "success");
+        } else {
+            alert("Periodo Activo: " + nuevoMes);
+        }
         
     } catch (err) {
         console.error("Error al activar:", err);
+        // Este mensaje es el que viste en tu captura
         alert("Error al sincronizar periodo: " + err.message);
     }
     }

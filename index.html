@@ -1802,34 +1802,30 @@ function ocultarSplash() {
 }
 
 async function guardarCambiosEmpresa() {
-    // Usamos los IDs reales de tu HTML: empresaNombre y empresaRif
     const nombreElemento = document.getElementById('empresaNombre');
     const rifElemento = document.getElementById('empresaRif');
     
     if (!nombreElemento || !rifElemento) return;
 
-    const nombre = nombreElemento.innerText.trim();
-    // Limpiamos el RIF por si acaso
-    const rif = rifElemento.innerText.replace(/RIF:/gi, "").trim();
+    const nuevoNombre = nombreElemento.innerText.trim();
+    const nuevoRif = rifElemento.innerText.trim();
 
     try {
         const { error } = await _supabase
-            .from('empresa') 
+            .from('empresa')
             .update({ 
-                nombre: nombre, 
-                rif: rif 
+                nombre: nuevoNombre, 
+                rif: nuevoRif 
             })
             .eq('id', 1);
 
         if (error) throw error;
-
-        // Actualizamos los demás encabezados (Balance, Mayor) para que coincidan
-        await cargarDatosEmpresaVisual();
         
-        console.log("✅ Datos guardados: " + nombre);
-
+        // Refrescamos los datos en el resto de la app (Balance, Mayor)
+        await cargarDatosEmpresaVisual();
+        console.log("Datos de empresa actualizados");
     } catch (err) {
-        console.error("❌ Error al guardar:", err);
+        console.error("Error al guardar:", err);
     }
 }
     

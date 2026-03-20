@@ -235,6 +235,26 @@
     const SUPABASE_URL = 'https://hgfutgmypebpnwzqsqqp.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_Um9pmjQ-PPl2Q9xDsRxFCw_gpnhSmPk'; 
 
+// Este código se ejecuta solo al abrir la página
+document.addEventListener('DOMContentLoaded', async () => {
+    const { data: { session }, error } = await _supabase.auth.getSession();
+
+    if (error) {
+        console.error("Error recuperando sesión:", error);
+        return;
+    }
+
+    if (session) {
+        // Si hay sesión guardada, entra directo verificando el perfil
+        console.log("Sesión activa detectada para:", session.user.email);
+        verificarPerfil(session.user.id);
+    } else {
+        // Si no hay sesión, se queda en el login
+        console.log("No hay sesión previa.");
+        cambiarVista('vista-login');
+    }
+});
+    
     let diccionarioCuentasGlobal = {};
 
  async function cargarDiccionarioCuentas() {

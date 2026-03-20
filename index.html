@@ -58,6 +58,15 @@
     </style>
 </head>
 <body>
+<div id="pantalla-carga" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s;">
+    <div style="width: 60px; height: 60px; border: 5px solid #f3f3f3; border-top: 5px solid var(--azul-pro); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <h2 style="color: var(--azul-pro); margin-top: 20px; font-family: sans-serif;">Cargando Sistema...</h2>
+    <p id="estado-carga" style="color: #64748b; font-size: 0.9rem;">Verificando credenciales</p>
+</div>
+
+<style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
 
     <div id="banner-suscripcion">⚠️ Tu suscripción está inactiva o dispositivo no registrado.</div>
 
@@ -1746,5 +1755,5 @@ async function actualizarNumeroAsientoAutomatico() {
     </div>
     </div>
     
-</body>
+</body>  
 </html> 

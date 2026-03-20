@@ -345,10 +345,10 @@ function ocultarSplash() {
 
    async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
-    const estadoTexto = document.getElementById('estado-carga'); // Para mostrar progreso en la splash
+    const estadoTexto = document.getElementById('estado-carga'); 
     
     try {
-        if (estadoTexto) estadoTexto.innerText = "Verificando perfil...";
+        if (estadoTexto) estadoTexto.innerText = "Validando credenciales...";
 
         const { data: perfil, error } = await _supabase
             .from('perfiles')
@@ -358,61 +358,60 @@ function ocultarSplash() {
         
         if (error) throw error;
         
+        // 1. SI NO ESTÁ REGISTRADO (No hay perfil en la tabla)
         if (!perfil) {
-            if (estadoTexto) estadoTexto.innerText = "Error de perfil";
-            ocultarSplash(); // Quitamos la carga para mostrar el error
-            Swal.fire("Error", "El usuario no tiene perfil. Contacta al administrador.", "error");
-            await _supabase.auth.signOut();
-            cambiarVista('vista-login');
+            ocultarSplash(); 
+            await Swal.fire("Acceso Restringido", "No tienes un perfil creado. Contacta al administrador.", "error");
+            await _supabase.auth.signOut(); // Cerramos sesión
+            cambiarVista('vista-login');   // Mandamos al login
             return;
         }
         
-        // --- Control de Dispositivo (Sin recargar la página) ---
+        // 2. CONTROL DE DISPOSITIVO
         if (!perfil.last_device_id) {
             await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
         } else if (perfil.last_device_id !== currentDevice) {
-            ocultarSplash(); // Quitamos la carga para mostrar el error
-            await Swal.fire({
-                title: "Acceso Denegado",
-                text: "Esta cuenta ya está vinculada a otro dispositivo.",
-                icon: "error"
-            });
+            ocultarSplash(); 
+            await Swal.fire("Dispositivo no autorizado", "Esta cuenta ya está vinculada a otro equipo.", "warning");
             await _supabase.auth.signOut();
             cambiarVista('vista-login');
             return;
         }
         
-        // --- Control de Suscripción ---
+        // 3. SI LA SUSCRIPCIÓN NO ESTÁ ACTIVA
         if (!perfil.suscripcion_activa) {
-            const banner = document.getElementById('banner-suscripcion');
-            if (banner) banner.style.display = 'block';
+            ocultarSplash(); 
+            await Swal.fire({
+                title: "Suscripción Vencida",
+                text: "Tu acceso ha expirado. Por favor, renueva tu suscripción para continuar.",
+                icon: "info",
+                confirmButtonText: "Entendido"
+            });
+            await _supabase.auth.signOut(); // Lo sacamos del sistema
+            cambiarVista('vista-login');
+            return;
         }
 
-        // --- Cargas Iniciales (Actualizando el texto de la Splash) ---
-        if (estadoTexto) estadoTexto.innerText = "Cargando datos contables...";
+        // --- SI PASA TODAS LAS PRUEBAS, CARGAMOS LA APP ---
+        if (estadoTexto) estadoTexto.innerText = "Sincronizando datos...";
         
-        // 1. Cargar el nombre de la empresa y el RIF en los encabezados
         await cargarDatosEmpresaVisual(); 
-        
-        // 2. Cargar diccionario y actualizar número de asiento
         await cargarDiccionarioCuentas();
         await actualizarNumeroAsientoAutomatico(); 
         
-        // 3. Todo listo: Entrar al menú y QUITAR la pantalla de carga
         cambiarVista('vista-menu');
         
-        // ESPERAMOS UN MOMENTO PARA QUE LA VISTA CAMBIE Y LUEGO QUITAMOS EL SPLASH
         setTimeout(() => {
             ocultarSplash();
         }, 800); 
 
     } catch (err) {
-        console.error("Error en verificación:", err);
-        ocultarSplash(); // Importante: si algo falla, quitar la splash para ver el error
-        Swal.fire("Error de sistema", err.message, "error");
+        console.error("Error:", err);
+        ocultarSplash(); 
+        await _supabase.auth.signOut();
         cambiarVista('vista-login');
     }
-   }
+    }
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 

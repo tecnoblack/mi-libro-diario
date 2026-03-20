@@ -303,48 +303,59 @@
 
    async function verificarPerfil(userId) {
     const currentDevice = getDeviceId();
-    const { data: perfil, error } = await _supabase
-        .from('perfiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
     
-    if (error) {
-        alert("Error al verificar perfil: " + error.message);
-        return;
-    }
-    
-    if (!perfil) {
-        alert("El usuario no tiene perfil. Contacta al administrador.");
-        await _supabase.auth.signOut();
-        return;
-    }
-    
-    // Control de Dispositivo
-    if (!perfil.last_device_id) {
-        await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
-    } else if (perfil.last_device_id !== currentDevice) {
-        alert("🚨 ACCESO DENEGADO: Esta cuenta ya está vinculada a otro dispositivo.");
-        await _supabase.auth.signOut();
-        location.reload();
-        return;
-    }
-    
-    // Control de Suscripción
-    if (!perfil.suscripcion_activa) {
-        document.getElementById('banner-suscripcion').style.display = 'block';
-        return;
-    }
-
-    // --- AQUÍ HACEMOS LAS CARGAS INICIALES DE DATOS ---
-    await cargarDiccionarioCuentas();
-    
-    // AGREGAMOS ESTA LÍNEA PARA EL NÚMERO DE ASIENTO:
-    await actualizarNumeroAsientoAutomatico(); 
+    try {
+        const { data: perfil, error } = await _supabase
+            .from('perfiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
         
-    cambiarVista('vista-menu');
-}
-    
+        if (error) throw error;
+        
+        if (!perfil) {
+            Swal.fire("Error", "El usuario no tiene perfil. Contacta al administrador.", "error");
+            await _supabase.auth.signOut();
+            cambiarVista('vista-login');
+            return;
+        }
+        
+        // --- Control de Dispositivo (Sin recargar la página) ---
+        if (!perfil.last_device_id) {
+            await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
+        } else if (perfil.last_device_id !== currentDevice) {
+            await Swal.fire({
+                title: "Acceso Denegado",
+                text: "Esta cuenta ya está vinculada a otro dispositivo.",
+                icon: "error"
+            });
+            await _supabase.auth.signOut();
+            cambiarVista('vista-login');
+            return;
+        }
+        
+        // --- Control de Suscripción ---
+        if (!perfil.suscripcion_activa) {
+            document.getElementById('banner-suscripcion').style.display = 'block';
+            // Si la suscripción es obligatoria para entrar, añade un return aquí
+        }
+
+        // --- Cargas Iniciales (Para que todo funcione al entrar) ---
+        // 1. Cargar el nombre de la empresa y el RIF en los encabezados
+        await cargarDatosEmpresaVisual(); 
+        
+        // 2. Cargar diccionario y actualizar número de asiento
+        await cargarDiccionarioCuentas();
+        await actualizarNumeroAsientoAutomatico(); 
+        
+        // 3. Entrar directamente al menú
+        cambiarVista('vista-menu');
+
+    } catch (err) {
+        console.error("Error en verificación:", err);
+        Swal.fire("Error de sistema", err.message, "error");
+    }
+                }
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 

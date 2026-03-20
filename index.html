@@ -247,24 +247,29 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const estadoTexto = document.getElementById('estado-carga');
     
-    // --- NUEVO: Detectores para guardar cambios de Empresa al editar ---
-    const hNombre = document.getElementById('header-nombre-empresa');
-    const hRif = document.getElementById('header-rif-empresa');
+    // --- CONFIGURACIÓN DE GUARDADO AL EDITAR (IDs Reales) ---
+    const elNombre = document.getElementById('empresaNombre');
+    const elRif = document.getElementById('empresaRif');
 
-    // Guardar automáticamente cuando el usuario hace clic fuera (blur)
-    hNombre?.addEventListener('blur', guardarCambiosEmpresa);
-    hRif?.addEventListener('blur', guardarCambiosEmpresa);
-
-    // Guardar si el usuario presiona Enter
+    // Función para procesar la tecla Enter
     const evitarEnter = (e) => { 
         if(e.key === 'Enter') { 
             e.preventDefault(); 
-            e.target.blur(); // Al quitar el foco, se activa el evento 'blur' de arriba
+            e.target.blur(); // Al quitar el foco, se activa el evento 'blur'
         } 
     };
-    hNombre?.addEventListener('keydown', evitarEnter);
-    hRif?.addEventListener('keydown', evitarEnter);
-    // ----------------------------------------------------------------
+
+    // Asignamos los eventos a tus elementos reales
+    if (elNombre) {
+        elNombre.addEventListener('blur', guardarCambiosEmpresa);
+        elNombre.addEventListener('keydown', evitarEnter);
+    }
+    
+    if (elRif) {
+        elRif.addEventListener('blur', guardarCambiosEmpresa);
+        elRif.addEventListener('keydown', evitarEnter);
+    }
+    // ---------------------------------------------------------
 
     try {
         // 1. Iniciamos la verificación de sesión
@@ -273,7 +278,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (session) {
             if (estadoTexto) estadoTexto.innerText = "Sincronizando perfiles...";
             await verificarPerfil(session.user.id);
-            // La función verificarPerfil ya carga el diccionario y la empresa
         } else {
             // Si no hay sesión, vamos al login directamente
             cambiarVista('vista-login');
@@ -1798,50 +1802,57 @@ function ocultarSplash() {
 }
 
 async function guardarCambiosEmpresa() {
-    const nombre = document.getElementById('header-nombre-empresa').innerText.trim();
-    const rifRaw = document.getElementById('header-rif-empresa').innerText.trim();
+    // Usamos los IDs reales de tu HTML: empresaNombre y empresaRif
+    const nombreElemento = document.getElementById('empresaNombre');
+    const rifElemento = document.getElementById('empresaRif');
     
-    // Limpiamos el RIF por si el usuario dejó la palabra "RIF:"
-    const rif = rifRaw.replace(/RIF:/gi, "").trim();
+    if (!nombreElemento || !rifElemento) return;
+
+    const nombre = nombreElemento.innerText.trim();
+    // Limpiamos el RIF por si acaso
+    const rif = rifElemento.innerText.replace(/RIF:/gi, "").trim();
 
     try {
         const { error } = await _supabase
-            .from('empresa')
+            .from('empresa') 
             .update({ 
                 nombre: nombre, 
                 rif: rif 
             })
-            .eq('id', 1); // Asumiendo que tu empresa es el ID 1
+            .eq('id', 1);
 
         if (error) throw error;
 
-        // Una vez guardado en la base de datos, actualizamos los demás reportes visualmente
-        await cargarDatosEmpresaVisual(); 
+        // Actualizamos los demás encabezados (Balance, Mayor) para que coincidan
+        await cargarDatosEmpresaVisual();
         
-        console.log("Datos de empresa actualizados con éxito");
+        console.log("✅ Datos guardados: " + nombre);
+
     } catch (err) {
-        console.error("Error al guardar cambios de empresa:", err);
+        console.error("❌ Error al guardar:", err);
     }
 }
-
+    
     async function cargarDatosEmpresaVisual() {
-    const { data } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
-    if (data) {
-        // Actualiza el encabezado del Diario (donde editas)
-        const hNombre = document.getElementById('header-nombre-empresa');
-        const hRif = document.getElementById('header-rif-empresa');
-        if(hNombre) hNombre.innerText = data.nombre;
-        if(hRif) hRif.innerText = "RIF: " + data.rif;
+    try {
+        const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
+        if (data) {
+            // Actualiza el Libro Diario (donde editas)
+            const dNombre = document.getElementById('empresaNombre');
+            const dRif = document.getElementById('empresaRif');
+            if (dNombre) dNombre.innerText = data.nombre;
+            if (dRif) dRif.innerText = data.rif;
 
-        // Actualiza el Balance
-        const bNombre = document.getElementById('balance-empresa-nombre');
-        if (bNombre) bNombre.innerText = data.nombre;
+            // Actualiza el Balance de Comprobación
+            const bNombre = document.getElementById('balance-empresa-nombre');
+            if (bNombre) bNombre.innerText = data.nombre;
 
-        // Actualiza el Mayor
-        const mNombre = document.getElementById('mayor-empresa-nombre'); // Asegúrate de que este ID exista en tu vista de Mayor
-        if (mNombre) mNombre.innerText = data.nombre;
-    }
-    }
+            // Actualiza el Libro Mayor
+            const mNombre = document.getElementById('mayor-empresa-nombre');
+            if (mNombre) mNombre.innerText = data.nombre;
+        }
+    } catch (e) { console.log("Error cargando visuales", e); }
+            }
     
 </script>
 

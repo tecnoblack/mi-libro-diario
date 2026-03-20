@@ -836,8 +836,12 @@ async function generarMayor() {
 }
       // 4. FUNCIÓN PARA ASIGNAR MES
     async function ejecutarAsignacionDesdeHistorial() {
-        try {
-        // Actualizamos en la base de datos (Tabla Empresa)
+    try {
+        // 1. ESTA ES LA LÍNEA QUE FALTA: Capturamos el valor del input o del elemento
+        // Asegúrate de que 'inputMesHistorial' sea el ID del selector donde eliges el mes
+        const nuevoMes = document.getElementById('inputMesHistorial').value; 
+
+        // 2. Actualizamos en la base de datos (Tabla Empresa)
         const { error } = await _supabase
             .from('empresa')
             .update({ "periodo_actual": nuevoMes })
@@ -845,7 +849,7 @@ async function generarMayor() {
 
         if (error) throw error;
 
-        // Actualizamos todos los textos de periodo en la pantalla
+        // 3. Actualizamos todos los textos de periodo en la pantalla
         const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
         IDs.forEach(id => {
             const el = document.getElementById(id);
@@ -858,7 +862,7 @@ async function generarMayor() {
         console.error("Error al activar:", err);
         alert("Error al sincronizar periodo: " + err.message);
     }
-}
+    }
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
     try {

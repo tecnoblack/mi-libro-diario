@@ -1699,6 +1699,38 @@ async function actualizarNumeroAsientoAutomatico() {
         console.error("Error al obtener correlativo:", err);
     }
 }
+
+    async function cargarDatosEmpresaVisual() {
+    try {
+        // Traemos la info de la tabla 'empresa'
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('nombre, rif, periodo_actual')
+            .eq('id', 1)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+            // Rellenamos los títulos del Balance sin tocar tus cálculos
+            const elNombre = document.getElementById('balance-empresa-nombre');
+            if (elNombre) elNombre.innerText = data.nombre;
+
+            const elRif = document.querySelector('.header-contable p');
+            if (elRif) elRif.innerText = "RIF: " + data.rif;
+
+            // Ponemos el periodo correcto (ej. MARZO 2026)
+            const nuevoMes = data.periodo_actual || "Sin Periodo";
+            const IDs = ['textoPeriodoDiario', 'balance-periodo-header', 'mayorPeriodoHeader'];
+            IDs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = nuevoMes;
+            });
+        }
+    } catch (err) {
+        console.error("Error al cargar encabezados:", err);
+    }
+    }
     
 </script>
 

@@ -1361,73 +1361,97 @@ async function confirmarEliminacion() {
 }
 
 async function generarBalance() {
-    // 1. Referencias a tu HTML según la foto
+    console.log("Iniciando generación de balance..."); // Para monitorear en consola
+    
     const contenedor = document.getElementById('contenedor-balance');
     const elementoPeriodo = document.getElementById('balance-periodo-header');
 
     try {
-        // Actualizar periodo inmediatamente
-        if(elementoPeriodo) {
+        // 1. Actualizar el PERIODO (esto quitará el "Cargando...")
+        if (elementoPeriodo) {
             const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             const f = new Date();
             elementoPeriodo.innerText = `${meses[f.getMonth()]} ${f.getFullYear()}`;
         }
 
-        contenedor.innerHTML = '<p style="text-align:center;">Calculando saldos...</p>';
+        // 2. Mostrar mensaje de carga mientras busca en Supabase
+        contenedor.innerHTML = '<p style="text-align:center;">Extrayendo datos del Libro Mayor...</p>';
 
-        // 2. Traer datos de Supabase
+        // 3. Obtener los datos del Libro Mayor (Asientos)
         const { data, error } = await _supabase.from('asientos').select('*');
         if (error) throw error;
 
+        if (!data || data.length === 0) {
+            contenedor.innerHTML = '<p style="text-align:center;">No hay cuentas registradas en el Mayor todavía.</p>';
+            return;
+        }
+
         const cuentas = {};
 
-        // 3. Procesar datos asegurando que sean números
+        // 4. Agrupar los saldos extrayendo Nombre y Ref
         data.forEach(reg => {
-            const nom = reg.cuenta || "Sin nombre";
-            if (!cuentas[nom]) cuentas[nom] = { ref: reg.ref || "-", d: 0, h: 0 };
+            const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
+            const ref = reg.ref || "-";
             
-            cuentas[nom].d += parseFloat(reg.debito) || 0;
-            cuentas[nom].h += parseFloat(reg.credito) || 0;
+            if (!cuentas[nom]) {
+                cuentas[nom] = { ref: ref, debe: 0, haber: 0 };
+            }
+            
+            cuentas[nom].debe += parseFloat(reg.debito) || 0;
+            cuentas[nom].haber += parseFloat(reg.credito) || 0;
         });
 
-        // 4. Construir la tabla (Variable declarada para evitar el error 'html is not defined')
+        // 5. Construir la vista
         let tablaHtml = `
-            <table style="width: 100%; border-collapse: collapse;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
                     <tr style="background: #2563eb; color: white;">
-                        <th style="padding: 10px; border: 1px solid #ddd;">REF</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">CUENTA</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">DEUDOR</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">ACREEDOR</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
+                        <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">CUENTA</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">DEBE</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">HABER</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
-        let tDebe = 0, tHaber = 0;
+        let totalDebe = 0, totalHaber = 0;
 
-        Object.keys(cuentas).forEach(nom => {
+        // Ordenar por el número REF extraído
+        const nombresOrdenados = Object.keys(cuentas).sort((a, b) => parseInt(cuentas[a].ref) - parseInt(cuentas[b].ref));
+
+        // 6. Asignar saldo deudor (Debe) o acreedor (Haber)
+        nombresOrdenados.forEach(nom => {
             const c = cuentas[nom];
-            const saldo = c.d - c.h;
+            const saldoFinal = c.debe - c.haber;
             let deudor = "", acreedor = "";
 
-            if (saldo > 0) { deudor = saldo.toFixed(2); tDebe += saldo; }
-            else if (saldo < 0) { acreedor = Math.abs(saldo).toFixed(2); tHaber += Math.abs(saldo); }
+            if (saldoFinal > 0) { 
+                deudor = saldoFinal.toFixed(2); 
+                totalDebe += saldoFinal; 
+            } else if (saldoFinal < 0) { 
+                acreedor = Math.abs(saldoFinal).toFixed(2); 
+                totalHaber += Math.abs(saldoFinal); 
+            }
 
-            tablaHtml += `
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">${c.ref}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${nom}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align:right;">${deudor}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align:right;">${acreedor}</td>
-                </tr>`;
+            // Solo dibuja la cuenta si no está en cero
+            if (saldoFinal !== 0) {
+                tablaHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; font-weight: 500;">${nom}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${deudor}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${acreedor}</td>
+                    </tr>`;
+            }
         });
 
+        // 7. Sumas Iguales
         tablaHtml += `
-                <tr style="background: #eee; font-weight: bold;">
-                    <td colspan="2" style="padding: 10px; text-align: right;">TOTAL:</td>
-                    <td style="padding: 10px; text-align: right;">${tDebe.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right;">${tHaber.toFixed(2)}</td>
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td colspan="2" style="padding: 10px; border: 1px solid #ccc; text-align: right;">SUMAS IGUALES:</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalDebe.toFixed(2)}</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalHaber.toFixed(2)}</td>
                 </tr>
             </tbody>
         </table>`;
@@ -1435,9 +1459,11 @@ async function generarBalance() {
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
-        contenedor.innerHTML = `<p style="color:red; text-align:center;">Error: ${err.message}</p>`;
+        // ¡NOTA! Cambié el texto aquí para saber si se actualizó el archivo
+        contenedor.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">NUEVO ERROR: ${err.message}</p>`;
+        console.error("Fallo detectado:", err);
     }
-}
+    }
     
     function renderizarTablaComprobacion(mayor) {
     const contenedor = document.getElementById('contenedor-balance');

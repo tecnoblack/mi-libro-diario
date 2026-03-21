@@ -832,91 +832,127 @@ async function guardarAsiento() {
 async function generarMayor() {
     const cuentaSel = document.getElementById('select-cuenta-mayor').value;
     const divRes = document.getElementById('resultado-mayor');
-    if (!cuentaSel) return;
-
-    // 1. OBTENER EL PERIODO ACTIVO (IMPORTANTE para no mezclar con archivados)
-    // Usamos el ID del elemento donde guardas el nombre del mes actual en tu pantalla principal
-    const periodoActual = document.getElementById('textoPeriodoDiario')?.innerText || "";
-
-    divRes.innerHTML = "<p style='text-align:center;'>Filtrando movimientos del periodo...</p>";
-
-    // 2. MODIFICACIÓN DE LA CONSULTA:
-    // Añadimos .eq('periodo', periodoActual) para que ignore los registros de otros meses o archivados
-    const { data: movs, error } = await _supabase
-        .from('asientos')
-        .select('*')
-        .eq('cuenta', cuentaSel)
-        .eq('periodo', periodoActual) // <--- ESTE ES EL FILTRO MAESTRO
-        .order('fecha', { ascending: true });
-
-    if (error || !movs?.length) { 
-        divRes.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">
-            No hay movimientos para <b>${cuentaSel}</b> en el periodo <b>${periodoActual}</b>.
-        </p>`; 
-        return; 
+    
+    // Si no hay cuenta seleccionada, limpiamos el div y salimos
+    if (!cuentaSel) {
+        divRes.innerHTML = "";
+        return;
     }
 
-    // 3. Crear el mapa de números de asiento (Solo para los del periodo actual)
-    // También filtramos por periodo aquí para que la numeración (#1, #2...) sea coherente con lo que ves
-    const { data: todos } = await _supabase
-        .from('asientos')
-        .select('asiento_id')
-        .eq('periodo', periodoActual)
-        .order('fecha', { ascending: true });
-    
-    const idsUnicos = [];
-    if (todos) {
-        todos.forEach(a => {
+    // 1. OBTENER EL PERIODO ACTIVO
+    // Este ID debe ser el que cambia a "ARCHIVADO_..." cuando entras al historial
+    const periodoActual = document.getElementById('textoPeriodoDiario')?.innerText || "";
+
+    divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Consultando movimientos del periodo...</p>";
+
+    try {
+        // 2. CONSULTA FILTRADA POR CUENTA Y PERIODO
+        // Esto evita que se mezclen registros de meses distintos
+        const { data: movs, error: errorMovs } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('cuenta', cuentaSel)
+            .eq('periodo', periodoActual) 
+            .order('fecha', { ascending: true });
+
+        if (errorMovs) throw errorMovs;
+
+        if (!movs || movs.length === 0) { 
+            divRes.innerHTML = `
+                <div style="text-align:center; padding:30px; border:2px dashed #e2e8f0; border-radius:12px;">
+                    <p style="color:#64748b; margin:0;">No se encontraron registros para <b>${cuentaSel}</b></p>
+                    <small style="color:#94a3b8;">Periodo: ${periodoActual}</small>
+                </div>`; 
+            return; 
+        }
+
+        // 3. GENERAR NUMERACIÓN DE ASIENTOS (#1, #2, #3...)
+        // Solo numeramos los asientos que pertenecen a este periodo específico
+        const { data: todosPeriodo, error: errorAsientos } = await _supabase
+            .from('asientos')
+            .select('asiento_id')
+            .eq('periodo', periodoActual)
+            .order('fecha', { ascending: true });
+        
+        if (errorAsientos) throw errorAsientos;
+
+        const idsUnicos = [];
+        todosPeriodo.forEach(a => {
             if (a.asiento_id && !idsUnicos.includes(a.asiento_id)) {
                 idsUnicos.push(a.asiento_id);
             }
         });
+
+        const mapaCorr = {}; 
+        idsUnicos.forEach((id, i) => { mapaCorr[id] = i + 1; });
+
+        // 4. CONSTRUIR LA TABLA
+        let html = `
+        <div class="info-mayor-header" style="animation: fadeIn 0.3s ease;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                <span style="font-weight:bold; color:#1e293b;">CUENTA: ${cuentaSel}</span>
+                <span style="color:#64748b; font-size:0.85rem;">Ref: ${movs[0].ref || 'S/R'} | Periodo: ${periodoActual}</span>
+            </div>
+            
+            <table class="tabla-mayor" style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:left;">FECHA</th>
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:left;">EXPLICACIÓN</th>
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:center;">ASIENTO</th>
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:right;">DÉBITO</th>
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:right;">CRÉDITO</th>
+                        <th style="padding:12px; border-bottom:2px solid #cbd5e1; text-align:right;">SALDO</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        let saldoAcumulado = 0;
+
+        movs.forEach(m => {
+            const debito = parseFloat(m.debito) || 0;
+            const credito = parseFloat(m.credito) || 0;
+            
+            // Cálculo del saldo (Debe - Haber)
+            saldoAcumulado += (debito - credito);
+            
+            const numAsiento = mapaCorr[m.asiento_id] || "S/N";
+
+            html += `
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:10px;">${new Date(m.fecha).toLocaleDateString()}</td>
+                    <td style="padding:10px; font-size:0.9rem;">${m.descripcion}</td>
+                    <td style="padding:10px; text-align:center; font-weight:bold; color:#2563eb;">#${numAsiento}</td>
+                    <td style="padding:10px; text-align:right;">${debito > 0 ? debito.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}</td>
+                    <td style="padding:10px; text-align:right;">${credito > 0 ? credito.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}</td>
+                    <td style="padding:10px; text-align:right; font-weight:bold; color:${saldoAcumulado >= 0 ? '#059669' : '#dc2626'};">
+                        ${Math.abs(saldoAcumulado).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    </td>
+                </tr>`;
+        });
+
+        const tipoSaldo = saldoAcumulado >= 0 ? 'DEUDOR' : 'ACREEDOR';
+        
+        html += `
+                </tbody>
+            </table>
+            
+            <div style="text-align:right; margin-top:20px; padding:15px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0;">
+                <span style="color:#64748b; margin-right:10px;">SALDO FINAL:</span>
+                <span class="tag-tipo ${saldoAcumulado >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}" 
+                      style="font-size:1.1rem; padding:5px 12px; border-radius:6px; font-weight:bold;">
+                    ${tipoSaldo} ${Math.abs(saldoAcumulado).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                </span>
+            </div>
+        </div>`;
+        
+        divRes.innerHTML = html;
+
+    } catch (err) {
+        console.error("Error en generarMayor:", err);
+        divRes.innerHTML = `<p style="color:red; text-align:center; padding:20px;">Error al cargar datos: ${err.message}</p>`;
     }
-
-    const mapaCorr = {}; 
-    idsUnicos.forEach((id, i) => { mapaCorr[id] = i + 1; });
-
-    // 4. Construir la tabla
-    let html = `<div class="info-mayor-header">
-        <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">PERIODO: ${periodoActual}</div>
-        <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
-        <table class="tabla-mayor">
-            <thead>
-                <tr>
-                    <th>FECHA</th>
-                    <th>EXPLICACIÓN</th>
-                    <th style="text-align:center;">ASIENTO</th>
-                    <th>DÉBITO</th>
-                    <th>CRÉDITO</th>
-                    <th>SALDO</th>
-                </tr>
-            </thead>
-            <tbody>`;
-
-    let saldo = 0;
-    movs.forEach(m => {
-        const debito = parseFloat(m.debito) || 0;
-        const credito = parseFloat(m.credito) || 0;
-        saldo += (debito - credito);
-        const numAsiento = mapaCorr[m.asiento_id] || "S/N";
-
-        html += `<tr>
-            <td>${m.fecha}</td>
-            <td>${m.descripcion}</td>
-            <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-            <td>${debito.toFixed(2)}</td>
-            <td>${credito.toFixed(2)}</td>
-            <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
-        </tr>`;
-    });
-
-    const tipo = saldo >= 0 ? 'DEUDOR' : 'ACREEDOR';
-    html += `</tbody></table><div style="text-align:right; margin-top:15px; font-weight:bold;">
-        SALDO: <span class="tag-tipo ${saldo >= 0 ? 'tipo-deudor' : 'tipo-acreedor'}">${tipo} ${Math.abs(saldo).toFixed(2)}</span>
-    </div></div>`;
-    
-    divRes.innerHTML = html;
-    }
+                                   }
 
     // Funciones de Borrado
     function activarModoBorrado() {

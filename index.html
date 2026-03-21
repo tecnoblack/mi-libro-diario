@@ -1814,18 +1814,18 @@ async function guardarCambiosEmpresa() {
         const { error } = await _supabase
             .from('empresa')
             .update({ 
-                nombre: nuevoNombre, 
+                nombre_empresa: nuevoNombre, // Cambiado de 'nombre' a 'nombre_empresa'
                 rif: nuevoRif 
             })
             .eq('id', 1);
 
         if (error) throw error;
         
-        // Refrescamos los datos en el resto de la app (Balance, Mayor)
+        // Refrescamos los datos en el resto de la app
         await cargarDatosEmpresaVisual();
-        console.log("Datos de empresa actualizados");
+        console.log("✅ Guardado en Supabase: " + nuevoNombre);
     } catch (err) {
-        console.error("Error al guardar:", err);
+        console.error("❌ Error al guardar:", err);
     }
 }
     
@@ -1833,22 +1833,20 @@ async function guardarCambiosEmpresa() {
     try {
         const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
         if (data) {
-            // Actualiza el Libro Diario (donde editas)
+            // Usamos 'data.nombre_empresa' que es el nombre real en tu tabla
             const dNombre = document.getElementById('empresaNombre');
             const dRif = document.getElementById('empresaRif');
-            if (dNombre) dNombre.innerText = data.nombre;
+            if (dNombre) dNombre.innerText = data.nombre_empresa; 
             if (dRif) dRif.innerText = data.rif;
 
-            // Actualiza el Balance de Comprobación
             const bNombre = document.getElementById('balance-empresa-nombre');
-            if (bNombre) bNombre.innerText = data.nombre;
+            if (bNombre) bNombre.innerText = data.nombre_empresa;
 
-            // Actualiza el Libro Mayor
             const mNombre = document.getElementById('mayor-empresa-nombre');
-            if (mNombre) mNombre.innerText = data.nombre;
+            if (mNombre) mNombre.innerText = data.nombre_empresa;
         }
     } catch (e) { console.log("Error cargando visuales", e); }
-            }
+}
     
 </script>
 

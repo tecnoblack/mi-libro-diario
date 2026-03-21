@@ -1807,39 +1807,33 @@ async function guardarCambiosEmpresa() {
     
     if (!nombreElemento || !rifElemento) return;
 
-    // Usamos innerText y limpiamos espacios
     const nuevoNombre = nombreElemento.innerText.trim();
     const nuevoRif = rifElemento.innerText.trim();
 
-    console.log("Intentando guardar en Supabase...", { nuevoNombre, nuevoRif });
-
     try {
-        const { data, error } = await _supabase
+        // Usamos UPSERT: Si no existe el ID 1, lo crea. Si existe, lo actualiza.
+        const { error } = await _supabase
             .from('empresa')
-            .update({ 
+            .upsert({ 
+                id: 1, // Obligamos a que sea el ID 1
                 nombre_empresa: nuevoNombre, 
                 rif: nuevoRif 
             })
-            .eq('id', 1) 
-            .select(); // El .select() nos confirma si hubo cambio
+            .select();
 
         if (error) {
-            console.error("Error de Supabase:", error.message);
-            return;
-        }
-
-        if (data && data.length > 0) {
-            console.log("✅ Guardado con éxito en la base de datos");
-            // Solo después de confirmar el guardado, actualizamos las otras vistas
-            await cargarDatosEmpresaVisual();
-        } else {
-            console.warn("⚠️ No se encontró ninguna fila con ID 1 para actualizar.");
+            alert("Error de Supabase: " + error.message);
+            throw error;
         }
         
+        // Refrescamos los datos en el resto de la app
+        await cargarDatosEmpresaVisual();
+        console.log("✅ Nombre guardado correctamente");
+        
     } catch (err) {
-        console.error("❌ Error de conexión:", err);
+        console.error("❌ Error al guardar:", err);
     }
-    }
+}
     
     async function cargarDatosEmpresaVisual() {
     try {

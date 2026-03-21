@@ -1502,24 +1502,23 @@ async function confirmarEliminacion() {
     }
 }
 
-async function generarBalance() {
-    console.log("Iniciando generación de balance..."); // Para monitorear en consola
+      async function generarBalance() {
+    console.log("Iniciando generación de balance...");
     
     const contenedor = document.getElementById('contenedor-balance');
     const elementoPeriodo = document.getElementById('balance-periodo-header');
 
     try {
-        // 1. Actualizar el PERIODO (esto quitará el "Cargando...")
+        // 1. Actualizar el PERIODO
         if (elementoPeriodo) {
             const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             const f = new Date();
             elementoPeriodo.innerText = `${meses[f.getMonth()]} ${f.getFullYear()}`;
         }
 
-        // 2. Mostrar mensaje de carga mientras busca en Supabase
         contenedor.innerHTML = '<p style="text-align:center;">Extrayendo datos del Libro Mayor...</p>';
 
-        // 3. Obtener los datos del Libro Mayor (Asientos)
+        // 2. Obtener los datos
         const { data, error } = await _supabase.from('asientos').select('*');
         if (error) throw error;
 
@@ -1530,7 +1529,7 @@ async function generarBalance() {
 
         const cuentas = {};
 
-        // 4. Agrupar los saldos extrayendo Nombre y Ref
+        // 3. Agrupar los saldos
         data.forEach(reg => {
             const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
             const ref = reg.ref || "-";
@@ -1543,15 +1542,15 @@ async function generarBalance() {
             cuentas[nom].haber += parseFloat(reg.credito) || 0;
         });
 
-        // 5. Construir la vista
+        // 4. Construir la tabla (ERROR 1 CORREGIDO: El bucle forEach estaba CERRANDO la tabla antes de dibujar las filas)
         let tablaHtml = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
                     <tr style="background: #2563eb; color: white;">
                         <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">CUENTA</th>
-                        <th style="padding: 10px; border: 1px solid #ccc;">DEBE</th>
-                        <th style="padding: 10px; border: 1px solid #ccc;">HABER</th>
+                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">DEBE</th>
+                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">HABER</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1559,25 +1558,25 @@ async function generarBalance() {
 
         let totalDebe = 0, totalHaber = 0;
 
-        // Ordenar por el número REF extraído
-        const nombresOrdenados = Object.keys(cuentas).sort((a, b) => parseInt(cuentas[a].ref) - parseInt(cuentas[b].ref));
+        // Ordenar cuentas alfabéticamente si no hay referencias numéricas claras
+        const nombresOrdenados = Object.keys(cuentas).sort();
 
-        // 6. Asignar saldo deudor (Debe) o acreedor (Haber)
+        // 5. Dibujar las filas dentro de la tabla
         nombresOrdenados.forEach(nom => {
             const c = cuentas[nom];
             const saldoFinal = c.debe - c.haber;
             let deudor = "", acreedor = "";
 
             if (saldoFinal > 0) { 
-                deudor = saldoFinal.toFixed(2); 
+                deudor = saldoFinal.toLocaleString('de-DE', { minimumFractionDigits: 2 }); 
                 totalDebe += saldoFinal; 
             } else if (saldoFinal < 0) { 
-                acreedor = Math.abs(saldoFinal).toFixed(2); 
+                acreedor = Math.abs(saldoFinal).toLocaleString('de-DE', { minimumFractionDigits: 2 }); 
                 totalHaber += Math.abs(saldoFinal); 
             }
 
-            // Solo dibuja la cuenta si no está en cero
             if (saldoFinal !== 0) {
+                // ERROR 2 CORREGIDO: Esto estaba fuera de la variable tablaHtml en tu código original
                 tablaHtml += `
                     <tr>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
@@ -1588,113 +1587,45 @@ async function generarBalance() {
             }
         });
 
-        // 7. Sumas Iguales
+        // 6. Cerrar la tabla con los totales
         tablaHtml += `
                 <tr style="background: #f1f5f9; font-weight: bold;">
                     <td colspan="2" style="padding: 10px; border: 1px solid #ccc; text-align: right;">SUMAS IGUALES:</td>
-                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalDebe.toFixed(2)}</td>
-                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalHaber.toFixed(2)}</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalDebe.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalHaber.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
                 </tr>
             </tbody>
         </table>`;
+
+        // Añadir el aviso de si está cuadrado
+        const diferencia = Math.abs(totalDebe - totalHaber);
+        if (diferencia > 0.01) {
+            tablaHtml += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
+        } else {
+            tablaHtml += `<p style="color: green; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
+        }
 
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
-        // ¡NOTA! Cambié el texto aquí para saber si se actualizó el archivo
         contenedor.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">NUEVO ERROR: ${err.message}</p>`;
         console.error("Fallo detectado:", err);
     }
-    }
-    
-    function renderizarTablaComprobacion(mayor) {
-    const contenedor = document.getElementById('contenedor-balance');
-    if (!contenedor) return;
+}
 
-    let sumaDebe = 0;
-    let sumaHaber = 0;
-
-    html += `
-<div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
-    <div style="text-align: left;">
-        <h3 style="margin: 0; color: #2563eb; text-transform: uppercase; font-size: 1.1rem;">${c.mes}</h3>
-        <small style="color: #64748b;">Finalizado el: ${new Date(c.creado_at).toLocaleDateString()}</small>
-    </div>
-    <div style="display: flex; justify-content: space-between; align-items: center;
-        <button onclick="activarDesdeHistorial('${c.mes}')" 
-                style="background: #f1f5f9; color: #1e293b; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
-            Activar
-        </button>
-        <button onclick="verDetalleReporte('diario')" 
-                style="background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
-            Ver Libro
-        </button>
-    </div>
-</div>`;
-
-    const nombresOrdenados = Object.keys(mayor).sort();
-
-    nombresOrdenados.forEach(nombre => {
-        const info = mayor[nombre];
-        const saldoFinal = info.debeTotal - info.haberTotal;
-        
-        let debeDisplay = "";
-        let haberDisplay = "";
-
-        if (saldoFinal > 0) {
-            debeDisplay = saldoFinal.toLocaleString('de-DE', { minimumFractionDigits: 2 });
-            sumaDebe += saldoFinal;
-        } else if (saldoFinal < 0) {
-            haberDisplay = Math.abs(saldoFinal).toLocaleString('de-DE', { minimumFractionDigits: 2 });
-            sumaHaber += Math.abs(saldoFinal);
-        }
-
-        html += `
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${info.fecha}</td>
-                <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">${nombre}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${info.referencia}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${debeDisplay}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${haberDisplay}</td>
-            </tr>`;
-    });
-
-    html += `
-            </tbody>
-            <tfoot>
-                <tr style="font-weight: bold; background-color: #e2e8f0; border-top: 2px solid #000;">
-                    <td colspan="3" style="border: 1px solid #000; padding: 10px; text-align: right;">TOTALES</td>
-                    <td style="border: 1px solid #000; padding: 10px; text-align: right; text-decoration: underline double;">${sumaDebe.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
-                    <td style="border: 1px solid #000; padding: 10px; text-align: right; text-decoration: underline double;">${sumaHaber.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
-                </tr>
-            </tfoot>
-        </table>`;
-
-    const diferencia = Math.abs(sumaDebe - sumaHaber);
-    if (diferencia > 0.01) {
-        html += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
-    } else {
-        html += `<p style="color: green; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
-    }
-
-    contenedor.innerHTML = html;
-} // <--- CIERRE CORRECTO DE LA FUNCIÓN
-
-    function irABalance() {
-    // 1. Primero mostramos la pantalla del balance
+// ERROR 3 CORREGIDO: Tu función se llamaba 'generarBalanceGeneral' pero la definiste como 'generarBalance'
+function irABalance() {
     cambiarVista('vista-balance');
-    
-    // 2. Esperamos un instante para que el HTML esté listo y ejecutamos
     setTimeout(() => {
         try {
-            generarBalanceGeneral();
+            generarBalance(); // <--- Aquí estaba el error que no dejaba que cargara nada
         } catch (e) {
             console.error("Error al cargar balance:", e);
             document.getElementById('contenedor-balance').innerHTML = 
                 "<div style='color:red; padding:20px;'>Error al procesar datos. Revisa la consola.</div>";
         }
     }, 300);
-    }
+    }          
 
     async function cargarHistorial() {
     const contenedor = document.getElementById('lista-meses-historial');

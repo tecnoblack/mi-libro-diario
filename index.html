@@ -1811,48 +1811,51 @@ async function guardarCambiosEmpresa() {
     const nuevoRif = rifElemento.innerText.trim();
 
     try {
-        // Usamos UPSERT: Si no existe el ID 1, lo crea. Si existe, lo actualiza.
+        // 1. Obtenemos el ID del usuario que está logueado actualmente
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) return;
+
+        // 2. Actualizamos la tabla 'empresa' donde el 'user_id' sea el tuyo
         const { error } = await _supabase
             .from('empresa')
-            .upsert({ 
-                id: 1, // Obligamos a que sea el ID 1
+            .update({ 
                 nombre_empresa: nuevoNombre, 
                 rif: nuevoRif 
             })
-            .select();
+            .eq('user_id', session.user.id); // <--- Esto busca tu fila automáticamente
 
-        if (error) {
-            alert("Error de Supabase: " + error.message);
-            throw error;
-        }
+        if (error) throw error;
         
-        // Refrescamos los datos en el resto de la app
+        console.log("✅ Guardado con éxito para el usuario:", session.user.id);
+        
+        // Refrescamos visualmente las otras pestañas
         await cargarDatosEmpresaVisual();
-        console.log("✅ Nombre guardado correctamente");
         
     } catch (err) {
-        console.error("❌ Error al guardar:", err);
+        console.error("Error al guardar:", err.message);
     }
-}
+    }
     
     async function cargarDatosEmpresaVisual() {
     try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) return;
+
         const { data, error } = await _supabase
             .from('empresa')
             .select('*')
-            .eq('id', 1)
+            .eq('user_id', session.user.id) // <--- Busca por tu usuario
             .maybeSingle();
 
         if (data) {
-            console.log("Datos cargados desde Supabase:", data);
+            // Actualizamos los campos con los nombres exactos de tu tabla
+            if (document.getElementById('empresaNombre')) 
+                document.getElementById('empresaNombre').innerText = data.nombre_empresa;
             
-            // Actualizamos los campos
-            const dNombre = document.getElementById('empresaNombre');
-            const dRif = document.getElementById('empresaRif');
-            if (dNombre) dNombre.innerText = data.nombre_empresa || "NOMBRE NO DEFINIDO";
-            if (dRif) dRif.innerText = data.rif || "J-00000000-0";
+            if (document.getElementById('empresaRif')) 
+                document.getElementById('empresaRif').innerText = data.rif;
 
-            // Sincronizamos Balance y Mayor (Asegúrate de tener estos IDs en el HTML)
+            // Balance y Mayor
             const bNombre = document.getElementById('balance-empresa-nombre');
             if (bNombre) bNombre.innerText = data.nombre_empresa;
 

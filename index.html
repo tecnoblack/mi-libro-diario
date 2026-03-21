@@ -1807,46 +1807,68 @@ async function guardarCambiosEmpresa() {
     
     if (!nombreElemento || !rifElemento) return;
 
+    // Usamos innerText y limpiamos espacios
     const nuevoNombre = nombreElemento.innerText.trim();
     const nuevoRif = rifElemento.innerText.trim();
 
+    console.log("Intentando guardar en Supabase...", { nuevoNombre, nuevoRif });
+
     try {
-        const { error } = await _supabase
+        const { data, error } = await _supabase
             .from('empresa')
             .update({ 
-                nombre_empresa: nuevoNombre, // Cambiado de 'nombre' a 'nombre_empresa'
+                nombre_empresa: nuevoNombre, 
                 rif: nuevoRif 
             })
-            .eq('id', 1);
+            .eq('id', 1) 
+            .select(); // El .select() nos confirma si hubo cambio
 
-        if (error) throw error;
+        if (error) {
+            console.error("Error de Supabase:", error.message);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            console.log("✅ Guardado con éxito en la base de datos");
+            // Solo después de confirmar el guardado, actualizamos las otras vistas
+            await cargarDatosEmpresaVisual();
+        } else {
+            console.warn("⚠️ No se encontró ninguna fila con ID 1 para actualizar.");
+        }
         
-        // Refrescamos los datos en el resto de la app
-        await cargarDatosEmpresaVisual();
-        console.log("✅ Guardado en Supabase: " + nuevoNombre);
     } catch (err) {
-        console.error("❌ Error al guardar:", err);
+        console.error("❌ Error de conexión:", err);
     }
-}
+    }
     
     async function cargarDatosEmpresaVisual() {
     try {
-        const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('*')
+            .eq('id', 1)
+            .maybeSingle();
+
         if (data) {
-            // Usamos 'data.nombre_empresa' que es el nombre real en tu tabla
+            console.log("Datos cargados desde Supabase:", data);
+            
+            // Actualizamos los campos
             const dNombre = document.getElementById('empresaNombre');
             const dRif = document.getElementById('empresaRif');
-            if (dNombre) dNombre.innerText = data.nombre_empresa; 
-            if (dRif) dRif.innerText = data.rif;
+            if (dNombre) dNombre.innerText = data.nombre_empresa || "NOMBRE NO DEFINIDO";
+            if (dRif) dRif.innerText = data.rif || "J-00000000-0";
 
+            // Sincronizamos Balance y Mayor (Asegúrate de tener estos IDs en el HTML)
             const bNombre = document.getElementById('balance-empresa-nombre');
             if (bNombre) bNombre.innerText = data.nombre_empresa;
 
             const mNombre = document.getElementById('mayor-empresa-nombre');
             if (mNombre) mNombre.innerText = data.nombre_empresa;
         }
-    } catch (e) { console.log("Error cargando visuales", e); }
-}
+    } catch (e) {
+        console.error("Error cargando visuales:", e);
+    }
+        }
     
 </script>
 

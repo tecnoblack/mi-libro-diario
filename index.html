@@ -1502,8 +1502,8 @@ async function confirmarEliminacion() {
     }
 }
 
-      async function generarBalance() {
-    console.log("Iniciando generación de balance...");
+     async function generarBalance() {
+    console.log("Iniciando generación de balance ordenado por REF...");
     
     const contenedor = document.getElementById('contenedor-balance');
     const elementoPeriodo = document.getElementById('balance-periodo-header');
@@ -1532,7 +1532,7 @@ async function confirmarEliminacion() {
         // 3. Agrupar los saldos
         data.forEach(reg => {
             const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
-            const ref = reg.ref || "-";
+            const ref = reg.ref || "0";
             
             if (!cuentas[nom]) {
                 cuentas[nom] = { ref: ref, debe: 0, haber: 0 };
@@ -1542,13 +1542,21 @@ async function confirmarEliminacion() {
             cuentas[nom].haber += parseFloat(reg.credito) || 0;
         });
 
-        // 4. Construir la tabla (ERROR 1 CORREGIDO: El bucle forEach estaba CERRANDO la tabla antes de dibujar las filas)
+        // --- MODIFICACIÓN: ORDENAR POR REF MATEMÁTICAMENTE ---
+        const nombresOrdenados = Object.keys(cuentas).sort((a, b) => {
+            // Extraemos solo los números de la referencia (por si escribes "REF-1")
+            const refA = parseInt(cuentas[a].ref.toString().replace(/\D/g, "")) || 0;
+            const refB = parseInt(cuentas[b].ref.toString().replace(/\D/g, "")) || 0;
+            return refA - refB;
+        });
+
+        // --- MODIFICACIÓN: REF A LA DERECHA DE CUENTA ---
         let tablaHtml = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
                     <tr style="background: #2563eb; color: white;">
-                        <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">CUENTA</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">DEBE</th>
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">HABER</th>
                     </tr>
@@ -1557,9 +1565,6 @@ async function confirmarEliminacion() {
         `;
 
         let totalDebe = 0, totalHaber = 0;
-
-        // Ordenar cuentas alfabéticamente si no hay referencias numéricas claras
-        const nombresOrdenados = Object.keys(cuentas).sort();
 
         // 5. Dibujar las filas dentro de la tabla
         nombresOrdenados.forEach(nom => {
@@ -1576,11 +1581,10 @@ async function confirmarEliminacion() {
             }
 
             if (saldoFinal !== 0) {
-                // ERROR 2 CORREGIDO: Esto estaba fuera de la variable tablaHtml en tu código original
                 tablaHtml += `
                     <tr>
-                        <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; font-weight: 500;">${nom}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${deudor}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${acreedor}</td>
                     </tr>`;
@@ -1597,7 +1601,7 @@ async function confirmarEliminacion() {
             </tbody>
         </table>`;
 
-        // Añadir el aviso de si está cuadrado
+        // Aviso de balance cuadrado
         const diferencia = Math.abs(totalDebe - totalHaber);
         if (diferencia > 0.01) {
             tablaHtml += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
@@ -1608,7 +1612,7 @@ async function confirmarEliminacion() {
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
-        contenedor.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">NUEVO ERROR: ${err.message}</p>`;
+        contenedor.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">ERROR: ${err.message}</p>`;
         console.error("Fallo detectado:", err);
     }
 }

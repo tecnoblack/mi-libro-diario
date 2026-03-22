@@ -1739,30 +1739,41 @@ async function actualizarNumeroAsientoAutomatico() {
             .eq('id', 1)
             .maybeSingle();
 
-        if (data) {
-            // USAR periodo_actual (tu columna real)
-            // IMPORTANTE: Quitamos cualquier mes que esté escrito en el código (como "MARZO")
-            // Si la base de datos está vacía, ponemos "---"
-            const periodoReal = data.periodo_actual || "---"; 
-            
-            const etiquetas = [
-                'textoPeriodoDiario', 
-                'mayorPeriodoHeader', 
-                'periodoSeleccionadoHistorial', 
-                'balance-periodo-header', 
-                'periodoAsientoManual'
-            ];
+        if (error) throw error;
 
-            etiquetas.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.innerText = periodoReal;
-                    // Estética: gris si es vacío, azul/negro si hay mes
-                    el.style.color = (periodoReal === "---") ? "#94a3b8" : "inherit";
-                }
-            });
+        // 1. FORZAMOS LA LIMPIEZA: Si no hay datos o el campo es nulo/vacío, p = "---"
+        let p = "---";
+        if (data && data.periodo_actual && data.periodo_actual.trim() !== "") {
+            p = data.periodo_actual;
         }
-    } catch (e) { console.log("Error de sincronización:", e); }
+
+        console.log("Sincronizando periodo real desde DB:", p);
+
+        // 2. ACTUALIZAR LA VARIABLE GLOBAL (Esto es lo que te faltaba)
+        // Si no actualizas 'periodoActivo', al cambiar de pestaña el mes viejo vuelve.
+        periodoActivo = p; 
+
+        // 3. ACTUALIZAR TODA LA INTERFAZ
+        const etiquetas = [
+            'textoPeriodoDiario', 
+            'mayorPeriodoHeader', 
+            'periodoSeleccionadoHistorial', 
+            'balance-periodo-header', 
+            'periodoAsientoManual'
+        ];
+
+        etiquetas.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerText = p;
+                // Si es rayitas, ponemos color gris suave, si no, color fuerte
+                el.style.color = (p === "---") ? "#94a3b8" : "#1e293b";
+            }
+        });
+
+    } catch (e) { 
+        console.error("Error de sincronización:", e); 
+    }
     }
     
 function ocultarSplash() {

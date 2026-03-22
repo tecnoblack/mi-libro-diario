@@ -1051,10 +1051,10 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
+    // 1. Buscamos el texto del periodo en la pantalla principal
     const pElement = document.getElementById('textoPeriodoDiario');
     const periodoCerrando = pElement ? pElement.innerText.trim() : "";
 
-    // Si ya está en "---", no hacemos nada
     if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
         Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
         return;
@@ -1062,7 +1062,7 @@ async function cerrarMesActual() {
 
     const confirmacion = await Swal.fire({
         title: `¿Cerrar ${periodoCerrando}?`,
-        text: "Los libros se limpiarán y el periodo volverá a '---'",
+        text: "Los libros se limpiarán y verás '---' en todas las pantallas.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, cerrar',
@@ -1072,41 +1072,46 @@ async function cerrarMesActual() {
     if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Archivar en la base de datos (Supabase)
-        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        // 2. Archivar asientos (Tabla 'asientos', columna 'periodo')
+        await _supabase.from('asientos')
+            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
+            .eq('periodo', periodoCerrando);
+
+        // 3. Guardar registro histórico
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 2. Limpiar la columna periodo en la tabla empresa
-        const { error } = await _supabase.from('empresa').update({ "periodo": "---" }).eq('id', 1);
+        // 4. LIMPIEZA EN SUPABASE (Usando 'periodo_actual')
+        const { error } = await _supabase
+            .from('empresa')
+            .update({ "periodo_actual": "---" }) 
+            .eq('id', 1);
+
         if (error) throw error;
 
-        // 3. ✨ LA SOLUCIÓN: Limpieza visual inmediata de todos los encabezados ✨
-        const IDs_a_limpiar = [
-            'textoPeriodoDiario',           // Libro Diario
-            'mayorPeriodoHeader',           // Libro Mayor
-            'balance-periodo-header',       // Balance
-            'periodoSeleccionadoHistorial', // Pantalla de Historial
-            'periodoAsientoManual'          // Modal de nuevo asiento
+        // 5. LIMPIEZA VISUAL INMEDIATA (Lo que necesitas para que el video funcione)
+        const ids = [
+            'textoPeriodoDiario', 
+            'mayorPeriodoHeader', 
+            'balance-periodo-header', 
+            'periodoSeleccionadoHistorial'
         ];
 
-        IDs_a_limpiar.forEach(id => {
+        ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
-                el.innerText = "---";
-                el.style.color = "#94a3b8"; // Le damos un color gris de "vacío"
-            }
+            if (el) el.innerText = "---";
         });
 
-        await Swal.fire("Éxito", "Mes cerrado. El periodo ahora es ---", "success");
+        await Swal.fire("¡Listo!", "Mes cerrado exitosamente.", "success");
         
-        // Opcional: Recargar la página para asegurar que todo el sistema se resetee
-        location.reload(); 
+        // Recargamos para que el sistema lea el "---" de la base de datos
+        location.reload();
 
     } catch (err) {
-        Swal.fire("Error", "No se pudo cerrar: " + err.message, "error");
+        console.error(err);
+        Swal.fire("Error", "Error de base de datos: " + err.message, "error");
     }
 }
     
@@ -1733,21 +1738,13 @@ async function actualizarNumeroAsientoAutomatico() {
             .maybeSingle();
 
         if (data) {
-            // Nombres y RIF
-            const nombre = data.nombre || "Sin Nombre";
-            const rif = data.rif || "Sin RIF";
-            if (document.getElementById('empresaNombre')) document.getElementById('empresaNombre').innerText = nombre;
-            if (document.getElementById('empresaRif')) document.getElementById('empresaRif').innerText = rif;
-            if (document.getElementById('balance-empresa-nombre')) document.getElementById('balance-empresa-nombre').innerText = nombre;
-            if (document.getElementById('mayor-empresa-nombre')) document.getElementById('mayor-empresa-nombre').innerText = nombre;
-
-            // EL PERIODO (Usamos la columna 'periodo' que es la original de tu tabla)
-            const valorPeriodo = data.periodo || "---";
-            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
+            // Buscamos periodo_actual
+            const mesEnDB = data.periodo_actual || "---";
             
+            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
             etiquetas.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = valorPeriodo;
+                if (el) el.innerText = mesEnDB;
             });
         }
     } catch (e) { console.error(e); }

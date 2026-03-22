@@ -1051,32 +1051,63 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    const periodoCerrando = document.getElementById('textoPeriodoDiario').innerText.trim();
+    const pElement = document.getElementById('textoPeriodoDiario');
+    const periodoCerrando = pElement ? pElement.innerText.trim() : "";
 
-    if (periodoCerrando === "---" || !periodoCerrando) {
-        alert("No hay periodo activo.");
+    // Si ya está en "---", no hacemos nada
+    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
+        Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
         return;
     }
 
-    if (!confirm("¿Cerrar mes y limpiar libros?")) return;
+    const confirmacion = await Swal.fire({
+        title: `¿Cerrar ${periodoCerrando}?`,
+        text: "Los libros se limpiarán y el periodo volverá a '---'",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cerrar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Archivamos asientos
+        // 1. Archivar en la base de datos (Supabase)
         await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodoCerrando, 
+            fecha_cierre: new Date().toISOString().split('T')[0] 
+        }]);
 
-        // 2. Guardamos historial
-        await _supabase.from('cierres_historicos').insert([{ nombre_periodo: periodoCerrando, fecha_cierre: new Date().toISOString().split('T')[0] }]);
+        // 2. Limpiar la columna periodo en la tabla empresa
+        const { error } = await _supabase.from('empresa').update({ "periodo": "---" }).eq('id', 1);
+        if (error) throw error;
 
-        // 3. LIMPIAMOS LA COLUMNA 'periodo' EN LA BASE DE DATOS
-        await _supabase
-            .from('empresa')
-            .update({ periodo: "---" }) // Volvemos al valor neutro
-            .eq('id', 1);
+        // 3. ✨ LA SOLUCIÓN: Limpieza visual inmediata de todos los encabezados ✨
+        const IDs_a_limpiar = [
+            'textoPeriodoDiario',           // Libro Diario
+            'mayorPeriodoHeader',           // Libro Mayor
+            'balance-periodo-header',       // Balance
+            'periodoSeleccionadoHistorial', // Pantalla de Historial
+            'periodoAsientoManual'          // Modal de nuevo asiento
+        ];
 
-        alert("¡Mes cerrado!");
-        location.reload(); // Esto hará que la función 1 cargue las rayitas "---"
+        IDs_a_limpiar.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerText = "---";
+                el.style.color = "#94a3b8"; // Le damos un color gris de "vacío"
+            }
+        });
 
-    } catch (e) { alert("Error: " + e.message); }
+        await Swal.fire("Éxito", "Mes cerrado. El periodo ahora es ---", "success");
+        
+        // Opcional: Recargar la página para asegurar que todo el sistema se resetee
+        location.reload(); 
+
+    } catch (err) {
+        Swal.fire("Error", "No se pudo cerrar: " + err.message, "error");
+    }
 }
     
 async function cargarListaCierres() {

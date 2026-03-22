@@ -1058,30 +1058,43 @@ async function cerrarMesActual() {
         return;
     }
 
-    if (!confirm(`¿Cerrar ${periodoCerrando}? Los libros se pondrán en "---".`)) return;
+    if (!confirm(`¿Estás seguro de cerrar ${periodoCerrando}? Los libros quedarán limpios.`)) return;
 
     try {
-        // 1. Archivar asientos
-        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        // 1. Archivar asientos actuales
+        await _supabase.from('asientos')
+            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
+            .eq('periodo', periodoCerrando);
 
-        // 2. Historial
-        await _supabase.from('cierres_historicos').insert([{ nombre_periodo: periodoCerrando, fecha_cierre: new Date().toISOString().split('T')[0] }]);
+        // 2. Guardar registro en el historial
+        await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodoCerrando, 
+            fecha_cierre: new Date().toISOString().split('T')[0] 
+        }]);
 
-        // 3. LIMPIEZA EN TABLA EMPRESA (Usando la columna 'periodo')
+        // 3. LIMPIEZA EN LA TABLA EMPRESA (Usando periodo_actual)
         const { error } = await _supabase
             .from('empresa')
-            .update({ "periodo": "---" }) // <--- Aquí estaba el error, antes decía 'periodo_actual'
+            .update({ "periodo_actual": "---" }) 
             .eq('id', 1);
 
         if (error) throw error;
 
-        alert("✅ Mes cerrado. Ahora todo quedará en ---");
+        // 4. Limpieza visual inmediata antes de recargar
+        const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial'];
+        IDs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = "---";
+        });
+
+        alert("✅ Mes cerrado correctamente. El sistema se ha limpiado.");
         
-        // Al recargar, la función de arriba leerá el "---" de la columna 'periodo'
+        // Recargamos para que todo el sistema reconozca el nuevo estado "---"
         location.reload(); 
 
     } catch (err) {
-        alert("Error al cerrar: " + err.message);
+        console.error("Error al cerrar:", err);
+        alert("Error al cerrar el mes: " + err.message);
     }
 }
     
@@ -1710,7 +1723,7 @@ async function actualizarNumeroAsientoAutomatico() {
         if (error) throw error;
 
         if (data) {
-            // Tu tabla usa 'nombre' y 'rif'
+            // Datos de la empresa (Nombre y RIF)
             const nombre = data.nombre || "Sin Nombre";
             const rif = data.rif || "Sin RIF";
 
@@ -1719,8 +1732,8 @@ async function actualizarNumeroAsientoAutomatico() {
             if (document.getElementById('balance-empresa-nombre')) document.getElementById('balance-empresa-nombre').innerText = nombre;
             if (document.getElementById('mayor-empresa-nombre')) document.getElementById('mayor-empresa-nombre').innerText = nombre;
 
-            // IMPORTANTE: Tu columna en Supabase se llama 'periodo'
-            const periodoRecuperado = data.periodo || "---";
+            // --- SINCRONIZACIÓN DEL PERIODO ---
+            const periodoRecuperado = data.periodo_actual || "---";
             
             const etiquetasPeriodo = [
                 'textoPeriodoDiario', 
@@ -1733,13 +1746,15 @@ async function actualizarNumeroAsientoAutomatico() {
                 const el = document.getElementById(id);
                 if (el) {
                     el.innerText = periodoRecuperado;
+                    // Estilo visual si está vacío
+                    el.style.color = (periodoRecuperado === "---") ? "#94a3b8" : "inherit";
                 }
             });
         }
     } catch (e) {
         console.error("Error cargando visuales:", e);
     }
-                }
+    }
 
 function ocultarSplash() {
     const splash = document.getElementById('pantalla-carga');

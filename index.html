@@ -978,46 +978,49 @@ async function generarMayor() {
       // 4. FUNCIÓN PARA ASIGNAR MES
     async function ejecutarAsignacionDesdeHistorial() {
     try {
-        // 1. Buscamos el texto directamente del modal para no fallar
-        // Intentamos obtenerlo de varios lugares posibles
         let nuevoMes = "";
         const elementoInput = document.getElementById('inputMesHistorial');
-        const elementoModal = document.querySelector('.modal-body h4'); // El h4 suele tener el nombre del mes
+        const elementoModal = document.querySelector('.modal-body h4'); 
 
-        if (elementoInput) {
+        if (elementoInput && elementoInput.value) {
             nuevoMes = elementoInput.value;
         } else if (elementoModal) {
             nuevoMes = elementoModal.innerText.trim();
-        } else {
-            // Si todo falla, usamos el mes actual por defecto
-            nuevoMes = "MARZO 2026"; 
         }
 
-        // 2. Actualizamos en Supabase
+        // Si no hay mes seleccionado, no hacemos nada (evitamos el error de Marzo 2026)
+        if (!nuevoMes || nuevoMes === "---") {
+            alert("⚠️ Selecciona un mes válido del historial.");
+            return;
+        }
+
+        // Actualizamos en Supabase. 
+        // Usamos un filtro más seguro por si el ID no es 1
         const { error } = await _supabase
             .from('empresa')
             .update({ "periodo_actual": nuevoMes })
-            .eq('id', 1);
+            .neq('nombre_empresa', ''); // Actualiza la fila de la empresa donde el nombre no esté vacío
 
         if (error) throw error;
 
-        // 3. Actualizamos todos los textos en pantalla
+        // Actualizamos todos los textos en pantalla inmediatamente
         const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
         IDs.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = nuevoMes;
         });
 
-        // 4. Cerramos el modal si usas SweetAlert o Bootstrap
         if (window.Swal) {
             Swal.fire("Periodo Activo", "Ahora estás trabajando en: " + nuevoMes, "success");
         } else {
             alert("Periodo Activo: " + nuevoMes);
         }
+
+        // Opcional: recargar para limpiar tablas
+        location.reload();
         
     } catch (err) {
         console.error("Error al activar:", err);
-        // Este mensaje es el que viste en tu captura
         alert("Error al sincronizar periodo: " + err.message);
     }
     }
@@ -1048,75 +1051,51 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    // 1. Detectamos qué mes estamos cerrando
     const periodoCerrando = document.getElementById('textoPeriodoDiario').innerText.trim();
 
-    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "SIN PERIODO") {
+    if (periodoCerrando === "---" || !periodoCerrando) {
         alert("⚠️ No hay un periodo activo para cerrar.");
         return;
     }
 
-    const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodoCerrando}? Esto limpiará los libros para el siguiente mes.`);
-    if (!confirmar) return;
+    if (!confirm(`¿Cerrar ${periodoCerrando}? Esto pondrá los libros en "---".`)) return;
 
     try {
-        // --- PROCESO EN BASE DE DATOS ---
-        
-        // A. Archivamos los asientos
+        // 1. Archivar asientos
         await _supabase.from('asientos')
             .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
             .eq('periodo', periodoCerrando);
 
-        // B. Creamos el registro en el historial
-        await _supabase.from('cierres_historicos')
-            .insert([{ 
-                nombre_periodo: periodoCerrando, 
-                fecha_cierre: new Date().toISOString().split('T')[0] 
-            }]);
+        // 2. Historial de cierre
+        await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodoCerrando, 
+            fecha_cierre: new Date().toISOString().split('T')[0] 
+        }]);
 
-        // C. Vaciamos el periodo en la tabla empresa (esto es vital para el futuro)
+        // 3. LIMPIEZA REAL EN DB
+        // Usamos .neq('id', 0) para que afecte a la fila de la empresa sin importar su ID
         const { error: errorEmpresa } = await _supabase
             .from('empresa')
             .update({ periodo_actual: '---' })
-            .eq('id', 1); // Filtramos por ID 1 que es el que tienes
+            .neq('id', 0); 
 
         if (errorEmpresa) throw errorEmpresa;
 
-
-        // --- LIMPIEZA RADICAL DE LA INTERFAZ (Lo que tú necesitas) ---
-        
-        const elementosALimpiar = [
-            'textoPeriodoDiario',           // El del Libro Diario
-            'mayorPeriodoHeader',           // El del Libro Mayor
-            'balance-periodo-header',       // El del Balance
-            'periodoSeleccionadoHistorial'  // El del selector de historial
-        ];
-
-        elementosALimpiar.forEach(id => {
+        // 4. LIMPIEZA VISUAL INMEDIATA
+        const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial'];
+        IDs.forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
-                el.innerText = "---"; 
-                el.style.color = "#94a3b8"; // Lo ponemos en gris para indicar que está vacío
-            }
+            if (el) el.innerText = "---";
         });
 
-        // Vaciamos la tabla del Mayor para que no queden datos viejos a la vista
-        const divResMayor = document.getElementById('resultado-mayor');
-        if (divResMayor) {
-            divResMayor.innerHTML = `<div style="text-align:center; padding:40px; color:#94a3b8;">
-                <p>Periodo Cerrado con Éxito.</p>
-                <small>Asigne un nuevo periodo para continuar.</small>
-            </div>`;
-        }
-
-        alert(`✅ ¡Hecho! ${periodoCerrando} cerrado. Libros listos para el nuevo mes.`);
+        alert("✅ Libros cerrados. Ahora puedes asignar el mes siguiente.");
         
-        // Recargamos para que todo el sistema reconozca que ahora estamos en "modo espera"
+        // El reload ahora sí cargará las rayitas porque la DB ya tiene el "---"
         location.reload(); 
 
     } catch (err) {
-        console.error("Error al cerrar mes:", err);
-        alert("No se pudo cerrar el mes: " + err.message);
+        console.error("Error:", err);
+        alert("Hubo un error al cerrar: " + err.message);
     }
 }
     

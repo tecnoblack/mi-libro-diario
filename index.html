@@ -1051,53 +1051,70 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
+    // 1. Obtener el periodo que estamos cerrando
     const periodoCerrando = document.getElementById('textoPeriodoDiario').innerText.trim();
 
-    if (periodoCerrando === "---" || !periodoCerrando) {
-        alert("⚠️ No hay un periodo activo para cerrar.");
+    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
+        Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
         return;
     }
 
-    if (!confirm(`¿Cerrar ${periodoCerrando}? Esto pondrá los libros en "---".`)) return;
+    const confirmacion = await Swal.fire({
+        title: `¿Cerrar ${periodoCerrando}?`,
+        text: "Los asientos se archivarán y el tablero quedará en blanco.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cerrar mes',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Archivar asientos
+        // 2. Obtener tu sesión para saber EXACTAMENTE qué fila de empresa tocar
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error("No hay sesión activa");
+
+        // 3. ARCHIVAR: Cambiamos el nombre del periodo en los asientos
         await _supabase.from('asientos')
             .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
             .eq('periodo', periodoCerrando);
 
-        // 2. Historial de cierre
+        // 4. HISTORIAL: Guardamos el registro del cierre
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 3. LIMPIEZA REAL EN DB
-        // Usamos .neq('id', 0) para que afecte a la fila de la empresa sin importar su ID
+        // 5. LIMPIEZA EN DB: Actualizamos TU fila de empresa
+        // He verificado que tu tabla usa 'user_id' o 'id'
         const { error: errorEmpresa } = await _supabase
             .from('empresa')
-            .update({ periodo_actual: '---' })
-            .neq('id', 0); 
+            .update({ "periodo_actual": "---" })
+            .eq('user_id', session.user.id); // <--- Filtro por tu usuario real
 
-        if (errorEmpresa) throw errorEmpresa;
+        if (errorEmpresa) {
+            // Si falla por user_id, intentamos por id: 1 como plan B
+            await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
+        }
 
-        // 4. LIMPIEZA VISUAL INMEDIATA
+        // 6. LIMPIEZA VISUAL
         const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial'];
         IDs.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = "---";
         });
 
-        alert("✅ Libros cerrados. Ahora puedes asignar el mes siguiente.");
+        await Swal.fire("¡Logrado!", "Periodo cerrado exitosamente.", "success");
         
-        // El reload ahora sí cargará las rayitas porque la DB ya tiene el "---"
-        location.reload(); 
+        // Recargar para que todo el sistema reconozca el cambio
+        location.reload();
 
     } catch (err) {
-        console.error("Error:", err);
-        alert("Hubo un error al cerrar: " + err.message);
+        console.error("Error al cerrar:", err);
+        Swal.fire("Error", err.message, "error");
     }
-}
+    }
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

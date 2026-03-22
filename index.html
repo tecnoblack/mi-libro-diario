@@ -150,7 +150,7 @@
         <div class="contenedor-principal">
             <button class="btn-regresar" onclick="cambiarVista('vista-diario')">✕ Cancelar</button>
             <div style="text-align: center; margin-bottom: 20px;">
-    <h2 id="periodoAsientoManual" style="margin:0; color: var(--azul-oscuro);">FEBRERO 2026</h2>
+    <h2 id="periodoAsientoManual" style="margin:0; color: var(--azul-oscuro);">---</h2>
     <h3 id="num-asiento-header" style="margin: 5px 0; color: var(--azul-pro);">ASIENTO Nº ...</h3> 
     <small>Complete los datos del asiento</small>
 </div>
@@ -198,7 +198,7 @@
             <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
-                    <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">ESPERANDO SELECCIÓN...</h2>
+                    <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">---</h2>
                 </div>
                 <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px;">+</button>
             </div>
@@ -1071,42 +1071,43 @@ async function cerrarMesActual() {
     if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Archivar asientos y guardar historial
+        // 1. Archivar en Supabase
         await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 2. Limpieza en Base de Datos (periodo_actual)
+        // 2. Limpiar la columna real en la tabla empresa
         const { error } = await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
         if (error) throw error;
 
-        // 3. LIMPIEZA VISUAL TOTAL
+        // 3. LIMPIEZA VISUAL TOTAL (Para que tu video funcione)
         const ids = [
             'textoPeriodoDiario', 
             'mayorPeriodoHeader', 
             'balance-periodo-header', 
             'periodoSeleccionadoHistorial',
-            'input-periodo-nuevo' // Limpiamos también el campo donde escribes
+            'periodoAsientoManual'
         ];
 
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                if (el.tagName === 'INPUT') el.value = ""; 
-                else el.innerText = "---";
+                el.innerText = "---";
+                el.style.color = "#94a3b8"; 
             }
         });
 
-        await Swal.fire("¡Listo!", "Mes cerrado exitosamente.", "success");
+        await Swal.fire("Éxito", "Mes cerrado. Ahora todo está en ---", "success");
+        
+        // RECARGA IMPORTANTE: Para que el sistema no guarde nada en memoria
         location.reload(); 
 
     } catch (err) {
-        console.error(err);
-        Swal.fire("Error", "Error: " + err.message, "error");
+        Swal.fire("Error", err.message, "error");
     }
-    }
+}
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

@@ -1721,22 +1721,6 @@ async function actualizarNumeroAsientoAutomatico() {
         console.error("Error al obtener correlativo:", err);
     }
 }
-
-    async function cargarDatosEmpresaVisual() {
-    try {
-        const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
-        if (data) {
-            // Si la columna es periodo_actual, usamos esa. Si no, ponemos ---
-            const periodoRecuperado = data.periodo_actual || "---";
-            
-            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
-            etiquetas.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = periodoRecuperado;
-            });
-        }
-    } catch (e) { console.error(e); }
-    }
     
 function ocultarSplash() {
     const splash = document.getElementById('pantalla-carga');
@@ -1746,21 +1730,6 @@ function ocultarSplash() {
             splash.style.display = 'none';
         }, 500); // 0.5 segundos de desvanecimiento
     }
-}
-
-async function guardarCambiosEmpresa() {
-    const n = document.getElementById('empresaNombre').innerText.trim();
-    const r = document.getElementById('empresaRif').innerText.trim();
-
-    try {
-        await _supabase
-            .from('empresa')
-            .update({ nombre: n, rif: r })
-            .eq('id', 1);
-        
-        console.log("Datos guardados");
-        cargarDatosEmpresaVisual(); // Refresca la vista
-    } catch (e) { console.error(e); }
 }
 
     // Agrega esto a tu función que cambia a la vista del mayor

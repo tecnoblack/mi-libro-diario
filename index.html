@@ -834,19 +834,16 @@ async function generarMayor() {
     const divRes = document.getElementById('resultado-mayor');
     if (!cuentaSel) return;
 
-    // 1. OBTENER EL PERIODO ACTIVO (IMPORTANTE para no mezclar con archivados)
-    // Usamos el ID del elemento donde guardas el nombre del mes actual en tu pantalla principal
-    const periodoActual = document.getElementById('textoPeriodoDiario')?.innerText || "";
+    // AÑADIDO: .trim() para limpiar espacios del texto y asegurar la búsqueda
+    const periodoActual = document.getElementById('textoPeriodoDiario')?.innerText.trim() || "";
 
     divRes.innerHTML = "<p style='text-align:center;'>Filtrando movimientos del periodo...</p>";
 
-    // 2. MODIFICACIÓN DE LA CONSULTA:
-    // Añadimos .eq('periodo', periodoActual) para que ignore los registros de otros meses o archivados
     const { data: movs, error } = await _supabase
         .from('asientos')
         .select('*')
         .eq('cuenta', cuentaSel)
-        .eq('periodo', periodoActual) // <--- ESTE ES EL FILTRO MAESTRO
+        .eq('periodo', periodoActual) // Usará ARCHIVADO_ si vienes del historial
         .order('fecha', { ascending: true });
 
     if (error || !movs?.length) { 
@@ -856,8 +853,6 @@ async function generarMayor() {
         return; 
     }
 
-    // 3. Crear el mapa de números de asiento (Solo para los del periodo actual)
-    // También filtramos por periodo aquí para que la numeración (#1, #2...) sea coherente con lo que ves
     const { data: todos } = await _supabase
         .from('asientos')
         .select('asiento_id')
@@ -876,9 +871,8 @@ async function generarMayor() {
     const mapaCorr = {}; 
     idsUnicos.forEach((id, i) => { mapaCorr[id] = i + 1; });
 
-    // 4. Construir la tabla
     let html = `<div class="info-mayor-header">
-        <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">PERIODO: ${periodoActual}</div>
+        <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">PERIODO: ${periodoActual.replace('ARCHIVADO_', '')}</div>
         <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
         <table class="tabla-mayor">
             <thead>
@@ -916,7 +910,7 @@ async function generarMayor() {
     </div></div>`;
     
     divRes.innerHTML = html;
-    }
+}
 
     // Funciones de Borrado
     function activarModoBorrado() {
@@ -1054,56 +1048,57 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-        const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
+    // AÑADIDO: .trim() para limpiar espacios invisibles
+    const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText.trim();
 
-        if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
-            alert("⚠️ No hay un periodo activo para cerrar.");
-            return;
-        }
+    if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
+        alert("⚠️ No hay un periodo activo para cerrar.");
+        return;
+    }
 
-        const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?`);
-        if (!confirmar) return;
+    const confirmar = confirm(`¿Estás seguro de cerrar el mes ${periodo}?`);
+    if (!confirmar) return;
 
-        try {
-            // 1. Guardar en el historial
-            const { error: errorInsert } = await _supabase
-                .from('cierres_historicos')
-                .insert([{ 
-                    nombre_periodo: periodo, 
-                    fecha_cierre: new Date().toISOString().split('T')[0] 
-                }]);
-            if (errorInsert) throw errorInsert;
+    try {
+        // 1. Guardar en el historial
+        const { error: errorInsert } = await _supabase
+            .from('cierres_historicos')
+            .insert([{ 
+                nombre_periodo: periodo, 
+                fecha_cierre: new Date().toISOString().split('T')[0] 
+            }]);
+        if (errorInsert) throw errorInsert;
 
-            // 2. "Archivar" los asientos para que dejen de salir en el diario actual
-            const { error: errorUpdateAsientos } = await _supabase
-                .from('asientos')
-                .update({ periodo: 'ARCHIVADO_' + periodo })
-                .eq('periodo', periodo);
-            if (errorUpdateAsientos) throw errorUpdateAsientos;
+        // 2. "Archivar" los asientos
+        const { error: errorUpdateAsientos } = await _supabase
+            .from('asientos')
+            .update({ periodo: 'ARCHIVADO_' + periodo })
+            .eq('periodo', periodo);
+        if (errorUpdateAsientos) throw errorUpdateAsientos;
 
-            // 3. Limpiar el periodo en la tabla empresa
-            const { error: errorEmpresa } = await _supabase
-                .from('empresa')
-                .update({ periodo_actual: '---' })
-                .eq('id', 1);
-            if (errorEmpresa) throw errorEmpresa;
+        // 3. Limpiar el periodo en la tabla empresa para que quede en "---"
+        const { error: errorEmpresa } = await _supabase
+            .from('empresa')
+            .update({ periodo_actual: '---' })
+            .eq('id', 1);
+        if (errorEmpresa) throw errorEmpresa;
 
-            // --- AQUÍ VA TU CÓDIGO NUEVO (Línea 655 aprox.) ---
-            
-            document.getElementById('textoPeriodoDiario').innerText = "---";
-            document.getElementById('mayorPeriodoHeader').innerText = "---";
-            document.getElementById('periodoSeleccionadoHistorial').innerText = "---";
+        // Limpiamos la pantalla visualmente
+        document.getElementById('textoPeriodoDiario').innerText = "---";
+        document.getElementById('mayorPeriodoHeader').innerText = "---";
+        document.getElementById('periodoSeleccionadoHistorial').innerText = "---";
 
-            alert("✅ Periodo cerrado. Las hojas han sido limpiadas.");
-            
-            location.reload(); 
+        alert("✅ Periodo cerrado. Las hojas han sido limpiadas.");
+        
+        // Recargamos la app para que inicie en blanco
+        location.reload(); 
 
-        } catch (err) {
-            console.error("Error:", err);
-            alert("Hubo un problema: " + err.message);
-        }
-        }
-
+    } catch (err) {
+        console.error("Error:", err);
+        alert("Hubo un problema: " + err.message);
+    }
+}
+    
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
     if (!contenedor) return;
@@ -1391,16 +1386,15 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
 }
 
 async function verDetalleReporte(tipo) {
-    // Usamos el periodo que guardamos al tocar "Ver Reporte" en la lista de cierres
-    const periodoOriginal = periodoSeleccionadoHistorial; 
-    // Buscamos con el prefijo que el sistema le puso al cerrar el mes
+    // Limpiamos espacios por si acaso
+    const periodoOriginal = periodoSeleccionadoHistorial.trim(); 
     const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
 
     if (tipo === 'diario') {
-        document.getElementById('textoPeriodoDiario').innerText = periodoOriginal;
+        // Aquí le decimos al diario que busque el archivado
+        document.getElementById('textoPeriodoDiario').innerText = periodoArchivado;
         cambiarVista('vista-diario');
         
-        // Consultamos los asientos que tienen el periodo "ARCHIVADO_..."
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -1411,24 +1405,23 @@ async function verDetalleReporte(tipo) {
             return;
         }
 
-        // IMPORTANTE: Pasamos "true" para activar el Modo Lectura (Bloqueo de edición)
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
+        // 1. Cambiamos visualmente el título al mes original
         document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
-        cambiarVista('vista-mayor');
         
-        // Consultamos los asientos archivados para el mayor
-        const { data } = await _supabase
-            .from('asientos')
-            .select('*')
-            .eq('periodo', periodoArchivado);
+        // 2. LA SOLUCIÓN: Guardamos el nombre "ARCHIVADO_" oculto para que generarMayor() lo lea
+        const elementoFiltro = document.getElementById('textoPeriodoDiario');
+        if(elementoFiltro) elementoFiltro.innerText = periodoArchivado;
 
-        // Aquí podrías llamar a una función específica para dibujar el mayor del historial
-        if (data) {
-            // Si tienes una función para procesar datos del mayor, úsala aquí
-            console.log("Datos del mayor cargados:", data.length);
-        }
+        // 3. Limpiamos resultados anteriores del mayor
+        document.getElementById('select-cuenta-mayor').value = "";
+        const divRes = document.getElementById('resultado-mayor');
+        if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta para ver sus movimientos históricos.</p>";
+
+        // 4. Vamos a la vista
+        cambiarVista('vista-mayor');
     } 
 }
     

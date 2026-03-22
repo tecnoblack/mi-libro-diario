@@ -246,6 +246,12 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     const estadoTexto = document.getElementById('estado-carga');
+
+const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header', 'periodoAsientoManual'];
+    etiquetas.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = "---"; 
+    });
     
     // --- CONFIGURACIÓN DE GUARDADO AL EDITAR (IDs Reales) ---
     const elNombre = document.getElementById('empresaNombre');
@@ -1727,18 +1733,36 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
-        const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('*')
+            .eq('id', 1)
+            .maybeSingle();
+
         if (data) {
-            // Si la columna es periodo_actual, usamos esa. Si no, ponemos ---
-            const periodoRecuperado = data.periodo_actual || "---";
+            // USAR periodo_actual (tu columna real)
+            // IMPORTANTE: Quitamos cualquier mes que esté escrito en el código (como "MARZO")
+            // Si la base de datos está vacía, ponemos "---"
+            const periodoReal = data.periodo_actual || "---"; 
             
-            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
+            const etiquetas = [
+                'textoPeriodoDiario', 
+                'mayorPeriodoHeader', 
+                'periodoSeleccionadoHistorial', 
+                'balance-periodo-header', 
+                'periodoAsientoManual'
+            ];
+
             etiquetas.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = periodoRecuperado;
+                if (el) {
+                    el.innerText = periodoReal;
+                    // Estética: gris si es vacío, azul/negro si hay mes
+                    el.style.color = (periodoReal === "---") ? "#94a3b8" : "inherit";
+                }
             });
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.log("Error de sincronización:", e); }
     }
     
 function ocultarSplash() {

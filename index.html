@@ -1048,8 +1048,7 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    // AÑADIDO: .trim() para limpiar espacios invisibles
-    const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText.trim();
+    const periodo = document.getElementById('textoPeriodoDiario').innerText.trim();
 
     if (periodo === "---" || !periodo || periodo === "SIN PERIODO") {
         alert("⚠️ No hay un periodo activo para cerrar.");
@@ -1060,44 +1059,36 @@ async function cerrarMesActual() {
     if (!confirmar) return;
 
     try {
-        // 1. Guardar en el historial
-        const { error: errorInsert } = await _supabase
-            .from('cierres_historicos')
-            .insert([{ 
-                nombre_periodo: periodo, 
-                fecha_cierre: new Date().toISOString().split('T')[0] 
-            }]);
-        if (errorInsert) throw errorInsert;
+        const { data: { session } } = await _supabase.auth.getSession();
 
-        // 2. "Archivar" los asientos
-        const { error: errorUpdateAsientos } = await _supabase
-            .from('asientos')
-            .update({ periodo: 'ARCHIVADO_' + periodo })
-            .eq('periodo', periodo);
-        if (errorUpdateAsientos) throw errorUpdateAsientos;
+        // 1. Archivar asientos
+        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodo }).eq('periodo', periodo);
 
-        // 3. Limpiar el periodo en la tabla empresa para que quede en "---"
+        // 2. Guardar en historial
+        await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodo, 
+            fecha_cierre: new Date().toISOString().split('T')[0],
+            user_id: session.user.id 
+        }]);
+
+        // 3. LIMPIAR PERIODO EN BASE DE DATOS (Crucial para que no vuelva a aparecer)
         const { error: errorEmpresa } = await _supabase
             .from('empresa')
             .update({ periodo_actual: '---' })
-            .eq('id', 1);
+            .eq('user_id', session.user.id); // <--- Filtramos por usuario igual que al cargar
+
         if (errorEmpresa) throw errorEmpresa;
 
-        // Limpiamos la pantalla visualmente
-        document.getElementById('textoPeriodoDiario').innerText = "---";
-        document.getElementById('mayorPeriodoHeader').innerText = "---";
-        document.getElementById('periodoSeleccionadoHistorial').innerText = "---";
-
-        alert("✅ Periodo cerrado. Las hojas han sido limpiadas.");
+        alert("✅ Periodo cerrado con éxito.");
         
-        // Recargamos la app para que inicie en blanco
+        // Al recargar, cargarDatosEmpresaVisual leerá el "---" y todo quedará limpio
         location.reload(); 
 
     } catch (err) {
         console.error("Error:", err);
         alert("Hubo un problema: " + err.message);
     }
-}
+    }
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
@@ -1715,35 +1706,67 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
-        // Traemos la info de la tabla 'empresa'
+        // 1. Verificamos la sesión del usuario
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) return;
+
+        // 2. Traemos TODA la info de la tabla 'empresa' de ese usuario
         const { data, error } = await _supabase
             .from('empresa')
-            .select('nombre, rif, periodo_actual')
-            .eq('id', 1)
+            .select('*')
+            .eq('user_id', session.user.id)
             .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
-            // Rellenamos los títulos del Balance sin tocar tus cálculos
-            const elNombre = document.getElementById('balance-empresa-nombre');
-            if (elNombre) elNombre.innerText = data.nombre;
+            // --- PARTE 1: NOMBRES Y RIF ---
+            // Usamos los nombres de columna de tu tabla (nombre_empresa, rif)
+            const nombre = data.nombre_empresa || "Sin Nombre";
+            const rif = data.rif || "Sin RIF";
 
-            const elRif = document.querySelector('.header-contable p');
-            if (elRif) elRif.innerText = "RIF: " + data.rif;
+            if (document.getElementById('empresaNombre')) 
+                document.getElementById('empresaNombre').innerText = nombre;
+            
+            if (document.getElementById('empresaRif')) 
+                document.getElementById('empresaRif').innerText = rif;
 
-            // Ponemos el periodo correcto (ej. MARZO 2026)
-            const nuevoMes = data.periodo_actual || "Sin Periodo";
-            const IDs = ['textoPeriodoDiario', 'balance-periodo-header', 'mayorPeriodoHeader'];
-            IDs.forEach(id => {
+            if (document.getElementById('balance-empresa-nombre')) 
+                document.getElementById('balance-empresa-nombre').innerText = nombre;
+
+            if (document.getElementById('mayor-empresa-nombre')) 
+                document.getElementById('mayor-empresa-nombre').innerText = nombre;
+            
+            // Si tienes el RIF en el header contable
+            const elRifHeader = document.querySelector('.header-contable p');
+            if (elRifHeader) elRifHeader.innerText = "RIF: " + rif;
+
+
+            // --- PARTE 2: EL PERIODO (Lo que faltaba) ---
+            // Si periodo_actual está vacío o es nulo, ponemos "---"
+            const periodoRecuperado = data.periodo_actual || "---";
+            
+            // Lista de todos los lugares donde debe aparecer el mes (o las rayitas)
+            const etiquetasPeriodo = [
+                'textoPeriodoDiario', 
+                'mayorPeriodoHeader', 
+                'periodoSeleccionadoHistorial',
+                'balance-periodo-header'
+            ];
+
+            etiquetasPeriodo.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = nuevoMes;
+                if (el) {
+                    el.innerText = periodoRecuperado;
+                }
             });
+
+            console.log("Visuales cargados. Periodo actual:", periodoRecuperado);
         }
-    } catch (err) {
-        console.error("Error al cargar encabezados:", err);
+    } catch (e) {
+        console.error("Error cargando visuales:", e);
     }
-    }
+                }
 
 function ocultarSplash() {
     const splash = document.getElementById('pantalla-carga');
@@ -1789,37 +1812,6 @@ async function guardarCambiosEmpresa() {
         console.error("Error al guardar:", err.message);
     }
     }
-    
-    async function cargarDatosEmpresaVisual() {
-    try {
-        const { data: { session } } = await _supabase.auth.getSession();
-        if (!session) return;
-
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('*')
-            .eq('user_id', session.user.id) // <--- Busca por tu usuario
-            .maybeSingle();
-
-        if (data) {
-            // Actualizamos los campos con los nombres exactos de tu tabla
-            if (document.getElementById('empresaNombre')) 
-                document.getElementById('empresaNombre').innerText = data.nombre_empresa;
-            
-            if (document.getElementById('empresaRif')) 
-                document.getElementById('empresaRif').innerText = data.rif;
-
-            // Balance y Mayor
-            const bNombre = document.getElementById('balance-empresa-nombre');
-            if (bNombre) bNombre.innerText = data.nombre_empresa;
-
-            const mNombre = document.getElementById('mayor-empresa-nombre');
-            if (mNombre) mNombre.innerText = data.nombre_empresa;
-        }
-    } catch (e) {
-        console.error("Error cargando visuales:", e);
-    }
-        }
 
     // Agrega esto a tu función que cambia a la vista del mayor
 function irAMayor() {

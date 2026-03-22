@@ -984,66 +984,44 @@ async function generarMayor() {
       // 4. FUNCIÓN PARA ASIGNAR MES
  async function ejecutarAsignacionDesdeHistorial() {
     try {
-        // 1. LEER LO QUE ESCRIBISTE EN EL MODAL
         const inputElement = document.getElementById('input-periodo-nuevo');
-        // Lo tomamos y lo convertimos a mayúsculas automáticamente
         let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
 
-        // 2. Validar que no esté vacío
-        if (!nuevoMes) {
-            Swal.fire("Aviso", "Por favor, escribe el periodo (Ej: ABRIL 2026).", "warning");
-            return; // Detenemos la función aquí si está vacío
+        if (!nuevoMes || nuevoMes === "---") {
+            Swal.fire("Aviso", "Por favor, escribe un periodo válido.", "warning");
+            return;
         }
 
-        // 3. Guardar en Supabase lo que escribiste
+        // --- CAMBIO CLAVE: USAMOS UPSERT ---
+        // Esto asegura que si no existe la fila con ID 1, la cree en ese momento.
         const { error } = await _supabase
             .from('empresa')
-            .update({ "periodo_actual": nuevoMes }) 
-            .eq('id', 1);
+            .upsert({ 
+                id: 1, 
+                periodo_actual: nuevoMes 
+            }, { onConflict: 'id' });
 
         if (error) throw error;
 
-        // 4. Actualizar la variable global
+        // Actualizamos variable global y textos antes de recargar
         periodoActivo = nuevoMes;
-
-        // 5. Mostrar lo que escribiste en todos los títulos de la app
-        const IDs = [
-            'textoPeriodoDiario', 
-            'mayorPeriodoHeader', 
-            'balance-periodo-header', 
-            'periodoAsientoManual', 
-            'periodoSeleccionadoHistorial'
-        ];
-
-        IDs.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.innerText = nuevoMes;
-                el.style.color = "#1e293b"; // Quitamos el color gris
-            }
-        });
-
-        // Ocultar la ventanita (modal) y limpiar lo que escribiste
-        const modal = document.getElementById('modal-periodo');
-        if (modal) modal.style.display = 'none';
-        if (inputElement) inputElement.value = "";
-
+        
         await Swal.fire({
             title: "Periodo Activado",
-            text: "Ahora estás trabajando en " + nuevoMes,
+            text: "Sincronizando: " + nuevoMes,
             icon: "success",
-            timer: 1500,
+            timer: 1000,
             showConfirmButton: false
         });
 
-        // 6. Recargamos la página
+        // Al recargar, cargarDatosEmpresaVisual() leerá el valor que acabamos de guardar
         location.reload();
         
     } catch (err) {
         console.error("Error al activar:", err);
-        Swal.fire("Error", "No se pudo activar el periodo: " + err.message, "error");
+        Swal.fire("Error", "No se pudo guardar: " + err.message, "error");
     }
-    }
+ }
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
     try {
@@ -1753,19 +1731,14 @@ async function actualizarNumeroAsientoAutomatico() {
 
         if (error) throw error;
 
-        // 1. FORZAMOS LA LIMPIEZA: Si no hay datos o el campo es nulo/vacío, p = "---"
+        // Si data existe y tiene un periodo_actual que no sea vacío ni "---"
         let p = "---";
-        if (data && data.periodo_actual && data.periodo_actual.trim() !== "") {
+        if (data && data.periodo_actual && data.periodo_actual.trim() !== "" && data.periodo_actual !== "---") {
             p = data.periodo_actual;
         }
 
-        console.log("Sincronizando periodo real desde DB:", p);
+        periodoActivo = p; // Sincronizamos la variable global
 
-        // 2. ACTUALIZAR LA VARIABLE GLOBAL (Esto es lo que te faltaba)
-        // Si no actualizas 'periodoActivo', al cambiar de pestaña el mes viejo vuelve.
-        periodoActivo = p; 
-
-        // 3. ACTUALIZAR TODA LA INTERFAZ
         const etiquetas = [
             'textoPeriodoDiario', 
             'mayorPeriodoHeader', 
@@ -1778,13 +1751,16 @@ async function actualizarNumeroAsientoAutomatico() {
             const el = document.getElementById(id);
             if (el) {
                 el.innerText = p;
-                // Si es rayitas, ponemos color gris suave, si no, color fuerte
                 el.style.color = (p === "---") ? "#94a3b8" : "#1e293b";
             }
         });
 
+        // Si tenemos nombre y rif, los ponemos también
+        if (data && data.nombre) document.getElementById('empresaNombre').innerText = data.nombre;
+        if (data && data.rif) document.getElementById('empresaRif').innerText = data.rif;
+
     } catch (e) { 
-        console.error("Error de sincronización:", e); 
+        console.error("Error de carga:", e); 
     }
     }
     

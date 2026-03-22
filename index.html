@@ -1051,7 +1051,6 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    // 1. Buscamos el texto del periodo en la pantalla principal
     const pElement = document.getElementById('textoPeriodoDiario');
     const periodoCerrando = pElement ? pElement.innerText.trim() : "";
 
@@ -1072,48 +1071,42 @@ async function cerrarMesActual() {
     if (!confirmacion.isConfirmed) return;
 
     try {
-        // 2. Archivar asientos (Tabla 'asientos', columna 'periodo')
-        await _supabase.from('asientos')
-            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
-            .eq('periodo', periodoCerrando);
-
-        // 3. Guardar registro histórico
+        // 1. Archivar asientos y guardar historial
+        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 4. LIMPIEZA EN SUPABASE (Usando 'periodo_actual')
-        const { error } = await _supabase
-            .from('empresa')
-            .update({ "periodo_actual": "---" }) 
-            .eq('id', 1);
-
+        // 2. Limpieza en Base de Datos (periodo_actual)
+        const { error } = await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
         if (error) throw error;
 
-        // 5. LIMPIEZA VISUAL INMEDIATA (Lo que necesitas para que el video funcione)
+        // 3. LIMPIEZA VISUAL TOTAL
         const ids = [
             'textoPeriodoDiario', 
             'mayorPeriodoHeader', 
             'balance-periodo-header', 
-            'periodoSeleccionadoHistorial'
+            'periodoSeleccionadoHistorial',
+            'input-periodo-nuevo' // Limpiamos también el campo donde escribes
         ];
 
         ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerText = "---";
+            if (el) {
+                if (el.tagName === 'INPUT') el.value = ""; 
+                else el.innerText = "---";
+            }
         });
 
         await Swal.fire("¡Listo!", "Mes cerrado exitosamente.", "success");
-        
-        // Recargamos para que el sistema lea el "---" de la base de datos
-        location.reload();
+        location.reload(); 
 
     } catch (err) {
         console.error(err);
-        Swal.fire("Error", "Error de base de datos: " + err.message, "error");
+        Swal.fire("Error", "Error: " + err.message, "error");
     }
-}
+    }
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
@@ -1731,56 +1724,20 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
-        // Buscamos la fila con ID 1
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('*')
-            .eq('id', 1)
-            .maybeSingle();
-
-        if (error) throw error;
-
+        const { data, error } = await _supabase.from('empresa').select('*').eq('id', 1).maybeSingle();
         if (data) {
-            // 1. NOMBRES Y RIF
-            const nombre = data.nombre || "Sin Nombre";
-            const rif = data.rif || "Sin RIF";
-            
-            // Actualizamos todos los lugares donde aparece el nombre de la empresa
-            const idsNombre = ['empresaNombre', 'mayor-empresa-nombre', 'balance-empresa-nombre', 'mayorEmpresaNombre'];
-            idsNombre.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = nombre;
-            });
-
-            if (document.getElementById('empresaRif')) document.getElementById('empresaRif').innerText = rif;
-
-            // 2. EL PERIODO (Aquí está la clave)
-            // Usamos periodo_actual que es el nombre real de tu columna
+            // Si la columna es periodo_actual, usamos esa. Si no, ponemos ---
             const periodoRecuperado = data.periodo_actual || "---";
             
-            const etiquetasPeriodo = [
-                'textoPeriodoDiario',           // Libro Diario
-                'mayorPeriodoHeader',           // Libro Mayor
-                'periodoSeleccionadoHistorial', // Historial (el del cuadro azul)
-                'balance-periodo-header'        // Balance
-            ];
-
-            etiquetasPeriodo.forEach(id => {
+            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
+            etiquetas.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) {
-                    el.innerText = periodoRecuperado;
-                    // Si está vacío, le ponemos un color gris suave
-                    el.style.color = (periodoRecuperado === "---") ? "#94a3b8" : "inherit";
-                }
+                if (el) el.innerText = periodoRecuperado;
             });
-            
-            console.log("Sincronización completa. Periodo actual:", periodoRecuperado);
         }
-    } catch (e) {
-        console.error("Error cargando visuales:", e);
+    } catch (e) { console.error(e); }
     }
-    }
-
+    
 function ocultarSplash() {
     const splash = document.getElementById('pantalla-carga');
     if (splash) {

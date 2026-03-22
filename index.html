@@ -984,18 +984,18 @@ async function generarMayor() {
       // 4. FUNCIÓN PARA ASIGNAR MES
  async function ejecutarAsignacionDesdeHistorial() {
     try {
-        // 1. Buscamos el mes directamente del cuadro azul del historial
-        const elementoMes = document.getElementById('periodoSeleccionadoHistorial');
-        let nuevoMes = elementoMes ? elementoMes.innerText.trim() : "";
+        // 1. LEER LO QUE ESCRIBISTE EN EL MODAL
+        const inputElement = document.getElementById('input-periodo-nuevo');
+        // Lo tomamos y lo convertimos a mayúsculas automáticamente
+        let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
 
-        // 2. Validamos que no esté vacío o en "---"
-        if (!nuevoMes || nuevoMes === "---" || nuevoMes === "ESPERANDO SELECCIÓN...") {
-            Swal.fire("Aviso", "Por favor, selecciona un mes de la lista primero.", "warning");
-            return;
+        // 2. Validar que no esté vacío
+        if (!nuevoMes) {
+            Swal.fire("Aviso", "Por favor, escribe el periodo (Ej: ABRIL 2026).", "warning");
+            return; // Detenemos la función aquí si está vacío
         }
 
-        // 3. Actualizamos en Supabase (Usando el ID 1 y la columna 'periodo')
-        // NOTA: Si tu columna es 'periodo_actual', cambia "periodo" por "periodo_actual" abajo
+        // 3. Guardar en Supabase lo que escribiste
         const { error } = await _supabase
             .from('empresa')
             .update({ "periodo_actual": nuevoMes }) 
@@ -1003,7 +1003,10 @@ async function generarMayor() {
 
         if (error) throw error;
 
-        // 4. Sincronizamos toda la interfaz visualmente
+        // 4. Actualizar la variable global
+        periodoActivo = nuevoMes;
+
+        // 5. Mostrar lo que escribiste en todos los títulos de la app
         const IDs = [
             'textoPeriodoDiario', 
             'mayorPeriodoHeader', 
@@ -1014,24 +1017,33 @@ async function generarMayor() {
 
         IDs.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerText = nuevoMes;
+            if (el) {
+                el.innerText = nuevoMes;
+                el.style.color = "#1e293b"; // Quitamos el color gris
+            }
         });
+
+        // Ocultar la ventanita (modal) y limpiar lo que escribiste
+        const modal = document.getElementById('modal-periodo');
+        if (modal) modal.style.display = 'none';
+        if (inputElement) inputElement.value = "";
 
         await Swal.fire({
             title: "Periodo Activado",
             text: "Ahora estás trabajando en " + nuevoMes,
             icon: "success",
-            timer: 2000
+            timer: 1500,
+            showConfirmButton: false
         });
 
-        // 5. Recargamos para que el Libro Diario cargue los asientos de ese mes
+        // 6. Recargamos la página
         location.reload();
         
     } catch (err) {
         console.error("Error al activar:", err);
         Swal.fire("Error", "No se pudo activar el periodo: " + err.message, "error");
     }
-}
+    }
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
     try {

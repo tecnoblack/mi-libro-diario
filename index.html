@@ -1054,48 +1054,29 @@ async function cerrarMesActual() {
     const periodoCerrando = document.getElementById('textoPeriodoDiario').innerText.trim();
 
     if (periodoCerrando === "---" || !periodoCerrando) {
-        alert("No hay un periodo activo para cerrar.");
+        alert("No hay periodo activo.");
         return;
     }
 
-    if (!confirm(`¿Estás seguro de cerrar ${periodoCerrando}? Los libros quedarán limpios.`)) return;
+    if (!confirm("¿Cerrar mes y limpiar libros?")) return;
 
     try {
-        // 1. Archivar asientos actuales
-        await _supabase.from('asientos')
-            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
-            .eq('periodo', periodoCerrando);
+        // 1. Archivamos asientos
+        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
 
-        // 2. Guardar registro en el historial
-        await _supabase.from('cierres_historicos').insert([{ 
-            nombre_periodo: periodoCerrando, 
-            fecha_cierre: new Date().toISOString().split('T')[0] 
-        }]);
+        // 2. Guardamos historial
+        await _supabase.from('cierres_historicos').insert([{ nombre_periodo: periodoCerrando, fecha_cierre: new Date().toISOString().split('T')[0] }]);
 
-        // 3. LIMPIEZA EN LA TABLA EMPRESA (Usando periodo_actual)
-        const { error } = await _supabase
+        // 3. LIMPIAMOS LA COLUMNA 'periodo' EN LA BASE DE DATOS
+        await _supabase
             .from('empresa')
-            .update({ "periodo_actual": "---" }) 
+            .update({ periodo: "---" }) // Volvemos al valor neutro
             .eq('id', 1);
 
-        if (error) throw error;
+        alert("¡Mes cerrado!");
+        location.reload(); // Esto hará que la función 1 cargue las rayitas "---"
 
-        // 4. Limpieza visual inmediata antes de recargar
-        const IDs = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial'];
-        IDs.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = "---";
-        });
-
-        alert("✅ Mes cerrado correctamente. El sistema se ha limpiado.");
-        
-        // Recargamos para que todo el sistema reconozca el nuevo estado "---"
-        location.reload(); 
-
-    } catch (err) {
-        console.error("Error al cerrar:", err);
-        alert("Error al cerrar el mes: " + err.message);
-    }
+    } catch (e) { alert("Error: " + e.message); }
 }
     
 async function cargarListaCierres() {
@@ -1720,40 +1701,25 @@ async function actualizarNumeroAsientoAutomatico() {
             .eq('id', 1) 
             .maybeSingle();
 
-        if (error) throw error;
-
         if (data) {
-            // Datos de la empresa (Nombre y RIF)
+            // Nombres y RIF
             const nombre = data.nombre || "Sin Nombre";
             const rif = data.rif || "Sin RIF";
-
             if (document.getElementById('empresaNombre')) document.getElementById('empresaNombre').innerText = nombre;
             if (document.getElementById('empresaRif')) document.getElementById('empresaRif').innerText = rif;
             if (document.getElementById('balance-empresa-nombre')) document.getElementById('balance-empresa-nombre').innerText = nombre;
             if (document.getElementById('mayor-empresa-nombre')) document.getElementById('mayor-empresa-nombre').innerText = nombre;
 
-            // --- SINCRONIZACIÓN DEL PERIODO ---
-            const periodoRecuperado = data.periodo_actual || "---";
+            // EL PERIODO (Usamos la columna 'periodo' que es la original de tu tabla)
+            const valorPeriodo = data.periodo || "---";
+            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
             
-            const etiquetasPeriodo = [
-                'textoPeriodoDiario', 
-                'mayorPeriodoHeader', 
-                'periodoSeleccionadoHistorial',
-                'balance-periodo-header'
-            ];
-
-            etiquetasPeriodo.forEach(id => {
+            etiquetas.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) {
-                    el.innerText = periodoRecuperado;
-                    // Estilo visual si está vacío
-                    el.style.color = (periodoRecuperado === "---") ? "#94a3b8" : "inherit";
-                }
+                if (el) el.innerText = valorPeriodo;
             });
         }
-    } catch (e) {
-        console.error("Error cargando visuales:", e);
-    }
+    } catch (e) { console.error(e); }
     }
 
 function ocultarSplash() {
@@ -1767,39 +1733,19 @@ function ocultarSplash() {
 }
 
 async function guardarCambiosEmpresa() {
-    const nombreElemento = document.getElementById('empresaNombre');
-    const rifElemento = document.getElementById('empresaRif');
-    
-    if (!nombreElemento || !rifElemento) return;
-
-    const nuevoNombre = nombreElemento.innerText.trim();
-    const nuevoRif = rifElemento.innerText.trim();
+    const n = document.getElementById('empresaNombre').innerText.trim();
+    const r = document.getElementById('empresaRif').innerText.trim();
 
     try {
-        // 1. Obtenemos el ID del usuario que está logueado actualmente
-        const { data: { session } } = await _supabase.auth.getSession();
-        if (!session) return;
-
-        // 2. Actualizamos la tabla 'empresa' donde el 'user_id' sea el tuyo
-        const { error } = await _supabase
+        await _supabase
             .from('empresa')
-            .update({ 
-                nombre_empresa: nuevoNombre, 
-                rif: nuevoRif 
-            })
-            .eq('user_id', session.user.id); // <--- Esto busca tu fila automáticamente
-
-        if (error) throw error;
+            .update({ nombre: n, rif: r })
+            .eq('id', 1);
         
-        console.log("✅ Guardado con éxito para el usuario:", session.user.id);
-        
-        // Refrescamos visualmente las otras pestañas
-        await cargarDatosEmpresaVisual();
-        
-    } catch (err) {
-        console.error("Error al guardar:", err.message);
-    }
-    }
+        console.log("Datos guardados");
+        cargarDatosEmpresaVisual(); // Refresca la vista
+    } catch (e) { console.error(e); }
+}
 
     // Agrega esto a tu función que cambia a la vista del mayor
 function irAMayor() {

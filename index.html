@@ -1731,23 +1731,54 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
+        // Buscamos la fila con ID 1
         const { data, error } = await _supabase
             .from('empresa')
             .select('*')
-            .eq('id', 1) 
+            .eq('id', 1)
             .maybeSingle();
 
+        if (error) throw error;
+
         if (data) {
-            // Buscamos periodo_actual
-            const mesEnDB = data.periodo_actual || "---";
+            // 1. NOMBRES Y RIF
+            const nombre = data.nombre || "Sin Nombre";
+            const rif = data.rif || "Sin RIF";
             
-            const etiquetas = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoSeleccionadoHistorial', 'balance-periodo-header'];
-            etiquetas.forEach(id => {
+            // Actualizamos todos los lugares donde aparece el nombre de la empresa
+            const idsNombre = ['empresaNombre', 'mayor-empresa-nombre', 'balance-empresa-nombre', 'mayorEmpresaNombre'];
+            idsNombre.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = mesEnDB;
+                if (el) el.innerText = nombre;
             });
+
+            if (document.getElementById('empresaRif')) document.getElementById('empresaRif').innerText = rif;
+
+            // 2. EL PERIODO (Aquí está la clave)
+            // Usamos periodo_actual que es el nombre real de tu columna
+            const periodoRecuperado = data.periodo_actual || "---";
+            
+            const etiquetasPeriodo = [
+                'textoPeriodoDiario',           // Libro Diario
+                'mayorPeriodoHeader',           // Libro Mayor
+                'periodoSeleccionadoHistorial', // Historial (el del cuadro azul)
+                'balance-periodo-header'        // Balance
+            ];
+
+            etiquetasPeriodo.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerText = periodoRecuperado;
+                    // Si está vacío, le ponemos un color gris suave
+                    el.style.color = (periodoRecuperado === "---") ? "#94a3b8" : "inherit";
+                }
+            });
+            
+            console.log("Sincronización completa. Periodo actual:", periodoRecuperado);
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error("Error cargando visuales:", e);
+    }
     }
 
 function ocultarSplash() {

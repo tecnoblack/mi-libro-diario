@@ -211,8 +211,12 @@
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
                     <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
-                    <button class="btn-accion-azul" style="flex:1; background: #2563eb; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="verDetalleReporte('balance')">
-    <i class="fas fa-scale-balanced"></i> ⚖️ Balance
+                    <button class="btn-accion-azul" 
+        style="flex:1; background: #ffffff; color: #1e293b; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s;" 
+        onclick="verDetalleReporte('balance')"
+        onmouseover="this.style.borderColor='#2563eb'; this.style.color='#2563eb'"
+        onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#1e293b'">
+    <span style="font-size: 1.2rem;">⚖️</span> Balance
                     </button>
                 </div>
             </div>

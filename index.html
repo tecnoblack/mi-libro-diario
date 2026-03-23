@@ -1529,121 +1529,126 @@ async function confirmarEliminacion() {
     }
 }
 
-     async function generarBalance() {
-    console.log("Iniciando generación de balance ordenado por REF...");
+async function generarBalance() {
+    console.log("Iniciando generación de balance filtrado por periodo...");
     
     const contenedor = document.getElementById('contenedor-balance');
     const elementoPeriodo = document.getElementById('balance-periodo-header');
 
     try {
-        // 1. Actualizar el PERIODO
+        // 1. ACTUALIZAR EL TÍTULO con el periodo que elegiste
         if (elementoPeriodo) {
-            const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-            const f = new Date();
-            elementoPeriodo.innerText = `${meses[f.getMonth()]} ${f.getFullYear()}`;
+            // Usamos periodoActivo (ej: "ABRIL 2026") en lugar de la fecha de hoy
+            elementoPeriodo.innerText = (periodoActivo && periodoActivo !== "---") ? periodoActivo : "SIN PERIODO SELECCIONADO";
         }
 
-        contenedor.innerHTML = '<p style="text-align:center;">Extrayendo datos del Libro Mayor...</p>';
+        // Si no hay periodo, no buscamos nada
+        if (!periodoActivo || periodoActivo === "---") {
+            contenedor.innerHTML = '<p style="text-align:center; color: #64748b;">Por favor, selecciona un periodo en el menú principal.</p>';
+            return;
+        }
 
-        // 2. Obtener los datos
-        const { data, error } = await _supabase.from('asientos').select('*');
+        contenedor.innerHTML = '<p style="text-align:center;">Calculando saldos de ' + periodoActivo + '...</p>';
+
+        // 2. OBTENER DATOS FILTRADOS POR EL PERIODO ACTIVO
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoActivo); // <--- FILTRO CRUCIAL
+
         if (error) throw error;
 
         if (!data || data.length === 0) {
-            contenedor.innerHTML = '<p style="text-align:center;">No hay cuentas registradas en el Mayor todavía.</p>';
+            contenedor.innerHTML = `<p style="text-align:center;">No hay asientos registrados para <b>${periodoActivo}</b> todavía.</p>`;
             return;
         }
 
         const cuentas = {};
 
-        // 3. Agrupar los saldos
+        // 3. Agrupar los saldos (Asegúrate de que las columnas sean 'debe'/'haber' o 'debito'/'credito')
         data.forEach(reg => {
             const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
             const ref = reg.ref || "0";
             
             if (!cuentas[nom]) {
-                cuentas[nom] = { ref: ref, debe: 0, haber: 0 };
+                cuentas[nom] = { ref: ref, totalDebe: 0, totalHaber: 0 };
             }
             
-            cuentas[nom].debe += parseFloat(reg.debito) || 0;
-            cuentas[nom].haber += parseFloat(reg.credito) || 0;
+            // Ajusté los nombres a 'debe' y 'haber' que es lo común, cámbialos si en tu DB son diferentes
+            cuentas[nom].totalDebe += parseFloat(reg.debe) || 0;
+            cuentas[nom].totalHaber += parseFloat(reg.haber) || 0;
         });
 
-        // --- MODIFICACIÓN: ORDENAR POR REF MATEMÁTICAMENTE ---
         const nombresOrdenados = Object.keys(cuentas).sort((a, b) => {
-            // Extraemos solo los números de la referencia (por si escribes "REF-1")
             const refA = parseInt(cuentas[a].ref.toString().replace(/\D/g, "")) || 0;
             const refB = parseInt(cuentas[b].ref.toString().replace(/\D/g, "")) || 0;
             return refA - refB;
         });
 
-        // --- MODIFICACIÓN: REF A LA DERECHA DE CUENTA ---
         let tablaHtml = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
                     <tr style="background: #2563eb; color: white;">
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">CUENTA</th>
                         <th style="padding: 10px; border: 1px solid #ccc;">REF</th>
-                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">DEBE</th>
-                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">HABER</th>
+                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">DEUDOR</th>
+                        <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">ACREEDOR</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
-        let totalDebe = 0, totalHaber = 0;
+        let totalSaldosDeudores = 0, totalSaldosAcreedores = 0;
 
-        // 5. Dibujar las filas dentro de la tabla
         nombresOrdenados.forEach(nom => {
             const c = cuentas[nom];
-            const saldoFinal = c.debe - c.haber;
-            let deudor = "", acreedor = "";
+            const saldoNeto = c.totalDebe - c.totalHaber;
+            let deudorStr = "", acreedorStr = "";
 
-            if (saldoFinal > 0) { 
-                deudor = saldoFinal.toLocaleString('de-DE', { minimumFractionDigits: 2 }); 
-                totalDebe += saldoFinal; 
-            } else if (saldoFinal < 0) { 
-                acreedor = Math.abs(saldoFinal).toLocaleString('de-DE', { minimumFractionDigits: 2 }); 
-                totalHaber += Math.abs(saldoFinal); 
+            // En un balance de comprobación mostramos el saldo neto de la cuenta
+            if (saldoNeto > 0) { 
+                deudorStr = saldoNeto.toLocaleString('es-VE', { minimumFractionDigits: 2 }); 
+                totalSaldosDeudores += saldoNeto; 
+            } else if (saldoNeto < 0) { 
+                acreedorStr = Math.abs(saldoNeto).toLocaleString('es-VE', { minimumFractionDigits: 2 }); 
+                totalSaldosAcreedores += Math.abs(saldoNeto); 
             }
 
-            if (saldoFinal !== 0) {
+            if (saldoNeto !== 0) {
                 tablaHtml += `
                     <tr>
                         <td style="padding: 8px; border: 1px solid #ccc; font-weight: 500;">${nom}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${deudor}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${acreedor}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${deudorStr}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${acreedorStr}</td>
                     </tr>`;
             }
         });
 
-        // 6. Cerrar la tabla con los totales
         tablaHtml += `
                 <tr style="background: #f1f5f9; font-weight: bold;">
                     <td colspan="2" style="padding: 10px; border: 1px solid #ccc; text-align: right;">SUMAS IGUALES:</td>
-                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalDebe.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
-                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalHaber.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalSaldosDeudores.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px; border: 1px solid #ccc; text-align: right;">${totalSaldosAcreedores.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
                 </tr>
             </tbody>
         </table>`;
 
-        // Aviso de balance cuadrado
-        const diferencia = Math.abs(totalDebe - totalHaber);
+        const diferencia = Math.abs(totalSaldosDeudores - totalSaldosAcreedores);
         if (diferencia > 0.01) {
-            tablaHtml += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
+            tablaHtml += `<p style="color: #ef4444; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
         } else {
-            tablaHtml += `<p style="color: green; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
+            tablaHtml += `<p style="color: #10b981; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
         }
 
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
-        contenedor.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">ERROR: ${err.message}</p>`;
-        console.error("Fallo detectado:", err);
+        contenedor.innerHTML = `<p style="color:red; text-align:center;">ERROR: ${err.message}</p>`;
+        console.error(err);
     }
-}
-
+    }
+    
 // ERROR 3 CORREGIDO: Tu función se llamaba 'generarBalanceGeneral' pero la definiste como 'generarBalance'
 function irABalance() {
     cambiarVista('vista-balance');

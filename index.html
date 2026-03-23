@@ -1395,7 +1395,6 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
 }
 
 async function verDetalleReporte(tipo) {
-    // Limpiamos espacios y preparamos el nombre del periodo archivado
     const periodoOriginal = periodoSeleccionadoHistorial.trim(); 
     const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
 
@@ -1408,31 +1407,26 @@ async function verDetalleReporte(tipo) {
             .select('*')
             .eq('periodo', periodoArchivado);
         
-        if (error) {
-            console.error("Error al cargar historial:", error);
-            return;
-        }
+        if (error) return console.error("Error:", error);
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
+        // ACTUALIZACIÓN AQUÍ:
+        // 1. Ponemos el título limpio para el usuario (Marzo 2026)
         document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
-        const elementoFiltro = document.getElementById('textoPeriodoDiario');
-        if(elementoFiltro) elementoFiltro.innerText = periodoArchivado;
-
-        document.getElementById('select-cuenta-mayor').value = "";
-        const divRes = document.getElementById('resultado-mayor');
-        if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta para ver sus movimientos históricos.</p>";
+        
+        // 2. IMPORTANTE: Le pasamos el nombre real (ARCHIVADO_...) a la función del Mayor
         cambiarVista('vista-mayor');
+        
+        // Llamamos a la función que carga el Mayor pasándole el filtro del historial
+        // Nota: Asegúrate de que tu función de Mayor acepte este parámetro ahora
+        cargarLibroMayor(periodoArchivado); 
 
     } else if (tipo === 'balance') {
-        // --- NUEVA LÓGICA PARA EL BALANCE ---
-        // 1. Vamos a la vista del balance
         cambiarVista('vista-balance'); 
-        
-        // 2. Llamamos a generarBalance pasándole el nombre ARCHIVADO
         generarBalance(periodoArchivado);
     }
-}
+    }
     
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');

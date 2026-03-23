@@ -1395,12 +1395,11 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
 }
 
 async function verDetalleReporte(tipo) {
-    // Limpiamos espacios por si acaso
+    // Limpiamos espacios y preparamos el nombre del periodo archivado
     const periodoOriginal = periodoSeleccionadoHistorial.trim(); 
     const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
 
     if (tipo === 'diario') {
-        // Aquí le decimos al diario que busque el archivado
         document.getElementById('textoPeriodoDiario').innerText = periodoArchivado;
         cambiarVista('vista-diario');
         
@@ -1413,25 +1412,26 @@ async function verDetalleReporte(tipo) {
             console.error("Error al cargar historial:", error);
             return;
         }
-
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
-        // 1. Cambiamos visualmente el título al mes original
         document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
-        
-        // 2. LA SOLUCIÓN: Guardamos el nombre "ARCHIVADO_" oculto para que generarMayor() lo lea
         const elementoFiltro = document.getElementById('textoPeriodoDiario');
         if(elementoFiltro) elementoFiltro.innerText = periodoArchivado;
 
-        // 3. Limpiamos resultados anteriores del mayor
         document.getElementById('select-cuenta-mayor').value = "";
         const divRes = document.getElementById('resultado-mayor');
         if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta para ver sus movimientos históricos.</p>";
-
-        // 4. Vamos a la vista
         cambiarVista('vista-mayor');
-    } 
+
+    } else if (tipo === 'balance') {
+        // --- NUEVA LÓGICA PARA EL BALANCE ---
+        // 1. Vamos a la vista del balance
+        cambiarVista('vista-balance'); 
+        
+        // 2. Llamamos a generarBalance pasándole el nombre ARCHIVADO
+        generarBalance(periodoArchivado);
+    }
 }
     
 function activarModoBorrado() {
@@ -1530,43 +1530,48 @@ async function confirmarEliminacion() {
     }
 }
 
-async function generarBalance() {
-    console.log("Iniciando generación de balance filtrado por periodo...");
+ // Añadimos periodoManual como parámetro opcional
+async function generarBalance(periodoManual = null) {
+    console.log("Iniciando generación de balance...");
     
     const contenedor = document.getElementById('contenedor-balance');
     const elementoPeriodo = document.getElementById('balance-periodo-header');
 
+    // PRIORIDAD: Si viene un periodoManual (historial), usamos ese. 
+    // Si no, usamos el periodoActivo (el mes que está abierto actualmente).
+    const periodoAConsultar = periodoManual || periodoActivo;
+
     try {
-        // 1. ACTUALIZAR EL TÍTULO con el periodo que elegiste
+        // 1. ACTUALIZAR EL TÍTULO VISUAL
         if (elementoPeriodo) {
-            // Usamos periodoActivo (ej: "ABRIL 2026") en lugar de la fecha de hoy
-            elementoPeriodo.innerText = (periodoActivo && periodoActivo !== "---") ? periodoActivo : "SIN PERIODO SELECCIONADO";
+            // Quitamos el "ARCHIVADO_" solo para que el título se vea limpio (ej: "MARZO 2026")
+            const tituloLimpio = periodoAConsultar ? periodoAConsultar.replace('ARCHIVADO_', '') : "SIN PERIODO";
+            elementoPeriodo.innerText = tituloLimpio;
         }
 
-        // Si no hay periodo, no buscamos nada
-        if (!periodoActivo || periodoActivo === "---") {
-            contenedor.innerHTML = '<p style="text-align:center; color: #64748b;">Por favor, selecciona un periodo en el menú principal.</p>';
+        if (!periodoAConsultar || periodoAConsultar === "---") {
+            contenedor.innerHTML = '<p style="text-align:center; color: #64748b;">Por favor, selecciona un periodo primero.</p>';
             return;
         }
 
-        contenedor.innerHTML = '<p style="text-align:center;">Calculando saldos de ' + periodoActivo + '...</p>';
+        contenedor.innerHTML = `<p style="text-align:center;">Extrayendo datos de <b>${periodoAConsultar}</b>...</p>`;
 
-        // 2. OBTENER DATOS FILTRADOS POR EL PERIODO ACTIVO
+        // 2. OBTENER DATOS FILTRADOS (Aquí usamos el nombre con ARCHIVADO_ si es necesario)
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoActivo); // <--- FILTRO CRUCIAL
+            .eq('periodo', periodoAConsultar); 
 
         if (error) throw error;
 
         if (!data || data.length === 0) {
-            contenedor.innerHTML = `<p style="text-align:center;">No hay asientos registrados para <b>${periodoActivo}</b> todavía.</p>`;
+            contenedor.innerHTML = `<p style="text-align:center;">No hay datos registrados para <b>${periodoAConsultar}</b>.</p>`;
             return;
         }
 
         const cuentas = {};
 
-        // 3. Agrupar los saldos (Asegúrate de que las columnas sean 'debe'/'haber' o 'debito'/'credito')
+        // 3. Agrupar los saldos (Asegúrate de usar debito/credito según tu tabla)
         data.forEach(reg => {
             const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
             const ref = reg.ref || "0";
@@ -1575,9 +1580,15 @@ async function generarBalance() {
                 cuentas[nom] = { ref: ref, totalDebe: 0, totalHaber: 0 };
             }
             
-            // Ajusté los nombres a 'debe' y 'haber' que es lo común, cámbialos si en tu DB son diferentes
+            // Si en tu base de datos las columnas son 'debe'/'haber', déjalo así:
             cuentas[nom].totalDebe += parseFloat(reg.debe) || 0;
             cuentas[nom].totalHaber += parseFloat(reg.haber) || 0;
+            
+            /* NOTA: Si tus columnas se llaman 'debito'/'credito', cambia las 
+               dos líneas de arriba por estas:
+               cuentas[nom].totalDebe += parseFloat(reg.debito) || 0;
+               cuentas[nom].totalHaber += parseFloat(reg.credito) || 0;
+            */
         });
 
         const nombresOrdenados = Object.keys(cuentas).sort((a, b) => {
@@ -1586,6 +1597,7 @@ async function generarBalance() {
             return refA - refB;
         });
 
+        // 4. Generar el HTML de la Tabla
         let tablaHtml = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
@@ -1606,7 +1618,6 @@ async function generarBalance() {
             const saldoNeto = c.totalDebe - c.totalHaber;
             let deudorStr = "", acreedorStr = "";
 
-            // En un balance de comprobación mostramos el saldo neto de la cuenta
             if (saldoNeto > 0) { 
                 deudorStr = saldoNeto.toLocaleString('es-VE', { minimumFractionDigits: 2 }); 
                 totalSaldosDeudores += saldoNeto; 
@@ -1636,11 +1647,9 @@ async function generarBalance() {
         </table>`;
 
         const diferencia = Math.abs(totalSaldosDeudores - totalSaldosAcreedores);
-        if (diferencia > 0.01) {
-            tablaHtml += `<p style="color: #ef4444; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
-        } else {
-            tablaHtml += `<p style="color: #10b981; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
-        }
+        tablaHtml += (diferencia > 0.01) 
+            ? `<p style="color: #ef4444; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`
+            : `<p style="color: #10b981; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
 
         contenedor.innerHTML = tablaHtml;
 
@@ -1648,7 +1657,7 @@ async function generarBalance() {
         contenedor.innerHTML = `<p style="color:red; text-align:center;">ERROR: ${err.message}</p>`;
         console.error(err);
     }
-    }
+                }
     
 // ERROR 3 CORREGIDO: Tu función se llamaba 'generarBalanceGeneral' pero la definiste como 'generarBalance'
 function irABalance() {

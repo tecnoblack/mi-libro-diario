@@ -738,40 +738,56 @@ function actualizarTotales() {
     }
 
 async function guardarAsiento() {
+    // 1. [NUEVO] BLOQUEO DE BOTÓN: Evita que el usuario guarde 2 o 3 veces lo mismo
+    const btnGuardar = document.querySelector('button[onclick="guardarAsiento()"]') || document.getElementById('btnGuardarAsiento');
+    if (btnGuardar) {
+        if (btnGuardar.disabled) return; 
+        btnGuardar.disabled = true;
+        btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    }
+
     try {
-        // 1. Verificar periodo activo
+        // [INTACTO] Verificación de periodo
         const elementoPeriodo = document.getElementById('textoPeriodoDiario');
         const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
         if (!periodoActivo || periodoActivo.includes("---") || periodoActivo === "") {
-            Swal.fire("Aviso", "Seleccione un periodo en el Historial antes de guardar", "warning"); 
-            return;
+            throw new Error("Seleccione un periodo en el Historial antes de guardar");
         }
 
-        // 2. Obtener el número de asiento del encabezado
+        // [INTACTO] Obtener número de asiento
         const headerTexto = document.getElementById('num-asiento-header').innerText;
         const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
 
-        // 3. Recolectar datos de las filas
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
 
+        // [NUEVO] VARIABLES PARA VALIDAR CUADRE
+        let acumuladoDebe = 0;
+        let acumuladoHaber = 0;
+
         for (let f of filas) {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
-            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(',', '.')) || 0;
-            const c = parseFloat(f.querySelector('.val-credito').innerText.replace(',', '.')) || 0;
+            
+            // [MEJORADO] Captura de montos con limpieza de puntos/comas
+            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
+            const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
+            
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
             let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
-                // Asignar REF si está vacía
+                // Sumamos para validar cuadre después
+                acumuladoDebe += d;
+                acumuladoHaber += c;
+
                 if (celdaRef && celdaRef.innerText.trim() === "") {
                     await asignarRefInteligente(elCuenta);
                 }
 
-                // Formatear fecha para base de datos (YYYY-MM-DD)
+                // [INTACTO] Formatear fecha
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
                     const p = fechaRaw.split('/');
@@ -786,21 +802,27 @@ async function guardarAsiento() {
                     debito: d, 
                     credito: c, 
                     periodo: periodoActivo, 
-                    descripcion: glosa
+                    descripcion: glosa,
+                    created_at: new Date().toISOString() // [NUEVO] Para que no se pierda el orden
                 });
             }
         }
 
-        if (datos.length === 0) {
-            Swal.fire("Aviso", "El asiento está vacío o no tiene montos válidos", "warning");
-            return;
+        // 2. [NUEVO] VALIDACIÓN DE CUADRE MATEMÁTICO
+        const diferencia = Math.abs(acumuladoDebe - acumuladoHaber);
+        if (diferencia > 0.01) {
+            throw new Error(`Asiento DESCUADRADO. Debe: ${acumuladoDebe.toFixed(2)} | Haber: ${acumuladoHaber.toFixed(2)}`);
         }
 
-        // 4. Guardar en Supabase
+        if (datos.length === 0) {
+            throw new Error("El asiento está vacío o no tiene montos válidos");
+        }
+
+        // [INTACTO] Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // 5. ÉXITO: Actualización visual sin recargar página
+        // [INTACTO] Mensaje de éxito
         await Swal.fire({
             title: "¡Guardado!",
             text: `Asiento Nº ${numeroAsientoActual} registrado correctamente`,
@@ -809,32 +831,37 @@ async function guardarAsiento() {
             showConfirmButton: false
         });
 
-        // LIMPIEZA AUTOMÁTICA
-        // Limpiar filas de la tabla (dejamos solo la estructura vacía)
+        // 3. [MEJORADO] LIMPIEZA PROFUNDA (Para que el usuario no tenga que recargar)
         const cuerpoTabla = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
         if (cuerpoTabla) {
             cuerpoTabla.innerHTML = ""; 
-            // Opcional: Agregar una fila vacía inicial si tu app lo requiere
             if (typeof agregarFila === "function") agregarFila(); 
         }
 
-        // Limpiar la glosa/resumen
         const inputGlosa = document.getElementById('resumenAsiento');
         if (inputGlosa) inputGlosa.value = "";
 
-        // Actualizar el número de asiento para el próximo (si tienes la función)
+        // [NUEVO] Limpiar totales visuales del editor
+        if(document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
+        if(document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
+
+        // [INTACTO] Actualizar número
         if (typeof actualizarNumeroAsientoAutomatico === "function") {
             await actualizarNumeroAsientoAutomatico();
         }
 
-        // IMPORTANTE: No usamos location.reload() para evitar cierres de sesión.
-
     } catch (e) { 
         console.error("Error en guardado:", e);
-        Swal.fire("Error", "No se pudo guardar: " + e.message, "error"); 
+        Swal.fire("Atención", e.message, "error"); 
+    } finally {
+        // 4. [NUEVO] RE-ACTIVAR BOTÓN: Pase lo que pase, el botón vuelve a la vida
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = 'Guardar Asiento';
+        }
     }
-    }
-    
+            }
+                
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');

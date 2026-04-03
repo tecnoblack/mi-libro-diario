@@ -721,21 +721,32 @@ function actualizarTotales() {
     
     async function consultarLibroDiario() {
     const div = document.getElementById('tabla-registros');
-    // Mantenemos el orden por asiento_id y agregamos id para que no se intercambien
+    const elementoPeriodo = document.getElementById('textoPeriodoDiario');
+    const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+
+    // Si no hay periodo, no buscamos nada para evitar errores
+    if (!periodoActivo || periodoActivo === "---") {
+        div.innerHTML = "<p style='text-align:center;'>Seleccione un periodo.</p>";
+        return;
+    }
+
+    // AÑADIMOS EL FILTRO POR PERIODO AQUÍ
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
+        .eq('periodo', periodoActivo) 
         .order('asiento_id', { ascending: true })
         .order('id', { ascending: true });
 
     if (error) { div.innerHTML = "Error."; return; }
 
     let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-    let ultimoId = null, num = 1, totalD = 0, totalC = 0;
+    let ultimoId = null, totalD = 0, totalC = 0;
 
     data.forEach(f => {
         if (f.asiento_id !== ultimoId) {
-            html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td></tr>`;
+            // Usamos f.asiento_id directamente para evitar errores de conteo manual
+            html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${f.asiento_id} — ${f.descripcion}</td></tr>`;
             ultimoId = f.asiento_id;
         }
         totalD += f.debito; totalC += f.credito;
@@ -768,31 +779,19 @@ async function guardarAsiento() {
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
-
-        let acumuladoDebe = 0;
-        let acumuladoHaber = 0;
+        let acumuladoDebe = 0, acumuladoHaber = 0;
 
         for (let f of filas) {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
-            
-            // Limpieza de montos corregida para evitar el error de la columna inexistente
-            let textoDebito = f.querySelector('.val-debito').innerText.trim();
-            let textoCredito = f.querySelector('.val-credito').innerText.trim();
-            
-            const d = parseFloat(textoDebito.replace(/\./g, '').replace(',', '.')) || 0;
-            const c = parseFloat(textoCredito.replace(/\./g, '').replace(',', '.')) || 0;
-            
+            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
+            const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
             let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
-                acumuladoDebe += d;
-                acumuladoHaber += c;
-
-                if (celdaRef && celdaRef.innerText.trim() === "") {
-                    await asignarRefInteligente(elCuenta);
-                }
+                acumuladoDebe += d; acumuladoHaber += c;
+                if (celdaRef && celdaRef.innerText.trim() === "") await asignarRefInteligente(elCuenta);
 
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
@@ -802,59 +801,49 @@ async function guardarAsiento() {
 
                 datos.push({ 
                     asiento_id: numeroAsientoActual,
-                    fecha: fechaEnvio, 
-                    cuenta: cuenta, 
+                    fecha: fechaEnvio, cuenta: cuenta, 
                     ref: celdaRef ? celdaRef.innerText : "-", 
-                    debito: d, 
-                    credito: c, 
-                    periodo: periodoActivo, 
-                    descripcion: glosa
+                    debito: d, credito: c, 
+                    periodo: periodoActivo, descripcion: glosa
                 });
             }
         }
 
-        const diferencia = Math.abs(acumuladoDebe - acumuladoHaber);
-        if (diferencia > 0.01) {
-            throw new Error(`Asiento DESCUADRADO. Debe: ${acumuladoDebe.toFixed(2)} | Haber: ${acumuladoHaber.toFixed(2)}`);
+        if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
+            throw new Error(`Asiento DESCUADRADO. D: ${acumuladoDebe.toFixed(2)} | H: ${acumuladoHaber.toFixed(2)}`);
         }
 
-        if (datos.length === 0) {
-            throw new Error("El asiento está vacío o no tiene montos válidos");
-        }
+        if (datos.length === 0) throw new Error("El asiento está vacío");
 
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        await Swal.fire({
-            title: "¡Guardado!",
-            text: `Asiento Nº ${numeroAsientoActual} registrado correctamente`,
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false
-        });
+        await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1500, showConfirmButton: false });
 
-        // Limpieza profunda
+        // --- LIMPIEZA ABSOLUTA ---
         const cuerpoTabla = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
-        if (cuerpoTabla) {
-            cuerpoTabla.innerHTML = ""; 
-            if (typeof agregarFila === "function") agregarFila(); 
-        }
-
+        if (cuerpoTabla) cuerpoTabla.innerHTML = ""; // Vaciamos visualmente
+        
         const inputGlosa = document.getElementById('resumenAsiento');
         if (inputGlosa) inputGlosa.value = "";
 
-        // Resetear totales visuales
         const dVis = document.getElementById('total-debe-visual');
         const cVis = document.getElementById('total-haber-visual');
         if(dVis) dVis.innerText = "0.00";
         if(cVis) cVis.innerText = "0.00";
 
+        // IMPORTANTE: Esperamos a que estas funciones terminen antes de seguir
         if (typeof actualizarNumeroAsientoAutomatico === "function") {
             await actualizarNumeroAsientoAutomatico();
         }
+        
+        // Agregamos una fila vacía para el siguiente registro
+        if (typeof agregarFila === "function") agregarFila();
+
+        // Refrescamos la vista del libro diario inmediatamente
+        await consultarLibroDiario();
 
     } catch (e) { 
-        console.error("Error en guardado:", e);
         Swal.fire("Atención", e.message, "error"); 
     } finally {
         if (btnGuardar) {
@@ -862,8 +851,7 @@ async function guardarAsiento() {
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-} 
-                
+                                                                                                               }
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');
         const select = document.getElementById('select-cuenta-mayor');

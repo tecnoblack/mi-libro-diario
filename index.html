@@ -730,15 +730,18 @@ function actualizarTotales() {
         return;
     }
 
-    async function guardarAsiento() {
-    const btnGuardar = document.querySelector('button[onclick="guardarAsiento()"]') || document.getElementById('btnGuardarAsiento');
+ async function guardarAsiento() {
+    // 1. Identificar el botón (probamos por ID y por Atributo)
+    const btnGuardar = document.getElementById('btnGuardarAsiento') || document.querySelector('button[onclick="guardarAsiento()"]');
+    
+    // Si el botón existe, lo bloqueamos para evitar doble envío
     if (btnGuardar) {
-        if (btnGuardar.disabled) return; 
         btnGuardar.disabled = true;
-        btnGuardar.innerHTML = 'Guardando...';
+        btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
     }
 
     try {
+        // 2. Validar Periodo
         const elementoPeriodo = document.getElementById('textoPeriodoDiario');
         const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
@@ -746,28 +749,33 @@ function actualizarTotales() {
             throw new Error("Seleccione un periodo en el Historial antes de guardar");
         }
 
+        // 3. Obtener Número de Asiento
         const headerTexto = document.getElementById('num-asiento-header').innerText;
         const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
 
+        // 4. Recolectar Filas
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
-        let acumuladoDebe = 0, acumuladoHaber = 0;
+        let acumuladoDebe = 0;
+        let acumuladoHaber = 0;
 
         for (let f of filas) {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
             
-            // Limpieza de puntos de mil y comas decimales
-            const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
-            const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
+            // Limpieza estricta de números para evitar NaN
+            const dStr = f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.') || "0";
+            const cStr = f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.') || "0";
+            const d = parseFloat(dStr) || 0;
+            const c = parseFloat(cStr) || 0;
             
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
             let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
-                acumuladoDebe += d; acumuladoHaber += c;
-                if (celdaRef && celdaRef.innerText.trim() === "") await asignarRefInteligente(elCuenta);
+                acumuladoDebe += d;
+                acumuladoHaber += c;
 
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
@@ -777,27 +785,42 @@ function actualizarTotales() {
 
                 datos.push({ 
                     asiento_id: numeroAsientoActual,
-                    fecha: fechaEnvio, cuenta: cuenta, 
+                    fecha: fechaEnvio, 
+                    cuenta: cuenta, 
                     ref: celdaRef ? celdaRef.innerText : "-", 
-                    debito: d, credito: c, 
-                    periodo: periodoActivo, descripcion: glosa
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo, 
+                    descripcion: glosa
                 });
             }
         }
 
-        if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
-            throw new Error(`Asiento DESCUADRADO. D: ${acumuladoDebe.toFixed(2)} | H: ${acumuladoHaber.toFixed(2)}`);
+        // 5. Validar Cuadre (Si no cuadra, reactivamos botón y lanzamos error)
+        const diferencia = Math.abs(acumuladoDebe - acumuladoHaber);
+        if (diferencia > 0.01) {
+            throw new Error(`Asiento DESCUADRADO.\nDebe: ${acumuladoDebe.toFixed(2)}\nHaber: ${acumuladoHaber.toFixed(2)}`);
         }
 
-        if (datos.length === 0) throw new Error("El asiento está vacío");
+        if (datos.length === 0) {
+            throw new Error("El asiento no tiene datos válidos para guardar.");
+        }
 
+        // 6. Enviar a Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // Mostrar éxito brevemente
-        await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1000, showConfirmButton: false });
+        // 7. Éxito: Animación y Salto
+        await Swal.fire({
+            title: "¡Guardado!",
+            text: `Asiento Nº ${numeroAsientoActual} registrado correctamente`,
+            icon: "success",
+            timer: 1500,
+            showConfirmButton: false
+        });
 
-        // --- 1. LIMPIEZA ABSOLUTA DEL EDITOR ---
+        // --- 8. LIMPIEZA ABSOLUTA Y SALTO AL LIBRO ---
+        // Limpiamos el editor
         const cuerpoTabla = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
         if (cuerpoTabla) cuerpoTabla.innerHTML = ""; 
         
@@ -805,30 +828,25 @@ function actualizarTotales() {
         if (document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
         if (document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
 
-        // --- 2. ACTUALIZACIÓN DE DATOS ---
-        if (typeof actualizarNumeroAsientoAutomatico === "function") {
-            await actualizarNumeroAsientoAutomatico();
-        }
-        
-        // Dejar el editor listo para la próxima vez que se abra
-        if (typeof agregarFila === "function") agregarFila();
+        // Actualizamos número y agregamos fila base
+        if (typeof actualizarNumeroAsientoAutomatico === "function") await actualizarNumeroAsientoAutomatico();
+        if (typeof agregarFila === "function") agregarFila(); 
 
-        // --- 3. SALTO Y REFRESCO ---
-        // Refrescamos el libro diario antes de saltar para ver el nuevo asiento
+        // Refrescar lista y saltar de vista
         if (typeof consultarLibroDiario === "function") await consultarLibroDiario();
-        
-        // SALTO AUTOMÁTICO A LA VISTA DEL LIBRO DIARIO
         if (typeof cambiarVista === "function") cambiarVista('vista-diario');
 
     } catch (e) { 
+        console.error("Error al guardar:", e);
         Swal.fire("Atención", e.message, "error"); 
     } finally {
+        // MUY IMPORTANTE: Reactivamos el botón pase lo que pase
         if (btnGuardar) {
             btnGuardar.disabled = false;
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-                }
+                    }
                                                                                                                }
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

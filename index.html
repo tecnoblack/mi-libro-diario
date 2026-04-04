@@ -1047,26 +1047,26 @@ async function generarMayor() {
         let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
 
         if (!nuevoMes || nuevoMes === "---") {
-            Swal.fire("Aviso", "Por favor, escribe un periodo válido.", "warning");
+            Swal.fire("Aviso", "Escribe un periodo válido.", "warning");
             return;
         }
 
-        // 1. Guardar en el dispositivo del usuario
-        const userId = localStorage.getItem('usuario_id') || 'usuario_generico';
-        localStorage.setItem(`periodo_activo_${userId}`, nuevoMes);
-
-        // 2. Actualizar la variable global que usan los filtros
-        periodoActivo = nuevoMes;
+        // 1. Guardamos en la memoria del teléfono
+        localStorage.setItem('mi_periodo_contable', nuevoMes);
         
-        // 3. CERRAR MODAL (si existe la función)
-        if (typeof cerrarModalPeriodo === 'function') {
-            cerrarModalPeriodo();
-        } else {
-            document.getElementById('modal-periodo').style.display = 'none';
-        }
+        // 2. Actualizamos la variable global para que los filtros funcionen
+        periodoActivo = nuevoMes;
 
-        // 4. LLAMAR A LA FUNCIÓN QUE PINTA LOS TEXTOS
-        await cargarDatosEmpresa(); 
+        // 3. ¡ESTO ES LO QUE FALTA EN TU VIDEO! 
+        // Actualizamos los textos de la pantalla manualmente para que cambien ya mismo
+        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = nuevoMes; 
+        });
+
+        // 4. Cerramos el modal de carga
+        if (typeof cerrarModalPeriodo === 'function') cerrarModalPeriodo();
 
         await Swal.fire({
             title: "Periodo Activado",
@@ -1076,14 +1076,14 @@ async function generarMayor() {
             showConfirmButton: false
         });
 
-        // 5. Opcional: Refrescar el libro diario automáticamente
-        if (typeof consultarLibroDiario === 'function') consultarLibroDiario();
+        // 5. Refrescamos el libro diario para que aparezca la tabla
+        if (typeof consultarLibroDiario === 'function') await consultarLibroDiario();
 
     } catch (err) {
         console.error("Error al activar:", err);
-        Swal.fire("Error", "No se pudo activar: " + err.message, "error");
+        Swal.fire("Error", "No se pudo activar.", "error");
     }
-        }
+    }
     
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
@@ -1252,60 +1252,41 @@ function mostrarOpcionesReporte() {
     document.getElementById('selector-reportes').style.display = 'flex';
 }
 
-/**
- * Función principal para alternar entre Libro Diario y Libro Mayor.
- * @param {string} tipo - Puede ser 'diario' o 'mayor'.
- */
 async function verDetalleReporte(tipo) {
-    // 1. Obtenemos el periodo actual de la interfaz para que el reporte sea preciso
-    const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
-    const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
+    // --- CAMBIO AQUÍ: Primero intentamos leer de la memoria local ---
+    let periodo = localStorage.getItem('mi_periodo_contable');
 
-    // 2. Lógica de cambio de vista y actualización de títulos
-    if (tipo === 'diario') {
-        // Cambia a la sección del Diario
-        if (typeof cambiarVista === 'function') {
-            cambiarVista('vista-diario');
-        }
-        
-        const titulo = document.getElementById('titulo-reporte-seleccionado');
-        if (titulo) {
-            titulo.innerText = "LIBRO DIARIO";
-        }
-        
-        console.log(`Cargando Libro Diario para el periodo: ${periodo}`);
-    } 
-    else if (tipo === 'mayor') {
-        // Cambia a la sección del Mayor (Cuentas T)
-        if (typeof cambiarVista === 'function') {
-            cambiarVista('vista-mayor');
-        }
-        
-        const titulo = document.getElementById('titulo-reporte-seleccionado');
-        if (titulo) {
-            titulo.innerText = "LIBRO MAYOR";
-        }
-        
-        console.log(`Cargando Libro Mayor para el periodo: ${periodo}`);
+    // Si no hay nada en la memoria, intentamos leer de la interfaz como respaldo
+    if (!periodo || periodo === "---") {
+        const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
+        periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
     }
 
-    // 3. Sincronización de Datos
-    // Llamamos a cargarRegistros, que ya configuramos para que:
-    // - Consulte Supabase filtrando por el periodo.
-    // - Dibuje los asientos agrupados si ve la 'vista-diario'.
-    // - Dibuje las Cuentas T si ve la 'vista-mayor'.
+    if (!periodo || periodo === "---") {
+        Swal.fire("Aviso", "Por favor, asigne un periodo en el historial primero.", "warning");
+        return;
+    }
+
+    if (tipo === 'diario') {
+        if (typeof cambiarVista === 'function') cambiarVista('vista-diario');
+        const titulo = document.getElementById('titulo-reporte-seleccionado');
+        if (titulo) titulo.innerText = "LIBRO DIARIO";
+    } 
+    else if (tipo === 'mayor') {
+        if (typeof cambiarVista === 'function') cambiarVista('vista-mayor');
+        const titulo = document.getElementById('titulo-reporte-seleccionado');
+        if (titulo) titulo.innerText = "LIBRO MAYOR";
+    }
+
     try {
+        // Importante: Asegúrate que cargarRegistros() use la variable 'periodo' 
+        // o que lea también de localStorage.
         await cargarRegistros();
     } catch (error) {
         console.error("Error al actualizar el reporte:", error);
     }
-    }
-
-  /**
- * Muestra el Libro Diario. 
- * @param {Array} datos - Registros de la DB.
- * @param {Boolean} modoLectura - Si es true, oculta botones de acción y bloquea edición.
- */
+            }
+    
 function mostrarAsientosEnTabla(datos, modoLectura = false) {
     const contenedor = document.getElementById('tabla-registros');
     if (!contenedor) return;
@@ -1456,49 +1437,48 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     }
 }
 
-async function verDetalleReporte(tipo) {
-    // 1. Obtenemos el nombre del mes (ej: MARZO 2026) y le ponemos el prefijo de la DB
-    const periodoOriginal = periodoSeleccionadoHistorial.trim(); 
-    const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
+async function verDetalleReporteHistorial(tipo) { // Le cambio el nombre para que no choquen
+    // Usamos el periodo que el usuario acaba de asignar en el buscador azul
+    const periodoOriginal = localStorage.getItem('mi_periodo_contable') || ""; 
+    
+    if (!periodoOriginal || periodoOriginal === "---") {
+        Swal.fire("Error", "No se ha detectado un periodo seleccionado.", "error");
+        return;
+    }
+
+    // Si es para ver algo que ya cerraste, podrías usar el prefijo, 
+    // pero para ver lo que estás trabajando ahora, usa el nombre directo.
+    const periodoABuscar = periodoOriginal; 
 
     if (tipo === 'diario') {
-        // Configuramos la vista del diario para historial
         if(document.getElementById('textoPeriodoDiario')) {
-            document.getElementById('textoPeriodoDiario').innerText = periodoArchivado;
+            document.getElementById('textoPeriodoDiario').innerText = periodoABuscar;
         }
         cambiarVista('vista-diario');
         
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoArchivado);
+            .eq('periodo', periodoABuscar);
         
         if (error) return console.error("Error diario historial:", error);
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
-        // Configuramos la vista del mayor para historial
         if(document.getElementById('mayorPeriodoHeader')) {
             document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
         }
-        
-        // Limpiamos el mayor antes de mostrarlo
         const divRes = document.getElementById('resultado-mayor');
         if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta.</p>";
-        
         cambiarVista('vista-mayor');
-        
-        // IMPORTANTE: Si tienes una función para cargar las cuentas del mayor, 
-        // deberías pasarle 'periodoArchivado' aquí.
 
     } else if (tipo === 'balance') {
-        // Vamos a la sección de balance
         cambiarVista('vista-balance'); 
-        
-        // LLAMAMOS AL BALANCE PASÁNDOLE EL NOMBRE DEL ARCHIVADO
-        generarBalance(periodoArchivado);
+        if (typeof generarBalance === 'function') {
+            generarBalance(periodoABuscar);
+        }
     }
-}
+    }
     
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');

@@ -753,6 +753,7 @@ function actualizarTotales() {
     html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
     if (div) div.innerHTML = html;
 }
+    }
 
 async function guardarAsiento() {
     const btn = document.getElementById('btnGuardar');

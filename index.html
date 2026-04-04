@@ -453,37 +453,34 @@ function ocultarSplash() {
 
     async function cargarDatosEmpresa() {
     try {
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('*')
-            .single();
-
-        if (error) throw error;
-
+        // Traemos el nombre de la empresa de Supabase (global)
+        const { data, error } = await _supabase.from('empresa').select('*').single();
         if (data) {
-            // El nombre de la empresa sí puede ser global
             document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
-            
-            // --- CAMBIO CLAVE: LEER PERIODO INDIVIDUAL ---
-            const userId = localStorage.getItem('usuario_id') || 'global';
-            const periodoIndividual = localStorage.getItem(`periodo_activo_${userId}`) || '---';
-            
-            // Guardamos en la variable global para que el resto de la app lo use
-            periodoActivo = periodoIndividual;
+        }
 
-            const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    // Si el periodo es "---", mostramos eso, si no, el periodo guardado
-                    el.innerText = periodoIndividual === '---' ? '---' : periodoIndividual;
-                }
-            });
-        }
+        // TRAEMOS EL PERIODO DEL LOCALSTORAGE (individual)
+        const userId = localStorage.getItem('usuario_id') || 'usuario_generico';
+        const periodoIndividual = localStorage.getItem(`periodo_activo_${userId}`) || '---';
+        
+        // Actualizamos la variable global para que el sistema sepa qué buscar en la DB
+        periodoActivo = periodoIndividual;
+
+        // Actualizamos todos los lugares donde se muestra el periodo
+        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerText = periodoIndividual;
+                // Si es un input, también le ponemos el valor
+                if(el.tagName === 'INPUT') el.value = periodoIndividual;
+            }
+        });
+
     } catch (err) {
-        console.error("Error al cargar empresa:", err);
+        console.error("Error al cargar datos visuales:", err);
     }
-        }
+    }
 
     async function guardarDatosEmpresa() {
         const n = document.getElementById('empresaNombre').innerText;
@@ -730,23 +727,70 @@ function actualizarTotales() {
 }
     
     async function consultarLibroDiario() {
-        const div = document.getElementById('tabla-registros');
-        const { data, error } = await _supabase.from('asientos').select('*').order('asiento_id', { ascending: true });
-        if (error) { div.innerHTML = "Error."; return; }
-        let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-        let ultimoId = null, num = 1, totalD = 0, totalC = 0;
-        data.forEach(f => {
-            if (f.asiento_id !== ultimoId) {
-                html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${num++} — ${f.descripcion}</td></tr>`;
-                ultimoId = f.asiento_id;
-            }
-            totalD += f.debito; totalC += f.credito;
-            html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
-        });
-        html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
-        div.innerHTML = html;
+    const div = document.getElementById('tabla-registros');
+    
+    // 1. LEER EL PERIODO DE LA MEMORIA LOCAL (Local Storage)
+    const periodoActivo = localStorage.getItem('mi_periodo_contable') || '---';
+
+    // Si no hay periodo, avisamos y no buscamos nada
+    if (periodoActivo === "---") {
+        div.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione un periodo en el Historial para ver los registros.</p>";
+        return;
     }
 
+    // 2. CONSULTA FILTRADA: Solo traemos lo que coincida con el periodo activo
+    // Importante: Si tienes una columna usuario_id, deberías añadir .eq('usuario_id', userId)
+    const { data, error } = await _supabase
+        .from('asientos')
+        .select('*')
+        .eq('periodo', periodoActivo) // <-- ESTE ES EL FILTRO CRÍTICO
+        .order('asiento_id', { ascending: true });
+
+    if (error) { 
+        console.error(error);
+        div.innerHTML = "Error al cargar los datos."; 
+        return; 
+    }
+
+    if (data.length === 0) {
+        div.innerHTML = `<p style="text-align:center; padding:20px;">No hay asientos registrados para el periodo <b>${periodoActivo}</b>.</p>`;
+        return;
+    }
+
+    // 3. CONSTRUCCIÓN DE LA TABLA (Tu lógica original)
+    let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+    let ultimoId = null, totalD = 0, totalC = 0;
+
+    data.forEach(f => {
+        if (f.asiento_id !== ultimoId) {
+            // Usamos f.asiento_id directamente para que coincida con la DB
+            html += `<tr class="fila-asiento-header">
+                        <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
+                        <td colspan="5">Asiento N° ${f.asiento_id} — ${f.descripcion || ""}</td>
+                     </tr>`;
+            ultimoId = f.asiento_id;
+        }
+        totalD += f.debito; 
+        totalC += f.credito;
+        html += `<tr>
+                    <td class="col-select"></td>
+                    <td>${f.fecha}</td>
+                    <td>${f.cuenta}</td>
+                    <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td>
+                    <td>${f.debito.toFixed(2)}</td>
+                    <td>${f.credito.toFixed(2)}</td>
+                 </tr>`;
+    });
+
+    html += `<tr class="fila-totales-libro">
+                <td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL (${periodoActivo}):</td>
+                <td>${totalD.toFixed(2)}</td>
+                <td>${totalC.toFixed(2)}</td>
+             </tr></tbody></table>`;
+    
+    div.innerHTML = html;
+    }
+    
 async function guardarAsiento() {
     // 1. BLOQUEO DE BOTÓN
     const btnGuardar = document.getElementById('btnGuardar') || document.querySelector('button[onclick="guardarAsiento()"]');
@@ -996,7 +1040,8 @@ async function generarMayor() {
         }
     }
 }
-      async function ejecutarAsignacionDesdeHistorial() {
+
+    async function ejecutarAsignacionDesdeHistorial() {
     try {
         const inputElement = document.getElementById('input-periodo-nuevo');
         let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
@@ -1006,41 +1051,39 @@ async function generarMayor() {
             return;
         }
 
-        // --- CAMBIO CLAVE: YA NO USAMOS SUPABASE PARA EL PERIODO ---
-        // Obtenemos el ID del usuario actual para que su periodo sea ÚNICO
+        // 1. Guardar en el dispositivo del usuario
         const userId = localStorage.getItem('usuario_id') || 'usuario_generico';
-
-        // Guardamos el periodo en el navegador del usuario (LocalStorage)
         localStorage.setItem(`periodo_activo_${userId}`, nuevoMes);
 
-        // Actualizamos variable global para el uso inmediato
+        // 2. Actualizar la variable global que usan los filtros
         periodoActivo = nuevoMes;
         
+        // 3. CERRAR MODAL (si existe la función)
+        if (typeof cerrarModalPeriodo === 'function') {
+            cerrarModalPeriodo();
+        } else {
+            document.getElementById('modal-periodo').style.display = 'none';
+        }
+
+        // 4. LLAMAR A LA FUNCIÓN QUE PINTA LOS TEXTOS
+        await cargarDatosEmpresa(); 
+
         await Swal.fire({
             title: "Periodo Activado",
-            text: "Cargando tu periodo: " + nuevoMes,
+            text: "Ahora trabajas en: " + nuevoMes,
             icon: "success",
             timer: 1000,
             showConfirmButton: false
         });
 
-        // En lugar de location.reload() que es lento, 
-        // actualizamos los textos y cerramos el modal
-        document.getElementById('textoPeriodoDiario').innerText = `Periodo: ${nuevoMes}`;
-        if(document.getElementById('mayorPeriodoHeader')) {
-            document.getElementById('mayorPeriodoHeader').innerText = nuevoMes;
-        }
-        
-        if (typeof cerrarModalPeriodo === 'function') cerrarModalPeriodo();
-        
-        // Refrescamos el libro diario con el nuevo periodo
-        if (typeof consultarLibroDiario === 'function') await consultarLibroDiario();
-        
+        // 5. Opcional: Refrescar el libro diario automáticamente
+        if (typeof consultarLibroDiario === 'function') consultarLibroDiario();
+
     } catch (err) {
         console.error("Error al activar:", err);
         Swal.fire("Error", "No se pudo activar: " + err.message, "error");
     }
-      }
+        }
     
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {

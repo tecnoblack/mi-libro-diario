@@ -451,29 +451,39 @@ function ocultarSplash() {
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
-    // --- LÓGICA CONTABLE ---
     async function cargarDatosEmpresa() {
-        try {
-            const { data, error } = await _supabase
-                .from('empresa')
-                .select('*')
-                .single();
+    try {
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('*')
+            .single();
 
-            if (error) throw error;
+        if (error) throw error;
 
-            if (data) {
-                document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
-                const periodo = data.periodo || 'ENERO 2025';
-                const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
-                ids.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerText = periodo;
-                });
-            }
-        } catch (err) {
-            console.error("Error al cargar empresa:", err);
+        if (data) {
+            // El nombre de la empresa sí puede ser global
+            document.getElementById('nombreEmpresaHeader').innerText = data.nombre || 'MI EMPRESA';
+            
+            // --- CAMBIO CLAVE: LEER PERIODO INDIVIDUAL ---
+            const userId = localStorage.getItem('usuario_id') || 'global';
+            const periodoIndividual = localStorage.getItem(`periodo_activo_${userId}`) || '---';
+            
+            // Guardamos en la variable global para que el resto de la app lo use
+            periodoActivo = periodoIndividual;
+
+            const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    // Si el periodo es "---", mostramos eso, si no, el periodo guardado
+                    el.innerText = periodoIndividual === '---' ? '---' : periodoIndividual;
+                }
+            });
         }
-    } // <-- ESTA LLAVE CIERRA LA FUNCIÓN CORRECTAMENTE
+    } catch (err) {
+        console.error("Error al cargar empresa:", err);
+    }
+        }
 
     async function guardarDatosEmpresa() {
         const n = document.getElementById('empresaNombre').innerText;

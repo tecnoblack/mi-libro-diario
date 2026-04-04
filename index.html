@@ -756,26 +756,31 @@ function actualizarTotales() {
 } // <-- ESTA ES LA LLAVE QUE CIERRA LA FUNCIÓN COMPLETA
 
          async function guardarAsiento() {
-    // Buscamos el botón por el ID que tienes en tu HTML: "btnGuardar"
+    // 1. Verificar que el botón existe
     const btn = document.getElementById('btnGuardar');
     
+    // 2. Intentar obtener el periodo (Si esto falla, el botón no hará nada)
+    let periodoActivo = "";
     try {
-        // 1. Verificar Periodo
         const elPeriodo = document.getElementById('textoPeriodoDiario');
-        const periodo = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
-        
-        if (!periodo || periodo === "" || periodo.includes("---")) {
-            Swal.fire("Aviso", "Seleccione un periodo en el historial primero", "warning");
-            return;
-        }
+        periodoActivo = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+    } catch (e) {
+        console.error("Error al obtener periodo:", e);
+    }
 
-        // 2. Bloqueo de seguridad para evitar duplicados y mezclas
-        if (btn) { 
-            btn.disabled = true; 
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...'; 
-        }
+    if (!periodoActivo || periodoActivo === "" || periodoActivo.includes("---")) {
+        Swal.fire("Aviso", "Seleccione un periodo en el historial primero", "warning");
+        return;
+    }
 
-        // 3. Capturar datos del encabezado
+    // 3. Bloqueo del botón
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Guardando...';
+    }
+
+    try {
+        // 4. Datos del encabezado
         const headerAsiento = document.getElementById('num-asiento-header').innerText;
         const numAsiento = parseInt(headerAsiento.replace(/\D/g, "")) || 1;
         const glosa = document.getElementById('resumenAsiento')?.value || "";
@@ -785,10 +790,9 @@ function actualizarTotales() {
         let sumaDebe = 0;
         let sumaHaber = 0;
 
-        // 4. Procesar filas
+        // 5. Recolectar datos
         filas.forEach(f => {
             const cuenta = f.querySelector('.txt-cuenta')?.innerText.trim();
-            // Limpieza de puntos y comas para números
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
@@ -810,48 +814,44 @@ function actualizarTotales() {
                     ref: f.querySelector('.col-ref')?.innerText || "-",
                     debito: d,
                     credito: c,
-                    periodo: periodo,
+                    periodo: periodoActivo,
                     descripcion: glosa
                 });
             }
         });
 
-        // 5. Validación de Cuadre
+        // 6. Validar Cuadre
         if (Math.abs(sumaDebe - sumaHaber) > 0.01) {
-            throw new Error(`Asiento DESCUADRADO: Debe ${sumaDebe.toFixed(2)} | Haber ${sumaHaber.toFixed(2)}`);
+            throw new Error("El asiento está descuadrado.");
         }
 
-        if (datos.length === 0) throw new Error("No hay datos válidos para guardar");
+        if (datos.length === 0) throw new Error("No hay datos para guardar.");
 
-        // 6. Guardar en Supabase
+        // 7. Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // 7. ÉXITO
+        // 8. Éxito y Limpieza
         await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1000, showConfirmButton: false });
 
-        // --- LIMPIEZA TOTAL DEL EDITOR ---
-        // Borramos el contenido de la tabla para que no queden datos viejos
-        const tablaCuerpo = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
-        if (tablaCuerpo) tablaCuerpo.innerHTML = "";
+        // Vaciamos la tabla
+        const tabla = document.querySelector('#tabla-asiento-diario tbody');
+        if (tabla) tabla.innerHTML = "";
         
         if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = "";
-        if (document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
-        if (document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
-
-        // --- ACTUALIZAR Y SALTAR ---
+        
+        // Actualizamos número y refrescamos
         if (typeof actualizarNumeroAsientoAutomatico === "function") await actualizarNumeroAsientoAutomatico();
-        if (typeof agregarFila === "function") agregarFila(); // Añade la primera fila limpia
-        if (typeof consultarLibroDiario === "function") await consultarLibroDiario(); // Refresca la tabla de registros
+        if (typeof agregarFila === "function") agregarFila();
+        if (typeof consultarLibroDiario === "function") await consultarLibroDiario();
 
-        // SALTO AUTOMÁTICO A LA VISTA DEL LIBRO DIARIO
+        // SALTO DE VISTA
         if (typeof cambiarVista === "function") cambiarVista('vista-diario');
 
     } catch (err) {
-        console.error(err);
         Swal.fire("Atención", err.message, "error");
     } finally {
-        // El bloque FINALLY siempre se ejecuta, pase lo que pase
+        // Esto asegura que el botón SIEMPRE se reactive
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = "Guardar Asiento";

@@ -728,7 +728,32 @@ function actualizarTotales() {
     if (!periodoActivo || periodoActivo === "---") {
         div.innerHTML = "<p style='text-align:center;'>Seleccione un periodo.</p>";
         return;
-    }
+    } // <-- Esta cerraba el IF
+
+    const { data, error } = await _supabase
+        .from('asientos')
+        .select('*')
+        .eq('periodo', periodoActivo) 
+        .order('asiento_id', { ascending: true })
+        .order('id', { ascending: true });
+
+    if (error) { div.innerHTML = "Error."; return; }
+
+    let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+    let ultimoId = null, totalD = 0, totalC = 0;
+
+    data.forEach(f => {
+        if (f.asiento_id !== ultimoId) {
+            html += `<tr class="fila-asiento-header"><td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td><td colspan="5">Asiento N° ${f.asiento_id} — ${f.descripcion}</td></tr>`;
+            ultimoId = f.asiento_id;
+        }
+        totalD += f.debito; totalC += f.credito;
+        html += `<tr><td class="col-select"></td><td>${f.fecha}</td><td>${f.cuenta}</td><td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td><td>${f.debito.toFixed(2)}</td><td>${f.credito.toFixed(2)}</td></tr>`;
+    });
+
+    html += `<tr class="fila-totales-libro"><td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL:</td><td>${totalD.toFixed(2)}</td><td>${totalC.toFixed(2)}</td></tr></tbody></table>`;
+    div.innerHTML = html;
+} // <-- ESTA ES LA LLAVE QUE CIERRA LA FUNCIÓN COMPLETA
 
          async function guardarAsiento() {
     // Buscamos el botón por el ID que tienes en tu HTML: "btnGuardar"

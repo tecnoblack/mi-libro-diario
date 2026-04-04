@@ -986,8 +986,7 @@ async function generarMayor() {
         }
     }
 }
-      // 4. FUNCIÓN PARA ASIGNAR MES
- async function ejecutarAsignacionDesdeHistorial() {
+      async function ejecutarAsignacionDesdeHistorial() {
     try {
         const inputElement = document.getElementById('input-periodo-nuevo');
         let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
@@ -997,36 +996,42 @@ async function generarMayor() {
             return;
         }
 
-        // --- CAMBIO CLAVE: USAMOS UPSERT ---
-        // Esto asegura que si no existe la fila con ID 1, la cree en ese momento.
-        const { error } = await _supabase
-            .from('empresa')
-            .upsert({ 
-                id: 1, 
-                periodo_actual: nuevoMes 
-            }, { onConflict: 'id' });
+        // --- CAMBIO CLAVE: YA NO USAMOS SUPABASE PARA EL PERIODO ---
+        // Obtenemos el ID del usuario actual para que su periodo sea ÚNICO
+        const userId = localStorage.getItem('usuario_id') || 'usuario_generico';
 
-        if (error) throw error;
+        // Guardamos el periodo en el navegador del usuario (LocalStorage)
+        localStorage.setItem(`periodo_activo_${userId}`, nuevoMes);
 
-        // Actualizamos variable global y textos antes de recargar
+        // Actualizamos variable global para el uso inmediato
         periodoActivo = nuevoMes;
         
         await Swal.fire({
             title: "Periodo Activado",
-            text: "Sincronizando: " + nuevoMes,
+            text: "Cargando tu periodo: " + nuevoMes,
             icon: "success",
             timer: 1000,
             showConfirmButton: false
         });
 
-        // Al recargar, cargarDatosEmpresaVisual() leerá el valor que acabamos de guardar
-        location.reload();
+        // En lugar de location.reload() que es lento, 
+        // actualizamos los textos y cerramos el modal
+        document.getElementById('textoPeriodoDiario').innerText = `Periodo: ${nuevoMes}`;
+        if(document.getElementById('mayorPeriodoHeader')) {
+            document.getElementById('mayorPeriodoHeader').innerText = nuevoMes;
+        }
+        
+        if (typeof cerrarModalPeriodo === 'function') cerrarModalPeriodo();
+        
+        // Refrescamos el libro diario con el nuevo periodo
+        if (typeof consultarLibroDiario === 'function') await consultarLibroDiario();
         
     } catch (err) {
         console.error("Error al activar:", err);
-        Swal.fire("Error", "No se pudo guardar: " + err.message, "error");
+        Swal.fire("Error", "No se pudo activar: " + err.message, "error");
     }
- }
+      }
+    
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
     try {

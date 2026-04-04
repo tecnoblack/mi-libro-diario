@@ -755,106 +755,128 @@ function actualizarTotales() {
     div.innerHTML = html;
 } // <-- ESTA ES LA LLAVE QUE CIERRA LA FUNCIÓN COMPLETA
 
-         async function guardarAsiento() {
-    // 1. Verificar que el botón existe
+          async function guardarAsiento() {
+    // 1. BLOQUEO DEL BOTÓN (Para evitar duplicados)
     const btn = document.getElementById('btnGuardar');
-    
-    // 2. Intentar obtener el periodo (Si esto falla, el botón no hará nada)
-    let periodoActivo = "";
-    try {
-        const elPeriodo = document.getElementById('textoPeriodoDiario');
-        periodoActivo = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
-    } catch (e) {
-        console.error("Error al obtener periodo:", e);
-    }
-
-    if (!periodoActivo || periodoActivo === "" || periodoActivo.includes("---")) {
-        Swal.fire("Aviso", "Seleccione un periodo en el historial primero", "warning");
-        return;
-    }
-
-    // 3. Bloqueo del botón
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = 'Guardando...';
     }
 
     try {
-        // 4. Datos del encabezado
-        const headerAsiento = document.getElementById('num-asiento-header').innerText;
-        const numAsiento = parseInt(headerAsiento.replace(/\D/g, "")) || 1;
-        const glosa = document.getElementById('resumenAsiento')?.value || "";
+        // 1. Verificar periodo activo
+        const elementoPeriodo = document.getElementById('textoPeriodoDiario');
+        const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
+        if (!periodoActivo || periodoActivo.includes("---") || periodoActivo === "") {
+            Swal.fire("Aviso", "Seleccione un periodo en el Historial antes de guardar", "warning"); 
+            return;
+        }
+
+        // 2. Obtener el número de asiento del encabezado
+        const headerTexto = document.getElementById('num-asiento-header').innerText;
+        const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
+
+        // 3. Recolectar datos de las filas
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
-        let sumaDebe = 0;
-        let sumaHaber = 0;
+        const glosa = document.getElementById('resumenAsiento')?.value || "";
+        
+        // Variables para VALIDACIÓN DE CUADRE
+        let acumuladoDebe = 0;
+        let acumuladoHaber = 0;
 
-        // 5. Recolectar datos
-        filas.forEach(f => {
-            const cuenta = f.querySelector('.txt-cuenta')?.innerText.trim();
+        for (let f of filas) {
+            const elCuenta = f.querySelector('.txt-cuenta');
+            const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
+            
+            // Manteniendo tu lógica de reemplazo de comas
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
+            
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
+            let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
-                sumaDebe += d;
-                sumaHaber += c;
-                
-                let fEnvio = fechaRaw;
-                if (fechaRaw.includes('/')) {
-                    const p = fechaRaw.split('/');
-                    fEnvio = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+                acumuladoDebe += d;
+                acumuladoHaber += c;
+
+                if (celdaRef && celdaRef.innerText.trim() === "") {
+                    await asignarRefInteligente(elCuenta);
                 }
 
-                datos.push({
-                    asiento_id: numAsiento,
-                    fecha: fEnvio,
-                    cuenta: cuenta,
-                    ref: f.querySelector('.col-ref')?.innerText || "-",
-                    debito: d,
-                    credito: c,
-                    periodo: periodoActivo,
+                let fechaEnvio = fechaRaw;
+                if (fechaRaw.includes('/')) {
+                    const p = fechaRaw.split('/');
+                    fechaEnvio = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+                }
+
+                datos.push({ 
+                    asiento_id: numeroAsientoActual,
+                    fecha: fechaEnvio, 
+                    cuenta: cuenta, 
+                    ref: celdaRef ? celdaRef.innerText : "-", 
+                    debito: d, 
+                    credito: c, 
+                    periodo: periodoActivo, 
                     descripcion: glosa
                 });
             }
-        });
-
-        // 6. Validar Cuadre
-        if (Math.abs(sumaDebe - sumaHaber) > 0.01) {
-            throw new Error("El asiento está descuadrado.");
         }
 
-        if (datos.length === 0) throw new Error("No hay datos para guardar.");
+        // --- VALIDACIÓN DE CUADRE ---
+        if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
+            throw new Error(`Asiento DESCUADRADO. Debe: ${acumuladoDebe.toFixed(2)} | Haber: ${acumuladoHaber.toFixed(2)}`);
+        }
 
-        // 7. Guardar en Supabase
+        if (datos.length === 0) {
+            Swal.fire("Aviso", "El asiento está vacío o no tiene montos válidos", "warning");
+            return;
+        }
+
+        // 4. Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // 8. Éxito y Limpieza
-        await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1000, showConfirmButton: false });
+        // 5. ÉXITO
+        await Swal.fire({
+            title: "¡Guardado!",
+            text: `Asiento Nº ${numeroAsientoActual} registrado correctamente`,
+            icon: "success",
+            timer: 1500,
+            showConfirmButton: false
+        });
 
-        // Vaciamos la tabla
-        const tabla = document.querySelector('#tabla-asiento-diario tbody');
-        if (tabla) tabla.innerHTML = "";
-        
-        if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = "";
-        
-        // Actualizamos número y refrescamos
-        if (typeof actualizarNumeroAsientoAutomatico === "function") await actualizarNumeroAsientoAutomatico();
-        if (typeof agregarFila === "function") agregarFila();
+        // --- LIMPIEZA AUTOMÁTICA Y SALTO ---
+        const cuerpoTabla = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
+        if (cuerpoTabla) {
+            cuerpoTabla.innerHTML = ""; 
+            if (typeof agregarFila === "function") agregarFila(); 
+        }
+
+        const inputGlosa = document.getElementById('resumenAsiento');
+        if (inputGlosa) inputGlosa.value = "";
+
+        // Resetear totales visuales del editor (Debe/Haber abajo)
+        if(document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
+        if(document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
+
+        if (typeof actualizarNumeroAsientoAutomatico === "function") {
+            await actualizarNumeroAsientoAutomatico();
+        }
+
+        // Refrescar el Libro Diario y saltar a esa vista
         if (typeof consultarLibroDiario === "function") await consultarLibroDiario();
-
-        // SALTO DE VISTA
         if (typeof cambiarVista === "function") cambiarVista('vista-diario');
 
-    } catch (err) {
-        Swal.fire("Atención", err.message, "error");
+    } catch (e) { 
+        console.error("Error en guardado:", e);
+        Swal.fire("Atención", e.message, "error"); 
     } finally {
-        // Esto asegura que el botón SIEMPRE se reactive
+        // --- REACTIVAR BOTÓN ---
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = "Guardar Asiento";
+            btn.innerHTML = 'Guardar Asiento';
         }
     }
     }

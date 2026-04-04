@@ -738,7 +738,7 @@ function actualizarTotales() {
     }
 
 async function guardarAsiento() {
-    // 1. [NUEVO] BLOQUEO DE BOTÓN: Evita que el usuario guarde 2 o 3 veces lo mismo
+    // 1. BLOQUEO DE BOTÓN: Evita que el usuario guarde 2 o 3 veces lo mismo
     const btnGuardar = document.querySelector('button[onclick="guardarAsiento()"]') || document.getElementById('btnGuardarAsiento');
     if (btnGuardar) {
         if (btnGuardar.disabled) return; 
@@ -747,7 +747,6 @@ async function guardarAsiento() {
     }
 
     try {
-        // [INTACTO] Verificación de periodo
         const elementoPeriodo = document.getElementById('textoPeriodoDiario');
         const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
@@ -755,7 +754,6 @@ async function guardarAsiento() {
             throw new Error("Seleccione un periodo en el Historial antes de guardar");
         }
 
-        // [INTACTO] Obtener número de asiento
         const headerTexto = document.getElementById('num-asiento-header').innerText;
         const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
 
@@ -763,7 +761,6 @@ async function guardarAsiento() {
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
 
-        // [NUEVO] VARIABLES PARA VALIDAR CUADRE
         let acumuladoDebe = 0;
         let acumuladoHaber = 0;
 
@@ -771,7 +768,6 @@ async function guardarAsiento() {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
             
-            // [MEJORADO] Captura de montos con limpieza de puntos/comas
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             
@@ -779,15 +775,15 @@ async function guardarAsiento() {
             let celdaRef = f.querySelector('.col-ref');
 
             if (cuenta && (d > 0 || c > 0)) {
-                // Sumamos para validar cuadre después
                 acumuladoDebe += d;
                 acumuladoHaber += c;
 
                 if (celdaRef && celdaRef.innerText.trim() === "") {
-                    await asignarRefInteligente(elCuenta);
+                    if (typeof asignarRefInteligente === "function") {
+                        await asignarRefInteligente(elCuenta);
+                    }
                 }
 
-                // [INTACTO] Formatear fecha
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
                     const p = fechaRaw.split('/');
@@ -803,12 +799,12 @@ async function guardarAsiento() {
                     credito: c, 
                     periodo: periodoActivo, 
                     descripcion: glosa,
-                    created_at: new Date().toISOString() // [NUEVO] Para que no se pierda el orden
+                    created_at: new Date().toISOString()
                 });
             }
         }
 
-        // 2. [NUEVO] VALIDACIÓN DE CUADRE MATEMÁTICO
+        // 2. VALIDACIÓN DE CUADRE MATEMÁTICO
         const diferencia = Math.abs(acumuladoDebe - acumuladoHaber);
         if (diferencia > 0.01) {
             throw new Error(`Asiento DESCUADRADO. Debe: ${acumuladoDebe.toFixed(2)} | Haber: ${acumuladoHaber.toFixed(2)}`);
@@ -818,21 +814,20 @@ async function guardarAsiento() {
             throw new Error("El asiento está vacío o no tiene montos válidos");
         }
 
-        // [INTACTO] Guardar en Supabase
+        // Guardar en Supabase
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
-        // [INTACTO] Mensaje de éxito
         await Swal.fire({
             title: "¡Guardado!",
             text: `Asiento Nº ${numeroAsientoActual} registrado correctamente`,
             icon: "success",
-            timer: 2000,
+            timer: 1500, // Lo bajé un poco para que sea más rápido
             showConfirmButton: false
         });
 
-        // 3. [MEJORADO] LIMPIEZA PROFUNDA (Para que el usuario no tenga que recargar)
-        const cuerpoTabla = document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
+        // 3. LIMPIEZA PROFUNDA (Corregido con múltiples selectores para que no falle)
+        const cuerpoTabla = document.getElementById('contenedor-filas') || document.querySelector('#tabla-asiento-diario tbody') || document.querySelector('.tabla-asiento tbody');
         if (cuerpoTabla) {
             cuerpoTabla.innerHTML = ""; 
             if (typeof agregarFila === "function") agregarFila(); 
@@ -841,26 +836,28 @@ async function guardarAsiento() {
         const inputGlosa = document.getElementById('resumenAsiento');
         if (inputGlosa) inputGlosa.value = "";
 
-        // [NUEVO] Limpiar totales visuales del editor
         if(document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
         if(document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
 
-        // [INTACTO] Actualizar número
         if (typeof actualizarNumeroAsientoAutomatico === "function") {
             await actualizarNumeroAsientoAutomatico();
         }
+
+        // 4. EVITAR FUSIONES: Obligamos a la app a refrescar la base de datos y mandarte al historial
+        if (typeof consultarLibroDiario === "function") await consultarLibroDiario();
+        if (typeof cambiarVista === "function") cambiarVista('vista-diario');
 
     } catch (e) { 
         console.error("Error en guardado:", e);
         Swal.fire("Atención", e.message, "error"); 
     } finally {
-        // 4. [NUEVO] RE-ACTIVAR BOTÓN: Pase lo que pase, el botón vuelve a la vida
+        // RE-ACTIVAR BOTÓN
         if (btnGuardar) {
             btnGuardar.disabled = false;
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-            }
+    }
                 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

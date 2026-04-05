@@ -1876,44 +1876,42 @@ function irAMayor() {
     const nombreLimpio = nuevoNombre.trim();
     const userId = localStorage.getItem('usuario_id');
 
-    // 1. Validaciones mínimas
-    if (!userId || !nombreLimpio || nombreLimpio === "") return;
-    
-    // Evitamos guardar si es el nombre de ejemplo para que no se bloquee
-    if (nombreLimpio === "COMERCIAL A B C, C.A.") return;
+    // 1. Validaciones de salida rápida
+    if (!userId || !nombreLimpio || nombreLimpio === "COMERCIAL A B C, C.A." || nombreLimpio === "") {
+        return; 
+    }
+
+    // 2. Actualización VISUAL inmediata (para evitar que se borre al ojo del usuario)
+    const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = nombreLimpio;
+    });
 
     try {
-        // Intentamos actualizar la fila de este usuario
-        const { data, error: updateError } = await _supabase
-            .from('empresa')
-            .update({ nombre: nombreLimpio })
-            .eq('usuario_id', userId);
-
-        // Si no existe (o hubo error), intentamos insertarlo como nuevo
-        // Usamos una consulta rápida para ver si existe
+        // 3. Guardado en Supabase usando una lógica de "si no existe, inserta; si existe, actualiza"
         const { data: existe } = await _supabase
             .from('empresa')
             .select('usuario_id')
             .eq('usuario_id', userId)
-            .single();
+            .maybeSingle();
 
-        if (!existe) {
+        if (existe) {
+            // Actualizar
+            await _supabase
+                .from('empresa')
+                .update({ nombre: nombreLimpio })
+                .eq('usuario_id', userId);
+        } else {
+            // Insertar nuevo
             await _supabase
                 .from('empresa')
                 .insert({ usuario_id: userId, nombre: nombreLimpio });
         }
-
-        // 2. Sincronizar visualmente al instante (Esto quita lo de "escribir 2 veces")
-        const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = nombreLimpio;
-        });
-
-        console.log("Nombre aceptado y guardado:", nombreLimpio);
-
+        
+        console.log("Nombre guardado permanentemente para el usuario:", userId);
     } catch (e) {
-        console.error("Error crítico al guardar nombre:", e);
+        console.error("Error al sincronizar con la base de datos:", e);
     }
     }
 
@@ -1956,7 +1954,7 @@ function irAMayor() {
 // IMPORTANTE: Ejecutar la función apenas cargue el script
 sincronizarNombresAlInicio();
 
-    async function cargarNombreEmpresaInicial() {
+ async function cargarNombreEmpresaInicial() {
     const userId = localStorage.getItem('usuario_id');
     if (!userId) return;
 
@@ -1965,18 +1963,23 @@ sincronizarNombresAlInicio();
             .from('empresa')
             .select('nombre')
             .eq('usuario_id', userId)
-            .maybeSingle(); // maybeSingle evita errores si no encuentra nada
+            .maybeSingle();
 
         if (data && data.nombre) {
-            ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'].forEach(id => {
+            // Ponemos el nombre guardado en todos los IDs
+            const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
+            ids.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = data.nombre;
             });
         }
     } catch (e) {
-        console.log("Configurando primer nombre para el usuario.");
+        console.log("Error al cargar nombre inicial:", e);
     }
-    }
+}
+
+// Llama a la función al final del script para que se ejecute al abrir
+cargarNombreEmpresaInicial();
     
 </script>
 

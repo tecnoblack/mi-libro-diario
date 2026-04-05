@@ -1868,22 +1868,33 @@ function irAMayor() {
 
     async function actualizarNombreEmpresaGlobal(nuevoNombre) {
     const nombreLimpio = nuevoNombre.trim();
-    if (!nombreLimpio) return;
+    const userId = localStorage.getItem('usuario_id');
+
+    // Validaciones básicas
+    if (!userId) return;
+    if (!nombreLimpio || nombreLimpio === "---" || nombreLimpio === "COMERCIAL A B C, C.A.") return;
 
     try {
-        // Guardar en Supabase
-        await _supabase.from('empresa').update({ "nombre": nombreLimpio }).eq('id', 1);
+        // Usamos UPSERT: Si el usuario_id ya existe, actualiza el nombre. Si no, crea la fila.
+        const { error } = await _supabase
+            .from('empresa')
+            .upsert({ 
+                usuario_id: userId, 
+                nombre: nombreLimpio 
+            }, { onConflict: 'usuario_id' }); 
 
-        // ACTUALIZACIÓN EN CALIENTE:
-        // Esto cambia los otros títulos sin esperar a recargar la página
+        if (error) throw error;
+
+        // Sincronizar los otros encabezados visualmente
         const ids = ['mayorEmpresaNombre', 'balance-empresa-nombre'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = nombreLimpio;
         });
 
+        console.log("Nombre sincronizado para el usuario:", userId);
     } catch (e) {
-        console.error("Error al guardar:", e);
+        console.error("Error al guardar:", e.message);
     }
     }
 

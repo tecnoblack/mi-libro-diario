@@ -797,7 +797,6 @@ function actualizarTotales() {
             throw new Error("Seleccione un periodo antes de guardar");
         }
 
-        // Leemos el número que calculó la función automática
         const headerTexto = document.getElementById('num-asiento-header').innerText;
         const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
 
@@ -805,14 +804,24 @@ function actualizarTotales() {
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
 
+        // VARIABLES PARA VALIDAR EL CUADRE
+        let acumuladoDebe = 0;
+        let acumuladoHaber = 0;
+
         for (let f of filas) {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
+            
+            // Limpieza de formato numérico (quitar puntos de miles y cambiar coma por punto decimal)
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
 
             if (cuenta && (d > 0 || c > 0)) {
+                // Sumamos a los acumuladores
+                acumuladoDebe += d;
+                acumuladoHaber += c;
+
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
                     const p = fechaRaw.split('/');
@@ -832,8 +841,15 @@ function actualizarTotales() {
             }
         }
 
+        // --- VALIDACIÓN DE CUADRE (EL BLOQUE QUE FALTABA) ---
+        // Usamos Math.abs para evitar problemas de micro-decimales en JS
+        if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
+            throw new Error(`Asiento DESCUADRADO. <br><br><b>Debe:</b> ${acumuladoDebe.toLocaleString('de-DE', {minimumFractionDigits:2})} <br><b>Haber:</b> ${acumuladoHaber.toLocaleString('de-DE', {minimumFractionDigits:2})}`);
+        }
+
         if (datos.length === 0) throw new Error("El asiento está vacío");
 
+        // GUARDAR EN SUPABASE
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
@@ -844,7 +860,6 @@ function actualizarTotales() {
         if (contenedor) contenedor.innerHTML = ""; 
         if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = "";
 
-        // REINICIAR NÚMERO PARA EL PRÓXIMO ASIENTO
         await actualizarNumeroAsientoAutomatico(); 
         await consultarLibroDiario();
         if (typeof agregarFila === 'function') agregarFila(); 
@@ -852,14 +867,15 @@ function actualizarTotales() {
         cambiarVista('vista-diario');
 
     } catch (e) { 
-        Swal.fire("Atención", e.message, "error"); 
+        // Usamos HTML en el SweetAlert para que los saltos de línea del error de cuadre se vean bien
+        Swal.fire({ title: "Atención", html: e.message, icon: "error" }); 
     } finally {
         if (btnGuardar) {
             btnGuardar.disabled = false;
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-    }
+            }
                 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

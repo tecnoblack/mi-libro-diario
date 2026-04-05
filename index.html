@@ -1484,44 +1484,47 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     }
 }
 
-async function verDetalleReporteHistorial(tipo, periodoDesdeFila = null) {
-    // Si periodoDesdeFila tiene algo (viene del clic en la lista), usamos ese.
-    // Si no, buscamos la variable global periodoSeleccionadoHistorial que usa tu app.
-    const periodoABuscar = periodoDesdeFila || (typeof periodoSeleccionadoHistorial !== 'undefined' ? periodoSeleccionadoHistorial : "");
-
-    if (!periodoABuscar || periodoABuscar === "---") {
-        Swal.fire("Error", "Seleccione un cierre del historial primero.", "error");
-        return;
-    }
-
-    // Actualizamos visualmente el header para que sepas que estás viendo el PASADO
-    if(document.getElementById('textoPeriodoDiario')) {
-        document.getElementById('textoPeriodoDiario').innerText = periodoABuscar;
-    }
+async function verDetalleReporte(tipo) {
+    // 1. Obtenemos el nombre del mes (ej: MARZO 2026) y le ponemos el prefijo de la DB
+    const periodoOriginal = periodoSeleccionadoHistorial.trim(); 
+    const periodoArchivado = 'ARCHIVADO_' + periodoOriginal;
 
     if (tipo === 'diario') {
+        // Configuramos la vista del diario para historial
+        if(document.getElementById('textoPeriodoDiario')) {
+            document.getElementById('textoPeriodoDiario').innerText = periodoArchivado;
+        }
         cambiarVista('vista-diario');
-        // Usamos el parámetro periodoABuscar directamente en la consulta
+        
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoABuscar); // Aquí busca el mes viejo correctamente
+            .eq('periodo', periodoArchivado);
         
-        if (error) return console.error(error);
+        if (error) return console.error("Error diario historial:", error);
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
+        // Configuramos la vista del mayor para historial
         if(document.getElementById('mayorPeriodoHeader')) {
-            document.getElementById('mayorPeriodoHeader').innerText = periodoABuscar;
+            document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
         }
-        cambiarVista('vista-mayor');
-        // Limpiar para que el usuario elija cuenta del mes viejo
+        
+        // Limpiamos el mayor antes de mostrarlo
         const divRes = document.getElementById('resultado-mayor');
-        if(divRes) divRes.innerHTML = "<p style='text-align:center;'>Viendo historial de: " + periodoABuscar + "</p>";
+        if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta.</p>";
+        
+        cambiarVista('vista-mayor');
+        
+        // IMPORTANTE: Si tienes una función para cargar las cuentas del mayor, 
+        // deberías pasarle 'periodoArchivado' aquí.
 
     } else if (tipo === 'balance') {
+        // Vamos a la sección de balance
         cambiarVista('vista-balance'); 
-        if (typeof generarBalance === 'function') generarBalance(periodoABuscar);
+        
+        // LLAMAMOS AL BALANCE PASÁNDOLE EL NOMBRE DEL ARCHIVADO
+        generarBalance(periodoArchivado);
     }
 }
     

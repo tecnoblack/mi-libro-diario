@@ -1813,6 +1813,10 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
+        // 1. Intentamos sacar el periodo de tu memoria privada primero
+        const userId = localStorage.getItem('usuario_id');
+        const periodoPrivado = localStorage.getItem(`periodo_activo_${userId}`);
+
         const { data, error } = await _supabase
             .from('empresa')
             .select('*')
@@ -1821,13 +1825,18 @@ async function actualizarNumeroAsientoAutomatico() {
 
         if (error) throw error;
 
-        // Si data existe y tiene un periodo_actual que no sea vacío ni "---"
+        // 2. LÓGICA DE PRIORIDAD:
+        // Si tienes un periodo guardado en el teléfono, usamos ESE.
+        // Si no tienes nada (primera vez), usamos lo que diga la DB.
         let p = "---";
-        if (data && data.periodo_actual && data.periodo_actual.trim() !== "" && data.periodo_actual !== "---") {
+        
+        if (periodoPrivado && periodoPrivado !== "---") {
+            p = periodoPrivado;
+        } else if (data && data.periodo_actual && data.periodo_actual !== "---") {
             p = data.periodo_actual;
         }
 
-        periodoActivo = p; // Sincronizamos la variable global
+        periodoActivo = p; // Sincronizamos la variable global para que todo funcione
 
         const etiquetas = [
             'textoPeriodoDiario', 
@@ -1840,17 +1849,26 @@ async function actualizarNumeroAsientoAutomatico() {
         etiquetas.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.innerText = p;
+                // Si el ID es textoPeriodoDiario, le ponemos el prefijo "Periodo: "
+                if (id === 'textoPeriodoDiario') {
+                    el.innerText = `Periodo: ${p}`;
+                } else {
+                    el.innerText = p;
+                }
                 el.style.color = (p === "---") ? "#94a3b8" : "#1e293b";
             }
         });
 
-        // Si tenemos nombre y rif, los ponemos también
-        if (data && data.nombre) document.getElementById('empresaNombre').innerText = data.nombre;
-        if (data && data.rif) document.getElementById('empresaRif').innerText = data.rif;
+        // Nombre y RIF (Esto sigue siendo global, está bien)
+        if (data) {
+            if (data.nombre && document.getElementById('empresaNombre')) 
+                document.getElementById('empresaNombre').innerText = data.nombre;
+            if (data.rif && document.getElementById('empresaRif')) 
+                document.getElementById('empresaRif').innerText = data.rif;
+        }
 
     } catch (e) { 
-        console.error("Error de carga:", e); 
+        console.error("Error de carga visual:", e); 
     }
     }
     

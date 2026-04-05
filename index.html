@@ -386,9 +386,8 @@ function ocultarSplash() {
     try {
         if (estadoTexto) estadoTexto.innerText = "Validando credenciales...";
 
-        // --- LÍNEA CRÍTICA PARA LA PERSISTENCIA ---
-        // Guardamos el ID del usuario para que el LocalStorage sepa a quién pertenece el periodo
-        localStorage.setItem('usuario_id', userId); 
+        // --- CAMBIO CLAVE: GUARDAR ID DE USUARIO ---
+        localStorage.setItem('usuario_id', userId);
 
         const { data: perfil, error } = await _supabase
             .from('perfiles')
@@ -398,61 +397,55 @@ function ocultarSplash() {
         
         if (error) throw error;
         
-        // 1. SI NO ESTÁ REGISTRADO
         if (!perfil) {
             ocultarSplash(); 
-            await Swal.fire("Acceso Restringido", "No tienes un perfil creado. Contacta al administrador.", "error");
+            await Swal.fire("Acceso Restringido", "No tienes un perfil creado.", "error");
             await _supabase.auth.signOut();
             cambiarVista('vista-login');
             return;
         }
         
-        // 2. CONTROL DE DISPOSITIVO
+        // CONTROL DE DISPOSITIVO (Tu lógica original)
         if (!perfil.last_device_id) {
             await _supabase.from('perfiles').update({ last_device_id: currentDevice }).eq('id', userId);
         } else if (perfil.last_device_id !== currentDevice) {
             ocultarSplash(); 
-            await Swal.fire("Dispositivo no autorizado", "Esta cuenta ya está vinculada a otro equipo.", "warning");
+            await Swal.fire("Dispositivo no autorizado", "Cuenta vinculada a otro equipo.", "warning");
             await _supabase.auth.signOut();
             cambiarVista('vista-login');
             return;
         }
         
-        // 3. SI LA SUSCRIPCIÓN NO ESTÁ ACTIVA
         if (!perfil.suscripcion_activa) {
             ocultarSplash(); 
-            await Swal.fire({
-                title: "Suscripción Vencida",
-                text: "Tu acceso ha expirado. Por favor, renueva tu suscripción para continuar.",
-                icon: "info",
-                confirmButtonText: "Entendido"
-            });
+            await Swal.fire("Suscripción Vencida", "Tu acceso ha expirado.", "info");
             await _supabase.auth.signOut();
             cambiarVista('vista-login');
             return;
         }
 
-        // --- CARGA DE DATOS ---
         if (estadoTexto) estadoTexto.innerText = "Sincronizando datos...";
         
-        // Esta función ahora leerá el periodo del LocalStorage correctamente
+        // --- CAMBIO CLAVE: RECUPERAR PERIODO AL RECARGAR ---
+        const periodoGuardado = localStorage.getItem(`periodo_activo_${userId}`);
+        if (periodoGuardado) {
+            periodoActivo = periodoGuardado;
+        }
+
         await cargarDatosEmpresaVisual(); 
         await cargarDiccionarioCuentas();
         await actualizarNumeroAsientoAutomatico(); 
         
         cambiarVista('vista-menu');
-        
-        setTimeout(() => {
-            ocultarSplash();
-        }, 800); 
+        setTimeout(() => ocultarSplash(), 800); 
 
     } catch (err) {
-        console.error("Error en verificación:", err);
+        console.error("Error:", err);
         ocultarSplash(); 
         await _supabase.auth.signOut();
         cambiarVista('vista-login');
     }
-    }
+   }
 
     async function cerrarSesion() { await _supabase.auth.signOut(); location.reload(); }
 
@@ -1094,43 +1087,40 @@ async function generarMayor() {
         let nuevoMes = inputElement ? inputElement.value.trim().toUpperCase() : "";
 
         if (!nuevoMes || nuevoMes === "---") {
-            Swal.fire("Aviso", "Escribe un periodo válido.", "warning");
+            Swal.fire("Aviso", "Por favor, escribe un periodo válido.", "warning");
             return;
         }
 
-        // 1. Guardamos en la memoria del teléfono
-        localStorage.setItem('mi_periodo_contable', nuevoMes);
-        
-        // 2. Actualizamos la variable global para que los filtros funcionen
+        // --- CAMBIO CLAVE: GUARDAR EN MEMORIA PRIVADA ---
+        const userId = localStorage.getItem('usuario_id') || 'usuario_generico';
+        localStorage.setItem(`periodo_activo_${userId}`, nuevoMes);
+
         periodoActivo = nuevoMes;
-
-        // 3. ¡ESTO ES LO QUE FALTA EN TU VIDEO! 
-        // Actualizamos los textos de la pantalla manualmente para que cambien ya mismo
-        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'periodoAsientoManual', 'periodoSeleccionadoHistorial'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = nuevoMes; 
-        });
-
-        // 4. Cerramos el modal de carga
-        if (typeof cerrarModalPeriodo === 'function') cerrarModalPeriodo();
-
+        
+        // Actualizamos los textos inmediatamente
+        document.getElementById('textoPeriodoDiario').innerText = `Periodo: ${nuevoMes}`;
+        if(document.getElementById('mayorPeriodoHeader')) {
+            document.getElementById('mayorPeriodoHeader').innerText = nuevoMes;
+        }
+        
         await Swal.fire({
             title: "Periodo Activado",
-            text: "Ahora trabajas en: " + nuevoMes,
+            text: "Cargando tu periodo: " + nuevoMes,
             icon: "success",
             timer: 1000,
             showConfirmButton: false
         });
 
-        // 5. Refrescamos el libro diario para que aparezca la tabla
+        if (typeof cerrarModalPeriodo === 'function') cerrarModalPeriodo();
+        
+        // Recargamos los registros para que la tabla se actualice con el nuevo mes
         if (typeof consultarLibroDiario === 'function') await consultarLibroDiario();
-
+        
     } catch (err) {
         console.error("Error al activar:", err);
-        Swal.fire("Error", "No se pudo activar.", "error");
+        Swal.fire("Error", "No se pudo activar: " + err.message, "error");
     }
-    }
+            }
     
     // --- PONER ESTO AL PRINCIPIO DEL SCRIPT ---
 async function cargarConfiguracionInicial() {
@@ -1300,18 +1290,14 @@ function mostrarOpcionesReporte() {
 }
 
 async function verDetalleReporte(tipo) {
-    // --- CAMBIO AQUÍ: Primero intentamos leer de la memoria local ---
-    let periodo = localStorage.getItem('mi_periodo_contable');
+    // 1. Obtenemos el periodo actual de la interfaz
+    const txtElement = document.getElementById('textoPeriodoDiario');
+    let periodo = txtElement ? txtElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "---";
 
-    // Si no hay nada en la memoria, intentamos leer de la interfaz como respaldo
-    if (!periodo || periodo === "---") {
-        const periodoRaw = document.getElementById('textoPeriodoDiario').innerText;
-        periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
-    }
-
-    if (!periodo || periodo === "---") {
-        Swal.fire("Aviso", "Por favor, asigne un periodo en el historial primero.", "warning");
-        return;
+    // Si por alguna razón el texto está vacío, intentamos sacarlo de la memoria
+    if (periodo === "---") {
+        const userId = localStorage.getItem('usuario_id');
+        periodo = localStorage.getItem(`periodo_activo_${userId}`) || "---";
     }
 
     if (tipo === 'diario') {
@@ -1326,13 +1312,13 @@ async function verDetalleReporte(tipo) {
     }
 
     try {
-        // Importante: Asegúrate que cargarRegistros() use la variable 'periodo' 
-        // o que lea también de localStorage.
+        // Sincronizamos la variable global antes de cargar
+        periodoActivo = periodo;
         await cargarRegistros();
     } catch (error) {
         console.error("Error al actualizar el reporte:", error);
     }
-            }
+}
     
 function mostrarAsientosEnTabla(datos, modoLectura = false) {
     const contenedor = document.getElementById('tabla-registros');

@@ -1844,18 +1844,18 @@ async function actualizarNumeroAsientoAutomatico() {
         etiquetas.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                // --- LIMPIEZA AGRESIVA ---
-                // Borra "PERIODO:", "Periodo:", "periodo:", "Periodo" y espacios extra
+                // 1. Limpiamos absolutamente todo lo que traiga la variable p
                 let pLimpio = p.replace(/periodo/gi, "").replace(/:/g, "").trim();
 
+                // 2. Si el elemento es el del Diario, inyectamos el formato desde cero
                 if (id === 'textoPeriodoDiario') {
-                    // Ahora sí, lo ponemos una sola vez y bien limpio
-                    el.innerText = `PERIODO: ${pLimpio}`;
+                    // Usamos .innerHTML para asegurar que sobrescribimos cualquier texto previo del HTML
+                    el.innerHTML = `PERIODO: <b>${pLimpio}</b>`;
                 } else {
                     el.innerText = pLimpio;
                 }
                 
-                el.style.color = (p === "---") ? "#94a3b8" : "#1e293b";
+                el.style.color = (pLimpio === "---" || pLimpio === "") ? "#94a3b8" : "#1e293b";
             }
         });
 

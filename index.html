@@ -814,6 +814,20 @@ function actualizarTotales() {
     
     async function guardarAsiento() {
     const btnGuardar = document.getElementById('btnGuardar') || document.querySelector('button[onclick="guardarAsiento()"]');
+    
+    // --- BLOQUE DE SEGURIDAD: VALIDACIÓN DE NOMBRE DE EMPRESA ---
+    const nombreEmpresaActual = document.getElementById('empresaNombre')?.innerText.trim() || "";
+    if (nombreEmpresaActual === "COMERCIAL A B C, C.A." || nombreEmpresaActual === "" || nombreEmpresaActual === "---") {
+        Swal.fire({
+            title: "Nombre de Empresa Requerido",
+            text: "Por favor, haga clic en el nombre de la empresa (arriba) y cámbielo por el nombre real antes de registrar asientos.",
+            icon: "warning",
+            confirmButtonText: "Entendido"
+        });
+        return; // Detiene la ejecución aquí
+    }
+    // ----------------------------------------------------------
+
     if (btnGuardar) {
         if (btnGuardar.disabled) return; 
         btnGuardar.disabled = true;
@@ -835,7 +849,6 @@ function actualizarTotales() {
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
 
-        // VARIABLES PARA VALIDAR EL CUADRE
         let acumuladoDebe = 0;
         let acumuladoHaber = 0;
 
@@ -843,13 +856,11 @@ function actualizarTotales() {
             const elCuenta = f.querySelector('.txt-cuenta');
             const cuenta = elCuenta ? elCuenta.innerText.trim() : "";
             
-            // Limpieza de formato numérico (quitar puntos de miles y cambiar coma por punto decimal)
             const d = parseFloat(f.querySelector('.val-debito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const c = parseFloat(f.querySelector('.val-credito').innerText.replace(/\./g, '').replace(',', '.')) || 0;
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
 
             if (cuenta && (d > 0 || c > 0)) {
-                // Sumamos a los acumuladores
                 acumuladoDebe += d;
                 acumuladoHaber += c;
 
@@ -872,21 +883,17 @@ function actualizarTotales() {
             }
         }
 
-        // --- VALIDACIÓN DE CUADRE (EL BLOQUE QUE FALTABA) ---
-        // Usamos Math.abs para evitar problemas de micro-decimales en JS
         if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
             throw new Error(`Asiento DESCUADRADO. <br><br><b>Debe:</b> ${acumuladoDebe.toLocaleString('de-DE', {minimumFractionDigits:2})} <br><b>Haber:</b> ${acumuladoHaber.toLocaleString('de-DE', {minimumFractionDigits:2})}`);
         }
 
         if (datos.length === 0) throw new Error("El asiento está vacío");
 
-        // GUARDAR EN SUPABASE
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
         await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1500, showConfirmButton: false });
 
-        // LIMPIEZA Y ACTUALIZACIÓN
         const contenedor = document.getElementById('contenedor-filas');
         if (contenedor) contenedor.innerHTML = ""; 
         if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = "";
@@ -898,7 +905,6 @@ function actualizarTotales() {
         cambiarVista('vista-diario');
 
     } catch (e) { 
-        // Usamos HTML en el SweetAlert para que los saltos de línea del error de cuadre se vean bien
         Swal.fire({ title: "Atención", html: e.message, icon: "error" }); 
     } finally {
         if (btnGuardar) {
@@ -1936,6 +1942,33 @@ function irAMayor() {
 
 // IMPORTANTE: Ejecutar la función apenas cargue el script
 sincronizarNombresAlInicio();
+
+    async function cargarNombreEmpresaInicial() {
+    const userId = localStorage.getItem('usuario_id');
+    if (!userId) return;
+
+    try {
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('nombre')
+            .eq('usuario_id', userId)
+            .single();
+
+        if (data && data.nombre) {
+            const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = data.nombre;
+            });
+        }
+    } catch (e) {
+        // Si no hay datos, se queda el nombre por defecto hasta que el usuario escriba
+        console.log("Perfil de empresa nuevo para este usuario.");
+    }
+}
+
+// Ejecutar al cargar la app
+cargarNombreEmpresaInicial();
     
 </script>
 

@@ -1628,8 +1628,8 @@ async function confirmarEliminacion() {
 
 async function generarBalance(periodoManual = null) {
     const contenedor = document.getElementById('contenedor-balance');
-    const periodoAConsultar = periodoManual || periodoActivo;
-    const nombreEmpresa = document.getElementById('empresaNombre').innerText; // Captura nombre actual
+    const periodoAConsultar = periodoManual || document.getElementById('textoPeriodoDiario')?.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() || "";
+    const nombreEmpresa = document.getElementById('empresaNombre').innerText;
 
     try {
         if (!periodoAConsultar || periodoAConsultar === "---") {
@@ -1637,14 +1637,45 @@ async function generarBalance(periodoManual = null) {
             return;
         }
 
-        const { data, error } = await _supabase.from('asientos').select('*').eq('periodo', periodoAConsultar);
-        if (error) throw error;
+        contenedor.innerHTML = '<p style="text-align:center;">Cargando datos...</p>';
 
-        // --- CONSTRUCCIÓN DEL REPORTE PROFESIONAL ---
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('periodo', periodoAConsultar);
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            contenedor.innerHTML = `<p style="text-align:center; padding:20px;">No hay registros para <b>${periodoAConsultar}</b>.</p>`;
+            return;
+        }
+
+        const cuentas = {};
+
+        // 1. Procesar montos
+        data.forEach(reg => {
+            const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
+            const ref = reg.ref || "0";
+            if (!cuentas[nom]) {
+                cuentas[nom] = { ref: ref, debe: 0, haber: 0 };
+            }
+            cuentas[nom].debe += parseFloat(reg.debito) || 0;
+            cuentas[nom].haber += parseFloat(reg.credito) || 0;
+        });
+
+        // --- LA SOLUCIÓN AL ERROR DEL VIDEO ESTÁ AQUÍ ---
+        // Definimos la variable nombresOrdenados antes de usarla
+        const nombresOrdenados = Object.keys(cuentas).sort((a, b) => {
+            const refA = parseInt(cuentas[a].ref.toString().replace(/\D/g, "")) || 0;
+            const refB = parseInt(cuentas[b].ref.toString().replace(/\D/g, "")) || 0;
+            return refA - refB;
+        });
+
+        // 2. Construir el HTML usando la variable ya definida
         let tablaHtml = `
-            <div style="text-align:center; margin-bottom:20px; border-bottom: 2px solid var(--azul-pro); padding-bottom:10px;">
+            <div style="text-align:center; margin-bottom:20px; border-bottom: 2px solid #2563eb; padding-bottom:10px;">
                 <h2 style="margin:0; text-transform:uppercase;">${nombreEmpresa}</h2>
-                <h3 style="margin:5px 0; color:var(--azul-pro);">BALANCE DE COMPROBACIÓN</h3>
+                <h3 style="margin:5px 0; color:#2563eb;">BALANCE DE COMPROBACIÓN</h3>
                 <span style="font-size:0.9rem; color:#64748b;">PERIODO: ${periodoAConsultar.replace('ARCHIVADO_', '')}</span>
             </div>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
@@ -1657,9 +1688,6 @@ async function generarBalance(periodoManual = null) {
                     </tr>
                 </thead>
                 <tbody>`;
-
-        // ... (Tu lógica de procesamiento de cuentas se mantiene igual) ...
-        // (Asegúrate de incluir aquí el resto del código de sumas iguales y diferencias)
 
         let totalDebe = 0, totalHaber = 0;
 
@@ -1679,7 +1707,7 @@ async function generarBalance(periodoManual = null) {
             if (saldoFinal !== 0) {
                 tablaHtml += `
                     <tr>
-                        <td style="padding: 8px; border: 1px solid #ccc; font-weight: 500;">${nom}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${nom}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${c.ref}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${deudor}</td>
                         <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">${acreedor}</td>
@@ -1696,21 +1724,13 @@ async function generarBalance(periodoManual = null) {
             </tbody>
         </table>`;
 
-        // Indicador visual de cuadre
-        const diferencia = Math.abs(totalDebe - totalHaber);
-        if (diferencia > 0.01) {
-            tablaHtml += `<p style="color: red; font-weight: bold; text-align: center; margin-top: 10px;">⚠️ DIFERENCIA: ${diferencia.toFixed(2)}</p>`;
-        } else {
-            tablaHtml += `<p style="color: green; font-weight: bold; text-align: center; margin-top: 10px;">✅ BALANCE CUADRADO</p>`;
-        }
-
         contenedor.innerHTML = tablaHtml;
 
     } catch (err) {
         console.error("Fallo en Balance:", err);
         contenedor.innerHTML = `<p style="color:red; text-align:center;">Error: ${err.message}</p>`;
     }
-    }
+                }
     
 // ERROR 3 CORREGIDO: Tu función se llamaba 'generarBalanceGeneral' pero la definiste como 'generarBalance'
 function irABalance() {

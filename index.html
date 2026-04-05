@@ -1876,31 +1876,44 @@ function irAMayor() {
     const nombreLimpio = nuevoNombre.trim();
     const userId = localStorage.getItem('usuario_id');
 
-    // Validaciones básicas
-    if (!userId) return;
-    if (!nombreLimpio || nombreLimpio === "---" || nombreLimpio === "COMERCIAL A B C, C.A.") return;
+    // 1. Validaciones mínimas
+    if (!userId || !nombreLimpio || nombreLimpio === "") return;
+    
+    // Evitamos guardar si es el nombre de ejemplo para que no se bloquee
+    if (nombreLimpio === "COMERCIAL A B C, C.A.") return;
 
     try {
-        // Usamos UPSERT: Si el usuario_id ya existe, actualiza el nombre. Si no, crea la fila.
-        const { error } = await _supabase
+        // Intentamos actualizar la fila de este usuario
+        const { data, error: updateError } = await _supabase
             .from('empresa')
-            .upsert({ 
-                usuario_id: userId, 
-                nombre: nombreLimpio 
-            }, { onConflict: 'usuario_id' }); 
+            .update({ nombre: nombreLimpio })
+            .eq('usuario_id', userId);
 
-        if (error) throw error;
+        // Si no existe (o hubo error), intentamos insertarlo como nuevo
+        // Usamos una consulta rápida para ver si existe
+        const { data: existe } = await _supabase
+            .from('empresa')
+            .select('usuario_id')
+            .eq('usuario_id', userId)
+            .single();
 
-        // Sincronizar los otros encabezados visualmente
-        const ids = ['mayorEmpresaNombre', 'balance-empresa-nombre'];
+        if (!existe) {
+            await _supabase
+                .from('empresa')
+                .insert({ usuario_id: userId, nombre: nombreLimpio });
+        }
+
+        // 2. Sincronizar visualmente al instante (Esto quita lo de "escribir 2 veces")
+        const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = nombreLimpio;
         });
 
-        console.log("Nombre sincronizado para el usuario:", userId);
+        console.log("Nombre aceptado y guardado:", nombreLimpio);
+
     } catch (e) {
-        console.error("Error al guardar:", e.message);
+        console.error("Error crítico al guardar nombre:", e);
     }
     }
 
@@ -1952,23 +1965,18 @@ sincronizarNombresAlInicio();
             .from('empresa')
             .select('nombre')
             .eq('usuario_id', userId)
-            .single();
+            .maybeSingle(); // maybeSingle evita errores si no encuentra nada
 
         if (data && data.nombre) {
-            const ids = ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'];
-            ids.forEach(id => {
+            ['empresaNombre', 'mayorEmpresaNombre', 'balance-empresa-nombre'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = data.nombre;
             });
         }
     } catch (e) {
-        // Si no hay datos, se queda el nombre por defecto hasta que el usuario escriba
-        console.log("Perfil de empresa nuevo para este usuario.");
+        console.log("Configurando primer nombre para el usuario.");
     }
-}
-
-// Ejecutar al cargar la app
-cargarNombreEmpresaInicial();
+    }
     
 </script>
 

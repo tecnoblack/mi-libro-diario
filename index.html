@@ -1007,15 +1007,55 @@ async function generarMayor() {
         }
     }
 
-    // 3. FUNCIÓN PARA REGISTRO NUEVO
-    function abrirRegistroNuevo() {
-        cambiarVista('vista-registro');
-        const cuerpo = document.getElementById('cuerpo-tabla');
-        if (cuerpo) cuerpo.innerHTML = '';
-        const resumen = document.getElementById('resumenAsiento');
-        if (resumen) resumen.value = '';
-        actualizarTotales();
-        agregarFila();
+    async function abrirRegistroNuevo() {
+    // 1. Antes de cambiar la vista, calculamos el número que toca
+    const proximoNumero = await obtenerSiguienteNumeroAsiento();
+    
+    // 2. Lo ponemos en el encabezado (Asegúrate de que este ID exista en tu HTML)
+    const headerAsiento = document.getElementById('num-asiento-header');
+    if (headerAsiento) {
+        headerAsiento.innerText = `ASIENTO N° ${proximoNumero}`;
+    }
+
+    // 3. Tu lógica original de limpieza
+    cambiarVista('vista-registro');
+    const cuerpo = document.getElementById('cuerpo-tabla');
+    if (cuerpo) cuerpo.innerHTML = '';
+    const resumen = document.getElementById('resumenAsiento');
+    if (resumen) resumen.value = '';
+    
+    actualizarTotales();
+    agregarFila();
+    }
+
+    async function obtenerSiguienteNumeroAsiento() {
+    try {
+        // Obtenemos el periodo actual que el usuario tiene activo
+        const elPeriodo = document.getElementById('textoPeriodoDiario');
+        const periodoActual = elPeriodo ? elPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "---";
+
+        if (periodoActual === "---" || periodoActual === "") return 1;
+
+        // Consultamos el último asiento_id PERO filtrando por el periodo actual
+        const { data, error } = await _supabase
+            .from('asientos')
+            .select('asiento_id')
+            .eq('periodo', periodoActual) // <-- Filtro para que el conteo sea independiente por mes
+            .order('asiento_id', { ascending: false })
+            .limit(1);
+
+        if (error) throw error;
+
+        // Si no hay nada en este mes, devolvemos 1. Si hay, sumamos 1.
+        if (!data || data.length === 0) {
+            return 1;
+        } else {
+            return parseInt(data[0].asiento_id) + 1;
+        }
+    } catch (e) {
+        console.error("Error al calcular correlativo:", e);
+        return 1; // Por seguridad, si falla, devuelve 1
+    }
     }
 
     async function activarDesdeHistorial(mesSeleccionado) {

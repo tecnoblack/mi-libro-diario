@@ -1813,7 +1813,6 @@ async function actualizarNumeroAsientoAutomatico() {
 
     async function cargarDatosEmpresaVisual() {
     try {
-        // 1. Intentamos sacar el periodo de tu memoria privada primero
         const userId = localStorage.getItem('usuario_id');
         const periodoPrivado = localStorage.getItem(`periodo_activo_${userId}`);
 
@@ -1825,7 +1824,6 @@ async function actualizarNumeroAsientoAutomatico() {
 
         if (error) throw error;
 
-        // 2. LÓGICA DE PRIORIDAD
         let p = "---";
         if (periodoPrivado && periodoPrivado !== "---") {
             p = periodoPrivado;
@@ -1833,7 +1831,7 @@ async function actualizarNumeroAsientoAutomatico() {
             p = data.periodo_actual;
         }
 
-        periodoActivo = p; // Sincronizamos la variable global
+        periodoActivo = p;
 
         const etiquetas = [
             'textoPeriodoDiario', 
@@ -1846,14 +1844,14 @@ async function actualizarNumeroAsientoAutomatico() {
         etiquetas.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                // LIMPIEZA: Quitamos cualquier duplicado de la palabra "Periodo" o "PERIODO"
-                let pLimpio = p.replace(/periodo:/gi, "").trim();
+                // --- LIMPIEZA AGRESIVA ---
+                // Borra "PERIODO:", "Periodo:", "periodo:", "Periodo" y espacios extra
+                let pLimpio = p.replace(/periodo/gi, "").replace(/:/g, "").trim();
 
                 if (id === 'textoPeriodoDiario') {
-                    // Solo aquí ponemos el prefijo una única vez
+                    // Ahora sí, lo ponemos una sola vez y bien limpio
                     el.innerText = `PERIODO: ${pLimpio}`;
                 } else {
-                    // En los demás (Mayor, Historial, Balance) ponemos el mes directo
                     el.innerText = pLimpio;
                 }
                 
@@ -1861,7 +1859,6 @@ async function actualizarNumeroAsientoAutomatico() {
             }
         });
 
-        // Nombre y RIF
         if (data) {
             if (data.nombre && document.getElementById('empresaNombre')) 
                 document.getElementById('empresaNombre').innerText = data.nombre;
@@ -1872,7 +1869,7 @@ async function actualizarNumeroAsientoAutomatico() {
     } catch (e) { 
         console.error("Error de carga visual:", e); 
     }
-                }
+    }
     
 function ocultarSplash() {
     const splash = document.getElementById('pantalla-carga');

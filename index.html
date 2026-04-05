@@ -386,6 +386,10 @@ function ocultarSplash() {
     try {
         if (estadoTexto) estadoTexto.innerText = "Validando credenciales...";
 
+        // --- LÍNEA CRÍTICA PARA LA PERSISTENCIA ---
+        // Guardamos el ID del usuario para que el LocalStorage sepa a quién pertenece el periodo
+        localStorage.setItem('usuario_id', userId); 
+
         const { data: perfil, error } = await _supabase
             .from('perfiles')
             .select('*')
@@ -394,12 +398,12 @@ function ocultarSplash() {
         
         if (error) throw error;
         
-        // 1. SI NO ESTÁ REGISTRADO (No hay perfil en la tabla)
+        // 1. SI NO ESTÁ REGISTRADO
         if (!perfil) {
             ocultarSplash(); 
             await Swal.fire("Acceso Restringido", "No tienes un perfil creado. Contacta al administrador.", "error");
-            await _supabase.auth.signOut(); // Cerramos sesión
-            cambiarVista('vista-login');   // Mandamos al login
+            await _supabase.auth.signOut();
+            cambiarVista('vista-login');
             return;
         }
         
@@ -423,14 +427,15 @@ function ocultarSplash() {
                 icon: "info",
                 confirmButtonText: "Entendido"
             });
-            await _supabase.auth.signOut(); // Lo sacamos del sistema
+            await _supabase.auth.signOut();
             cambiarVista('vista-login');
             return;
         }
 
-        // --- SI PASA TODAS LAS PRUEBAS, CARGAMOS LA APP ---
+        // --- CARGA DE DATOS ---
         if (estadoTexto) estadoTexto.innerText = "Sincronizando datos...";
         
+        // Esta función ahora leerá el periodo del LocalStorage correctamente
         await cargarDatosEmpresaVisual(); 
         await cargarDiccionarioCuentas();
         await actualizarNumeroAsientoAutomatico(); 
@@ -442,7 +447,7 @@ function ocultarSplash() {
         }, 800); 
 
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error en verificación:", err);
         ocultarSplash(); 
         await _supabase.auth.signOut();
         cambiarVista('vista-login');
@@ -726,67 +731,109 @@ function actualizarTotales() {
     if(elCre) elCre.innerText = cre.toFixed(2);
 }
     
-    async function consultarLibroDiario() {
+    async function consultarLibroDiario(periodoForzado = null) {
     const div = document.getElementById('tabla-registros');
-    
-    // 1. LEER EL PERIODO DE LA MEMORIA LOCAL (Local Storage)
-    const periodoActivo = localStorage.getItem('mi_periodo_contable') || '---';
+    if (!div) return;
 
-    // Si no hay periodo, avisamos y no buscamos nada
-    if (periodoActivo === "---") {
-        div.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione un periodo en el Historial para ver los registros.</p>";
+    // 1. DETERMINAR QUÉ PERIODO MOSTRAR
+    // Si viene un periodo forzado (del historial), usamos ese.
+    // Si no, lo buscamos en el LocalStorage (el periodo actual).
+    const periodoABuscar = periodoForzado || localStorage.getItem('mi_periodo_contable') || '---';
+
+    // Si al final no hay nada, mostramos mensaje de aviso
+    if (periodoABuscar === "---") {
+        div.innerHTML = `
+            <div style="text-align:center; padding:40px; color:#666;">
+                <i class="fas fa-calendar-times fa-3x" style="margin-bottom:15px; color:#ccc;"></i>
+                <p>No hay un periodo activo.<br>Seleccione uno en el <b>Historial de Cierres</b>.</p>
+            </div>`;
         return;
     }
 
-    // 2. CONSULTA FILTRADA: Solo traemos lo que coincida con el periodo activo
-    // Importante: Si tienes una columna usuario_id, deberías añadir .eq('usuario_id', userId)
+    // 2. CONSULTA FILTRADA A SUPABASE
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
-        .eq('periodo', periodoActivo) // <-- ESTE ES EL FILTRO CRÍTICO
+        .eq('periodo', periodoABuscar)
         .order('asiento_id', { ascending: true });
 
     if (error) { 
-        console.error(error);
-        div.innerHTML = "Error al cargar los datos."; 
+        console.error("Error Supabase:", error);
+        div.innerHTML = "<p style='color:red; text-align:center;'>Error al conectar con la base de datos.</p>"; 
         return; 
     }
 
-    if (data.length === 0) {
-        div.innerHTML = `<p style="text-align:center; padding:20px;">No hay asientos registrados para el periodo <b>${periodoActivo}</b>.</p>`;
+    // 3. SI EL MES ESTÁ VACÍO
+    if (!data || data.length === 0) {
+        div.innerHTML = `
+            <div style="text-align:center; padding:40px; color:#666;">
+                <p>No se encontraron registros para el periodo:<br><b>${periodoABuscar}</b></p>
+            </div>`;
         return;
     }
 
-    // 3. CONSTRUCCIÓN DE LA TABLA (Tu lógica original)
-    let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
-    let ultimoId = null, totalD = 0, totalC = 0;
+    // 4. CONSTRUCCIÓN DE LA TABLA
+    let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-select">SEL</th>
+                    <th>FECHA</th>
+                    <th>CUENTA</th>
+                    <th style="text-align:center;">REF</th>
+                    <th>DÉBITO</th>
+                    <th>CRÉDITO</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    let ultimoId = null;
+    let totalD = 0;
+    let totalC = 0;
 
     data.forEach(f => {
+        // Encabezado de cada asiento (N° y Glosa)
         if (f.asiento_id !== ultimoId) {
-            // Usamos f.asiento_id directamente para que coincida con la DB
-            html += `<tr class="fila-asiento-header">
-                        <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
-                        <td colspan="5">Asiento N° ${f.asiento_id} — ${f.descripcion || ""}</td>
-                     </tr>`;
+            html += `
+                <tr class="fila-asiento-header">
+                    <td class="col-select">
+                        <input type="checkbox" class="check-borrar" value="${f.asiento_id}">
+                    </td>
+                    <td colspan="5">
+                        <span style="font-weight:800; color:var(--azul-pro);">ASIENTO N° ${f.asiento_id}</span> 
+                        <span style="margin-left:15px; color:#555; font-style:italic;">— ${f.descripcion || ""}</span>
+                    </td>
+                </tr>`;
             ultimoId = f.asiento_id;
         }
-        totalD += f.debito; 
-        totalC += f.credito;
-        html += `<tr>
-                    <td class="col-select"></td>
-                    <td>${f.fecha}</td>
-                    <td>${f.cuenta}</td>
-                    <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref}</td>
-                    <td>${f.debito.toFixed(2)}</td>
-                    <td>${f.credito.toFixed(2)}</td>
-                 </tr>`;
+
+        // Sumatoria para el total final
+        totalD += parseFloat(f.debito) || 0;
+        totalC += parseFloat(f.credito) || 0;
+
+        // Fila de movimiento contable
+        html += `
+            <tr>
+                <td class="col-select"></td>
+                <td style="font-size:0.85em;">${f.fecha}</td>
+                <td style="font-weight:500;">${f.cuenta}</td>
+                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref || "-"}</td>
+                <td style="text-align:right;">${(f.debito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+                <td style="text-align:right;">${(f.credito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+            </tr>`;
     });
 
-    html += `<tr class="fila-totales-libro">
-                <td colspan="4" style="text-align:right; padding-right:15px;">TOTAL GENERAL (${periodoActivo}):</td>
-                <td>${totalD.toFixed(2)}</td>
-                <td>${totalC.toFixed(2)}</td>
-             </tr></tbody></table>`;
+    // Fila de Totales
+    html += `
+            <tr class="fila-totales-libro">
+                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">
+                    TOTAL GENERAL (${periodoABuscar}):
+                </td>
+                <td style="text-align:right; border-top:2px solid #333;">${totalD.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+                <td style="text-align:right; border-top:2px solid #333;">${totalC.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+            </tr>
+        </tbody>
+    </table>`;
     
     div.innerHTML = html;
     }
@@ -1437,48 +1484,46 @@ function mostrarAsientosEnTabla(datos, modoLectura = false) {
     }
 }
 
-async function verDetalleReporteHistorial(tipo) { // Le cambio el nombre para que no choquen
-    // Usamos el periodo que el usuario acaba de asignar en el buscador azul
-    const periodoOriginal = localStorage.getItem('mi_periodo_contable') || ""; 
-    
-    if (!periodoOriginal || periodoOriginal === "---") {
-        Swal.fire("Error", "No se ha detectado un periodo seleccionado.", "error");
+async function verDetalleReporteHistorial(tipo, periodoDesdeFila = null) {
+    // Si periodoDesdeFila tiene algo (viene del clic en la lista), usamos ese.
+    // Si no, buscamos la variable global periodoSeleccionadoHistorial que usa tu app.
+    const periodoABuscar = periodoDesdeFila || (typeof periodoSeleccionadoHistorial !== 'undefined' ? periodoSeleccionadoHistorial : "");
+
+    if (!periodoABuscar || periodoABuscar === "---") {
+        Swal.fire("Error", "Seleccione un cierre del historial primero.", "error");
         return;
     }
 
-    // Si es para ver algo que ya cerraste, podrías usar el prefijo, 
-    // pero para ver lo que estás trabajando ahora, usa el nombre directo.
-    const periodoABuscar = periodoOriginal; 
+    // Actualizamos visualmente el header para que sepas que estás viendo el PASADO
+    if(document.getElementById('textoPeriodoDiario')) {
+        document.getElementById('textoPeriodoDiario').innerText = periodoABuscar;
+    }
 
     if (tipo === 'diario') {
-        if(document.getElementById('textoPeriodoDiario')) {
-            document.getElementById('textoPeriodoDiario').innerText = periodoABuscar;
-        }
         cambiarVista('vista-diario');
-        
+        // Usamos el parámetro periodoABuscar directamente en la consulta
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodoABuscar);
+            .eq('periodo', periodoABuscar); // Aquí busca el mes viejo correctamente
         
-        if (error) return console.error("Error diario historial:", error);
+        if (error) return console.error(error);
         mostrarAsientosEnTabla(data || [], true);
         
     } else if (tipo === 'mayor') {
         if(document.getElementById('mayorPeriodoHeader')) {
-            document.getElementById('mayorPeriodoHeader').innerText = periodoOriginal;
+            document.getElementById('mayorPeriodoHeader').innerText = periodoABuscar;
         }
-        const divRes = document.getElementById('resultado-mayor');
-        if(divRes) divRes.innerHTML = "<p style='text-align:center; padding:20px;'>Seleccione una cuenta.</p>";
         cambiarVista('vista-mayor');
+        // Limpiar para que el usuario elija cuenta del mes viejo
+        const divRes = document.getElementById('resultado-mayor');
+        if(divRes) divRes.innerHTML = "<p style='text-align:center;'>Viendo historial de: " + periodoABuscar + "</p>";
 
     } else if (tipo === 'balance') {
         cambiarVista('vista-balance'); 
-        if (typeof generarBalance === 'function') {
-            generarBalance(periodoABuscar);
-        }
+        if (typeof generarBalance === 'function') generarBalance(periodoABuscar);
     }
-    }
+}
     
 function activarModoBorrado() {
     const columnas = document.querySelectorAll('.col-borrar');

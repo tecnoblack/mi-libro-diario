@@ -1084,7 +1084,8 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
     const pElement = document.getElementById('textoPeriodoDiario');
-    const periodoCerrando = pElement ? pElement.innerText.trim() : "";
+    // Limpiamos el texto para que solo quede el nombre del periodo
+    const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
 
     if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
         Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
@@ -1093,7 +1094,7 @@ async function cerrarMesActual() {
 
     const confirmacion = await Swal.fire({
         title: `¿Cerrar ${periodoCerrando}?`,
-        text: "Los libros se limpiarán y verás '---' en todas las pantallas.",
+        text: "El periodo se archivará y se limpiará tu vista actual.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, cerrar',
@@ -1103,18 +1104,27 @@ async function cerrarMesActual() {
     if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Archivar en Supabase
-        await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        // 1. Opcional: Archivar en Supabase (Si ya lo manejas por historial, esto es preventivo)
+        // await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 2. Limpiar la columna real en la tabla empresa
+        // 2. Limpiar la base de datos global (Tabla empresa)
         const { error } = await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
         if (error) throw error;
 
-        // 3. LIMPIEZA VISUAL TOTAL (Para que tu video funcione)
+        // --- 3. LO NUEVO: LIMPIEZA DE MEMORIA PRIVADA (LOCALSTORAGE) ---
+        const userId = localStorage.getItem('usuario_id');
+        if (userId) {
+            localStorage.removeItem(`periodo_activo_${userId}`);
+        }
+        // También limpiamos la variable global
+        periodoActivo = "---";
+
+        // 4. LIMPIEZA VISUAL TOTAL
         const ids = [
             'textoPeriodoDiario', 
             'mayorPeriodoHeader', 
@@ -1131,9 +1141,14 @@ async function cerrarMesActual() {
             }
         });
 
-        await Swal.fire("Éxito", "Mes cerrado. Ahora todo está en ---", "success");
+        // 5. LIMPIAR CONTENEDORES DE DATOS (Para que no se vean tablas viejas)
+        if (document.getElementById('tabla-registros')) document.getElementById('tabla-registros').innerHTML = "";
+        if (document.getElementById('contenedor-mayor')) document.getElementById('contenedor-mayor').innerHTML = "";
+        if (document.getElementById('contenedor-balance')) document.getElementById('contenedor-balance').innerHTML = "";
+
+        await Swal.fire("Éxito", "Mes cerrado correctamente.", "success");
         
-        // RECARGA IMPORTANTE: Para que el sistema no guarde nada en memoria
+        // 6. Recarga para resetear todo el estado de la app
         location.reload(); 
 
     } catch (err) {

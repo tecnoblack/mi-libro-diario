@@ -1841,21 +1841,17 @@ async function actualizarNumeroAsientoAutomatico() {
             'periodoAsientoManual'
         ];
 
+        // Limpiamos la variable por si trae la palabra "Periodo" de la base de datos
+        let soloElMes = p.replace(/periodo/gi, "").replace(/:/g, "").trim();
+
         etiquetas.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                // 1. Limpiamos absolutamente todo lo que traiga la variable p
-                let pLimpio = p.replace(/periodo/gi, "").replace(/:/g, "").trim();
-
-                // 2. Si el elemento es el del Diario, inyectamos el formato desde cero
-                if (id === 'textoPeriodoDiario') {
-                    // Usamos .innerHTML para asegurar que sobrescribimos cualquier texto previo del HTML
-                    el.innerHTML = `PERIODO: <b>${pLimpio}</b>`;
-                } else {
-                    el.innerText = pLimpio;
-                }
+                // AQUÍ ESTÁ EL CAMBIO: Ya no escribimos "PERIODO:"
+                // Solo ponemos el valor limpio (ej: MAYO 2026)
+                el.innerText = soloElMes;
                 
-                el.style.color = (pLimpio === "---" || pLimpio === "") ? "#94a3b8" : "#1e293b";
+                el.style.color = (soloElMes === "---") ? "#94a3b8" : "#1e293b";
             }
         });
 

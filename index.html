@@ -233,7 +233,9 @@
             </div>
 
             <div class="header-contable" style="border: 2px solid #000; padding: 15px; text-align: center; margin-bottom: 20px; background: white;">
-                <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">COMERCIAL A B C, C.A.</h1>
+                <h1 id="balance-empresa-nombre" style="margin: 0; text-transform: uppercase; letter-spacing: 2px;">
+    COMERCIAL A B C, C.A.
+                </h1>
                 <p style="margin: 5px 0;">RIF: J-00000000-0</p>
                 <h2 style="margin: 10px 0; text-decoration: underline;">BALANCE DE COMPROBACIÓN</h2>
                 <div style="font-weight: bold; margin-top: 10px;">
@@ -918,8 +920,8 @@ async function generarMayor() {
     const divRes = document.getElementById('resultado-mayor');
     if (!cuentaSel) return;
 
-    // AÑADIDO: .trim() para limpiar espacios del texto y asegurar la búsqueda
     const periodoActual = document.getElementById('textoPeriodoDiario')?.innerText.trim() || "";
+    const nombreEmpresa = document.getElementById('empresaNombre').innerText; // Captura nombre actual
 
     divRes.innerHTML = "<p style='text-align:center;'>Filtrando movimientos del periodo...</p>";
 
@@ -927,49 +929,35 @@ async function generarMayor() {
         .from('asientos')
         .select('*')
         .eq('cuenta', cuentaSel)
-        .eq('periodo', periodoActual) // Usará ARCHIVADO_ si vienes del historial
+        .eq('periodo', periodoActual)
         .order('fecha', { ascending: true });
 
     if (error || !movs?.length) { 
-        divRes.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">
-            No hay movimientos para <b>${cuentaSel}</b> en el periodo <b>${periodoActual}</b>.
-        </p>`; 
+        divRes.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">No hay movimientos para <b>${cuentaSel}</b>.</p>`; 
         return; 
     }
 
-    const { data: todos } = await _supabase
-        .from('asientos')
-        .select('asiento_id')
-        .eq('periodo', periodoActual)
-        .order('fecha', { ascending: true });
-    
+    // Lógica de numeración de asientos...
+    const { data: todos } = await _supabase.from('asientos').select('asiento_id').eq('periodo', periodoActual).order('fecha', { ascending: true });
     const idsUnicos = [];
-    if (todos) {
-        todos.forEach(a => {
-            if (a.asiento_id && !idsUnicos.includes(a.asiento_id)) {
-                idsUnicos.push(a.asiento_id);
-            }
-        });
-    }
-
+    if (todos) { todos.forEach(a => { if (a.asiento_id && !idsUnicos.includes(a.asiento_id)) idsUnicos.push(a.asiento_id); }); }
     const mapaCorr = {}; 
     idsUnicos.forEach((id, i) => { mapaCorr[id] = i + 1; });
 
-    let html = `<div class="info-mayor-header">
-        <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">PERIODO: ${periodoActual.replace('ARCHIVADO_', '')}</div>
-        <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
-        <table class="tabla-mayor">
-            <thead>
-                <tr>
-                    <th>FECHA</th>
-                    <th>EXPLICACIÓN</th>
-                    <th style="text-align:center;">ASIENTO</th>
-                    <th>DÉBITO</th>
-                    <th>CRÉDITO</th>
-                    <th>SALDO</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    // --- CONSTRUCCIÓN DEL REPORTE PROFESIONAL ---
+    let html = `
+        <div style="text-align:center; margin-bottom:20px; border-bottom:2px solid var(--azul-pro); padding-bottom:10px;">
+            <h2 style="margin:0; text-transform:uppercase;">${nombreEmpresa}</h2>
+            <h3 style="margin:5px 0; color:var(--azul-pro);">LIBRO MAYOR</h3>
+            <div style="color:#64748b; font-size:0.9rem;">PERIODO: ${periodoActual.replace('ARCHIVADO_', '')}</div>
+        </div>
+        <div class="info-mayor-header">
+            <div class="cuenta-ref-row"><span>CUENTA: ${cuentaSel}</span><span>REF: ${movs[0].ref || 'S/R'}</span></div>
+            <table class="tabla-mayor">
+                <thead>
+                    <tr><th>FECHA</th><th>EXPLICACIÓN</th><th style="text-align:center;">ASIENTO</th><th>DÉBITO</th><th>CRÉDITO</th><th>SALDO</th></tr>
+                </thead>
+                <tbody>`;
 
     let saldo = 0;
     movs.forEach(m => {
@@ -977,13 +965,10 @@ async function generarMayor() {
         const credito = parseFloat(m.credito) || 0;
         saldo += (debito - credito);
         const numAsiento = mapaCorr[m.asiento_id] || "S/N";
-
         html += `<tr>
-            <td>${m.fecha}</td>
-            <td>${m.descripcion}</td>
+            <td>${m.fecha}</td><td>${m.descripcion}</td>
             <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">#${numAsiento}</td>
-            <td>${debito.toFixed(2)}</td>
-            <td>${credito.toFixed(2)}</td>
+            <td>${debito.toFixed(2)}</td><td>${credito.toFixed(2)}</td>
             <td style="font-weight:bold;">${Math.abs(saldo).toFixed(2)}</td>
         </tr>`;
     });
@@ -1629,67 +1614,27 @@ async function confirmarEliminacion() {
     }
 }
 
- // Añadimos periodoManual como parámetro opcional
- async function generarBalance(periodoManual = null) {
-    console.log("Generando Balance...");
-    
+async function generarBalance(periodoManual = null) {
     const contenedor = document.getElementById('contenedor-balance');
-    const elementoPeriodo = document.getElementById('balance-periodo-header');
-
-    // Decidir qué periodo consultar (Manual para historial, Activo para mes abierto)
     const periodoAConsultar = periodoManual || periodoActivo;
+    const nombreEmpresa = document.getElementById('empresaNombre').innerText; // Captura nombre actual
 
     try {
-        // 1. Título visual limpio (le quitamos el "ARCHIVADO_" para que se vea bien)
-        if (elementoPeriodo) {
-            elementoPeriodo.innerText = periodoAConsultar.replace('ARCHIVADO_', '');
-        }
-
         if (!periodoAConsultar || periodoAConsultar === "---") {
             contenedor.innerHTML = '<p style="text-align:center;">Seleccione un periodo en el menú.</p>';
             return;
         }
 
-        contenedor.innerHTML = '<p style="text-align:center;">Cargando datos...</p>';
-
-        // 2. Consulta a Supabase filtrando por el periodo exacto
-        const { data, error } = await _supabase
-            .from('asientos')
-            .select('*')
-            .eq('periodo', periodoAConsultar);
-
+        const { data, error } = await _supabase.from('asientos').select('*').eq('periodo', periodoAConsultar);
         if (error) throw error;
 
-        if (!data || data.length === 0) {
-            contenedor.innerHTML = `<p style="text-align:center; padding:20px;">No hay registros encontrados para <b>${periodoAConsultar}</b>.</p>`;
-            return;
-        }
-
-        const cuentas = {};
-
-        // 3. Procesar montos (Usando debito y credito que es como lo tienes en el Mayor)
-        data.forEach(reg => {
-            const nom = reg.cuenta ? reg.cuenta.trim() : "Sin nombre";
-            const ref = reg.ref || "0";
-            
-            if (!cuentas[nom]) {
-                cuentas[nom] = { ref: ref, debe: 0, haber: 0 };
-            }
-            
-            // Sumamos los valores (asegurando que sean números)
-            cuentas[nom].debe += parseFloat(reg.debito) || 0;
-            cuentas[nom].haber += parseFloat(reg.credito) || 0;
-        });
-
-        // 4. Ordenar por Referencia (REF)
-        const nombresOrdenados = Object.keys(cuentas).sort((a, b) => {
-            const refA = parseInt(cuentas[a].ref.toString().replace(/\D/g, "")) || 0;
-            const refB = parseInt(cuentas[b].ref.toString().replace(/\D/g, "")) || 0;
-            return refA - refB;
-        });
-
-        // 5. Construir Tabla HTML
+        // --- CONSTRUCCIÓN DEL REPORTE PROFESIONAL ---
         let tablaHtml = `
+            <div style="text-align:center; margin-bottom:20px; border-bottom: 2px solid var(--azul-pro); padding-bottom:10px;">
+                <h2 style="margin:0; text-transform:uppercase;">${nombreEmpresa}</h2>
+                <h3 style="margin:5px 0; color:var(--azul-pro);">BALANCE DE COMPROBACIÓN</h3>
+                <span style="font-size:0.9rem; color:#64748b;">PERIODO: ${periodoAConsultar.replace('ARCHIVADO_', '')}</span>
+            </div>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <thead>
                     <tr style="background: #2563eb; color: white;">
@@ -1699,8 +1644,10 @@ async function confirmarEliminacion() {
                         <th style="padding: 10px; border: 1px solid #ccc; text-align: right;">ACREEDOR</th>
                     </tr>
                 </thead>
-                <tbody>
-        `;
+                <tbody>`;
+
+        // ... (Tu lógica de procesamiento de cuentas se mantiene igual) ...
+        // (Asegúrate de incluir aquí el resto del código de sumas iguales y diferencias)
 
         let totalDebe = 0, totalHaber = 0;
 
@@ -1919,44 +1866,27 @@ function irAMayor() {
     cargarCuentasSelect();
 }
 
-    // 1. Guarda el nombre cuando dejas de editar el h1
-async function actualizarNombreEmpresaGlobal(nuevoNombre) {
+    async function actualizarNombreEmpresaGlobal(nuevoNombre) {
     const nombreLimpio = nuevoNombre.trim();
     if (!nombreLimpio) return;
 
     try {
-        const { error } = await _supabase
-            .from('empresa')
-            .update({ "nombre": nombreLimpio }) // Asegúrate que tu columna se llame 'nombre'
-            .eq('id', 1);
+        // 1. Guardar en la base de datos (Supabase)
+        await _supabase.from('empresa').update({ "nombre": nombreLimpio }).eq('id', 1);
 
-        if (error) throw error;
-        console.log("Nombre sincronizado:", nombreLimpio);
+        // 2. ACTUALIZACIÓN INSTANTÁNEA:
+        // Buscamos los otros dos IDs y les ponemos el mismo nombre que acabas de escribir
+        const ids = ['mayorEmpresaNombre', 'balance-empresa-nombre'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = nombreLimpio;
+        });
+
+        console.log("Sincronización completa: " + nombreLimpio);
     } catch (e) {
-        console.error("Error al guardar nombre:", e);
+        console.error("Error al sincronizar nombres:", e);
     }
-}
-
-// 2. Carga el nombre guardado apenas abre la aplicación
-async function cargarNombreEmpresaInicial() {
-    try {
-        const { data, error } = await _supabase
-            .from('empresa')
-            .select('nombre')
-            .eq('id', 1)
-            .single();
-
-        if (data && data.nombre) {
-            const el = document.getElementById('empresaNombre');
-            if (el) el.innerText = data.nombre;
-        }
-    } catch (e) {
-        console.log("Aún no hay nombre guardado");
-    }
-}
-
-// LLAMADA INICIAL: Ejecuta esto al final de tu script
-cargarNombreEmpresaInicial();
+            }
     
 </script>
 

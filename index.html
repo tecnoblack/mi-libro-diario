@@ -728,111 +728,60 @@ function actualizarTotales() {
     const div = document.getElementById('tabla-registros');
     if (!div) return;
 
-    // 1. DETERMINAR QUÉ PERIODO MOSTRAR
-    // Si viene un periodo forzado (del historial), usamos ese.
-    // Si no, lo buscamos en el LocalStorage (el periodo actual).
-    const periodoABuscar = periodoForzado || localStorage.getItem('mi_periodo_contable') || '---';
+    const periodoABuscar = periodoForzado || localStorage.getItem(`periodo_activo_${localStorage.getItem('usuario_id')}`) || '---';
 
-    // Si al final no hay nada, mostramos mensaje de aviso
     if (periodoABuscar === "---") {
-        div.innerHTML = `
-            <div style="text-align:center; padding:40px; color:#666;">
-                <i class="fas fa-calendar-times fa-3x" style="margin-bottom:15px; color:#ccc;"></i>
-                <p>No hay un periodo activo.<br>Seleccione uno en el <b>Historial de Cierres</b>.</p>
-            </div>`;
+        div.innerHTML = `<div style="text-align:center; padding:40px; color:#666;"><p>Seleccione un periodo activo.</p></div>`;
         return;
     }
 
-    // 2. CONSULTA FILTRADA A SUPABASE
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
         .eq('periodo', periodoABuscar)
         .order('asiento_id', { ascending: true });
 
-    if (error) { 
-        console.error("Error Supabase:", error);
-        div.innerHTML = "<p style='color:red; text-align:center;'>Error al conectar con la base de datos.</p>"; 
-        return; 
-    }
+    if (error) { div.innerHTML = "Error de base de datos."; return; }
 
-    // 3. SI EL MES ESTÁ VACÍO
     if (!data || data.length === 0) {
-        div.innerHTML = `
-            <div style="text-align:center; padding:40px; color:#666;">
-                <p>No se encontraron registros para el periodo:<br><b>${periodoABuscar}</b></p>
-            </div>`;
+        div.innerHTML = `<div style="text-align:center; padding:40px; color:#666;"><p>No hay registros en <b>${periodoABuscar}</b></p></div>`;
         return;
     }
 
-    // 4. CONSTRUCCIÓN DE LA TABLA
-    let html = `
-        <table>
-            <thead>
-                <tr>
-                    <th class="col-select">SEL</th>
-                    <th>FECHA</th>
-                    <th>CUENTA</th>
-                    <th style="text-align:center;">REF</th>
-                    <th>DÉBITO</th>
-                    <th>CRÉDITO</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
 
     let ultimoId = null;
     let totalD = 0;
     let totalC = 0;
 
     data.forEach(f => {
-        // Encabezado de cada asiento (N° y Glosa)
         if (f.asiento_id !== ultimoId) {
-            html += `
-                <tr class="fila-asiento-header">
-                    <td class="col-select">
-                        <input type="checkbox" class="check-borrar" value="${f.asiento_id}">
-                    </td>
-                    <td colspan="5">
-                        <span style="font-weight:800; color:var(--azul-pro);">ASIENTO N° ${f.asiento_id}</span> 
-                        <span style="margin-left:15px; color:#555; font-style:italic;">— ${f.descripcion || ""}</span>
-                    </td>
-                </tr>`;
+            html += `<tr class="fila-asiento-header">
+                <td class="col-select"><input type="checkbox" class="check-borrar" value="${f.asiento_id}"></td>
+                <td colspan="5"><span style="font-weight:800; color:var(--azul-pro);">ASIENTO N° ${f.asiento_id}</span> <span style="margin-left:15px; color:#555; font-style:italic;">— ${f.descripcion || ""}</span></td>
+            </tr>`;
             ultimoId = f.asiento_id;
         }
 
-        // Sumatoria para el total final
         totalD += parseFloat(f.debito) || 0;
         totalC += parseFloat(f.credito) || 0;
 
-        // Fila de movimiento contable
-        html += `
-            <tr>
-                <td class="col-select"></td>
-                <td style="font-size:0.85em;">${f.fecha}</td>
-                <td style="font-weight:500;">${f.cuenta}</td>
-                <td style="text-align:center; font-weight:bold; color:var(--azul-pro);">${f.ref || "-"}</td>
-                <td style="text-align:right;">${(f.debito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
-                <td style="text-align:right;">${(f.credito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
-            </tr>`;
+        html += `<tr><td class="col-select"></td><td style="font-size:0.85em;">${f.fecha}</td><td style="font-weight:500;">${f.cuenta}</td><td style="text-align:center; font-weight:bold;">${f.ref || "-"}</td><td style="text-align:right;">${(f.debito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td><td style="text-align:right;">${(f.credito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td></tr>`;
     });
 
-    // Fila de Totales
-    html += `
-            <tr class="fila-totales-libro">
-                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">
-                    TOTAL GENERAL (${periodoABuscar}):
-                </td>
+    // LIMPIEZA DE NOMBRE EN TOTALES
+    const periodoLimpioParaTabla = periodoABuscar.replace(/periodo/gi, "").replace(/:/g, "").trim();
+
+    html += `<tr class="fila-totales-libro">
+                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">TOTAL GENERAL (<b>${periodoLimpioParaTabla}</b>):</td>
                 <td style="text-align:right; border-top:2px solid #333;">${totalD.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
                 <td style="text-align:right; border-top:2px solid #333;">${totalC.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
-            </tr>
-        </tbody>
-    </table>`;
+            </tr></tbody></table>`;
     
     div.innerHTML = html;
     }
     
-async function guardarAsiento() {
-    // 1. BLOQUEO DE BOTÓN
+    async function guardarAsiento() {
     const btnGuardar = document.getElementById('btnGuardar') || document.querySelector('button[onclick="guardarAsiento()"]');
     if (btnGuardar) {
         if (btnGuardar.disabled) return; 
@@ -845,17 +794,16 @@ async function guardarAsiento() {
         const periodoActivo = elementoPeriodo ? elementoPeriodo.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
         if (!periodoActivo || periodoActivo.includes("---") || periodoActivo === "") {
-            throw new Error("Seleccione un periodo en el Historial antes de guardar");
+            throw new Error("Seleccione un periodo antes de guardar");
         }
 
+        // Leemos el número que calculó la función automática
         const headerTexto = document.getElementById('num-asiento-header').innerText;
         const numeroAsientoActual = parseInt(headerTexto.replace(/\D/g, "")) || 1;
 
         const filas = document.querySelectorAll('.fila-asiento');
         let datos = [];
         const glosa = document.getElementById('resumenAsiento')?.value || "";
-        let acumuladoDebe = 0;
-        let acumuladoHaber = 0;
 
         for (let f of filas) {
             const elCuenta = f.querySelector('.txt-cuenta');
@@ -865,16 +813,12 @@ async function guardarAsiento() {
             const fechaRaw = f.querySelector('.val-fecha').innerText.trim();
 
             if (cuenta && (d > 0 || c > 0)) {
-                acumuladoDebe += d;
-                acumuladoHaber += c;
-
                 let fechaEnvio = fechaRaw;
                 if (fechaRaw.includes('/')) {
                     const p = fechaRaw.split('/');
                     fechaEnvio = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
                 }
 
-                // --- COLUMNA created_at ELIMINADA PARA EVITAR EL ERROR ---
                 datos.push({ 
                     asiento_id: numeroAsientoActual,
                     fecha: fechaEnvio, 
@@ -888,32 +832,22 @@ async function guardarAsiento() {
             }
         }
 
-        // VALIDACIÓN DE CUADRE
-        if (Math.abs(acumuladoDebe - acumuladoHaber) > 0.01) {
-            throw new Error(`Asiento DESCUADRADO. Debe: ${acumuladoDebe.toFixed(2)} | Haber: ${acumuladoHaber.toFixed(2)}`);
-        }
-
         if (datos.length === 0) throw new Error("El asiento está vacío");
 
-        // GUARDAR EN SUPABASE
         const { error } = await _supabase.from('asientos').insert(datos);
         if (error) throw error;
 
         await Swal.fire({ title: "¡Guardado!", icon: "success", timer: 1500, showConfirmButton: false });
 
-        // --- LIMPIEZA TOTAL ---
+        // LIMPIEZA Y ACTUALIZACIÓN
         const contenedor = document.getElementById('contenedor-filas');
-        if (contenedor) {
-            contenedor.innerHTML = ""; 
-        }
-
+        if (contenedor) contenedor.innerHTML = ""; 
         if (document.getElementById('resumenAsiento')) document.getElementById('resumenAsiento').value = "";
-        if (document.getElementById('total-debe-visual')) document.getElementById('total-debe-visual').innerText = "0.00";
-        if (document.getElementById('total-haber-visual')) document.getElementById('total-haber-visual').innerText = "0.00";
 
-        if (typeof actualizarNumeroAsientoAutomatico === "function") await actualizarNumeroAsientoAutomatico();
-        if (typeof consultarLibroDiario === "function") await consultarLibroDiario();
-        if (typeof agregarFila === "function") agregarFila(); 
+        // REINICIAR NÚMERO PARA EL PRÓXIMO ASIENTO
+        await actualizarNumeroAsientoAutomatico(); 
+        await consultarLibroDiario();
+        if (typeof agregarFila === 'function') agregarFila(); 
         
         cambiarVista('vista-diario');
 
@@ -925,7 +859,7 @@ async function guardarAsiento() {
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-}
+    }
                 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

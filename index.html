@@ -112,7 +112,9 @@
         <div class="contenedor-principal" id="contenedor-diario">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
             <div class="header-contable">
-                <h1 id="empresaNombre" contenteditable="true">COMERCIAL A B C, C.A.</h1>
+                <h1 id="empresaNombre" contenteditable="true" onblur="actualizarNombreEmpresaGlobal(this.innerText)">
+    COMERCIAL A B C, C.A.
+                </h1>
                 <p>RIF: <span id="empresaRif" contenteditable="true">J-00000000-0</span></p>
                 <p><b>LIBRO DIARIO</b></p>
                 <div style="background: #e2e8f0; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px;">
@@ -740,7 +742,6 @@ function actualizarTotales() {
     }
 
     // 2. CONSULTA A SUPABASE
-    // Buscamos el periodo tal cual, y por si acaso, también el que tenga el prefijo ARCHIVADO_
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
@@ -758,8 +759,28 @@ function actualizarTotales() {
         return;
     }
 
-    // 3. CONSTRUCCIÓN DE LA TABLA
-    let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
+    // --- NUEVO: CAPTURAR NOMBRE DE EMPRESA PARA EL REPORTE ---
+    const nombreEmpresaReporte = document.getElementById('empresaNombre').innerText;
+
+    // 3. CONSTRUCCIÓN DEL ENCABEZADO Y TABLA
+    let html = `
+        <div style="text-align:center; margin-bottom:20px; border-bottom: 2px solid var(--azul-pro); padding-bottom:10px;">
+            <h2 style="margin:0; text-transform:uppercase;">${nombreEmpresaReporte}</h2>
+            <h3 style="margin:5px 0; color:var(--azul-pro);">LIBRO DIARIO</h3>
+            <span style="font-size:0.9rem; color:#64748b;">PERIODO: ${periodoABuscar}</span>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-select">SEL</th>
+                    <th>FECHA</th>
+                    <th>CUENTA</th>
+                    <th style="text-align:center;">REF</th>
+                    <th>DÉBITO</th>
+                    <th>CRÉDITO</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
     let ultimoId = null;
     let totalD = 0;
@@ -781,9 +802,9 @@ function actualizarTotales() {
     });
 
     html += `<tr class="fila-totales-libro">
-                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">TOTAL GENERAL (<b>${periodoABuscar}</b>):</td>
-                <td style="text-align:right; border-top:2px solid #333;">${totalD.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
-                <td style="text-align:right; border-top:2px solid #333;">${totalC.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">TOTAL GENERAL:</td>
+                <td style="text-align:right; border-top:2px solid #333; font-weight:bold;">${totalD.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
+                <td style="text-align:right; border-top:2px solid #333; font-weight:bold;">${totalC.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
             </tr></tbody></table>`;
     
     div.innerHTML = html;
@@ -1897,6 +1918,45 @@ function irAMayor() {
     cambiarVista('vista-mayor');
     cargarCuentasSelect();
 }
+
+    // 1. Guarda el nombre cuando dejas de editar el h1
+async function actualizarNombreEmpresaGlobal(nuevoNombre) {
+    const nombreLimpio = nuevoNombre.trim();
+    if (!nombreLimpio) return;
+
+    try {
+        const { error } = await _supabase
+            .from('empresa')
+            .update({ "nombre": nombreLimpio }) // Asegúrate que tu columna se llame 'nombre'
+            .eq('id', 1);
+
+        if (error) throw error;
+        console.log("Nombre sincronizado:", nombreLimpio);
+    } catch (e) {
+        console.error("Error al guardar nombre:", e);
+    }
+}
+
+// 2. Carga el nombre guardado apenas abre la aplicación
+async function cargarNombreEmpresaInicial() {
+    try {
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('nombre')
+            .eq('id', 1)
+            .single();
+
+        if (data && data.nombre) {
+            const el = document.getElementById('empresaNombre');
+            if (el) el.innerText = data.nombre;
+        }
+    } catch (e) {
+        console.log("Aún no hay nombre guardado");
+    }
+}
+
+// LLAMADA INICIAL: Ejecuta esto al final de tu script
+cargarNombreEmpresaInicial();
     
 </script>
 

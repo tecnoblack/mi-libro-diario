@@ -812,22 +812,28 @@ function actualizarTotales() {
     div.innerHTML = html;
     }
     
-    async function guardarAsiento() {
-    const btnGuardar = document.getElementById('btnGuardar') || document.querySelector('button[onclick="guardarAsiento()"]');
-    
-    // --- BLOQUE DE SEGURIDAD: VALIDACIÓN DE NOMBRE DE EMPRESA ---
+async function guardarAsiento() {
+    // --- 1. BLOQUEO DE SEGURIDAD: VALIDACIÓN DE NOMBRE DE EMPRESA ---
     const nombreEmpresaActual = document.getElementById('empresaNombre')?.innerText.trim() || "";
-    if (nombreEmpresaActual === "COMERCIAL A B C, C.A." || nombreEmpresaActual === "" || nombreEmpresaActual === "---") {
+    
+    // Lista de valores prohibidos (nombre por defecto o vacío)
+    const nombresProhibidos = ["COMERCIAL A B C, C.A.", "", "---", "MI EMPRESA"];
+
+    if (nombresProhibidos.includes(nombreEmpresaActual.toUpperCase())) {
         Swal.fire({
-            title: "Nombre de Empresa Requerido",
-            text: "Por favor, haga clic en el nombre de la empresa (arriba) y cámbielo por el nombre real antes de registrar asientos.",
+            title: "Identificación Requerida",
+            text: "No puede registrar asientos bajo el nombre por defecto. Por favor, haga clic en el nombre de la empresa (arriba) y escriba el nombre real.",
             icon: "warning",
+            confirmButtonColor: "#2563eb",
             confirmButtonText: "Entendido"
         });
-        return; // Detiene la ejecución aquí
+        return; // SE DETIENE LA FUNCIÓN: No deja pasar al resto del código
     }
-    // ----------------------------------------------------------
+    // ----------------------------------------------------------------
 
+    // 2. Lógica normal de guardado (lo que ya tenías)
+    const btnGuardar = document.getElementById('btnGuardar') || document.querySelector('button[onclick="guardarAsiento()"]');
+    
     if (btnGuardar) {
         if (btnGuardar.disabled) return; 
         btnGuardar.disabled = true;
@@ -912,7 +918,7 @@ function actualizarTotales() {
             btnGuardar.innerHTML = 'Guardar Asiento';
         }
     }
-            }
+    }
                 
     async function cargarCuentasSelect() {
         const { data } = await _supabase.from('asientos').select('cuenta');

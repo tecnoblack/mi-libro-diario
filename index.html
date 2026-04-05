@@ -728,26 +728,37 @@ function actualizarTotales() {
     const div = document.getElementById('tabla-registros');
     if (!div) return;
 
-    const periodoABuscar = periodoForzado || localStorage.getItem(`periodo_activo_${localStorage.getItem('usuario_id')}`) || '---';
+    // 1. DETERMINAR QUÉ PERIODO MOSTRAR
+    let periodoABuscar = periodoForzado || localStorage.getItem(`periodo_activo_${localStorage.getItem('usuario_id')}`) || '---';
 
-    if (periodoABuscar === "---") {
+    // Limpiamos cualquier rastro de la palabra "Periodo" o espacios extra
+    periodoABuscar = periodoABuscar.replace(/Periodo:|PERIODO:/gi, "").trim();
+
+    if (periodoABuscar === "---" || periodoABuscar === "") {
         div.innerHTML = `<div style="text-align:center; padding:40px; color:#666;"><p>Seleccione un periodo activo.</p></div>`;
         return;
     }
 
+    // 2. CONSULTA A SUPABASE
+    // Buscamos el periodo tal cual, y por si acaso, también el que tenga el prefijo ARCHIVADO_
     const { data, error } = await _supabase
         .from('asientos')
         .select('*')
-        .eq('periodo', periodoABuscar)
+        .or(`periodo.eq."${periodoABuscar}",periodo.eq."ARCHIVADO_${periodoABuscar}"`)
         .order('asiento_id', { ascending: true });
 
-    if (error) { div.innerHTML = "Error de base de datos."; return; }
+    if (error) { 
+        console.error("Error Supabase:", error);
+        div.innerHTML = "Error de base de datos."; 
+        return; 
+    }
 
     if (!data || data.length === 0) {
         div.innerHTML = `<div style="text-align:center; padding:40px; color:#666;"><p>No hay registros en <b>${periodoABuscar}</b></p></div>`;
         return;
     }
 
+    // 3. CONSTRUCCIÓN DE LA TABLA
     let html = `<table><thead><tr><th class="col-select">SEL</th><th>FECHA</th><th>CUENTA</th><th style="text-align:center;">REF</th><th>DÉBITO</th><th>CRÉDITO</th></tr></thead><tbody>`;
 
     let ultimoId = null;
@@ -769,11 +780,8 @@ function actualizarTotales() {
         html += `<tr><td class="col-select"></td><td style="font-size:0.85em;">${f.fecha}</td><td style="font-weight:500;">${f.cuenta}</td><td style="text-align:center; font-weight:bold;">${f.ref || "-"}</td><td style="text-align:right;">${(f.debito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td><td style="text-align:right;">${(f.credito || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}</td></tr>`;
     });
 
-    // LIMPIEZA DE NOMBRE EN TOTALES
-    const periodoLimpioParaTabla = periodoABuscar.replace(/periodo/gi, "").replace(/:/g, "").trim();
-
     html += `<tr class="fila-totales-libro">
-                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">TOTAL GENERAL (<b>${periodoLimpioParaTabla}</b>):</td>
+                <td colspan="4" style="text-align:right; padding-right:15px; font-weight:800;">TOTAL GENERAL (<b>${periodoABuscar}</b>):</td>
                 <td style="text-align:right; border-top:2px solid #333;">${totalD.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
                 <td style="text-align:right; border-top:2px solid #333;">${totalC.toLocaleString('de-DE', {minimumFractionDigits: 2})}</td>
             </tr></tbody></table>`;
@@ -1140,7 +1148,6 @@ document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
     const pElement = document.getElementById('textoPeriodoDiario');
-    // Limpiamos el texto para que solo quede el nombre del periodo
     const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
 
     if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
@@ -1160,57 +1167,43 @@ async function cerrarMesActual() {
     if (!confirmacion.isConfirmed) return;
 
     try {
-        // 1. Opcional: Archivar en Supabase (Si ya lo manejas por historial, esto es preventivo)
-        // await _supabase.from('asientos').update({ periodo: 'ARCHIVADO_' + periodoCerrando }).eq('periodo', periodoCerrando);
+        // 1. ARCHIVAR: Le ponemos el prefijo a los asientos para que el sistema sepa que están cerrados
+        await _supabase
+            .from('asientos')
+            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
+            .eq('periodo', periodoCerrando);
         
+        // 2. REGISTRAR EL CIERRE
         await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0] 
         }]);
 
-        // 2. Limpiar la base de datos global (Tabla empresa)
-        const { error } = await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
-        if (error) throw error;
+        // 3. LIMPIAR EMPRESA
+        await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
-        // --- 3. LO NUEVO: LIMPIEZA DE MEMORIA PRIVADA (LOCALSTORAGE) ---
+        // 4. LIMPIAR LOCALSTORAGE
         const userId = localStorage.getItem('usuario_id');
-        if (userId) {
-            localStorage.removeItem(`periodo_activo_${userId}`);
-        }
-        // También limpiamos la variable global
+        if (userId) localStorage.removeItem(`periodo_activo_${userId}`);
         periodoActivo = "---";
 
-        // 4. LIMPIEZA VISUAL TOTAL
-        const ids = [
-            'textoPeriodoDiario', 
-            'mayorPeriodoHeader', 
-            'balance-periodo-header', 
-            'periodoSeleccionadoHistorial',
-            'periodoAsientoManual'
-        ];
-
+        // 5. LIMPIEZA VISUAL
+        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial', 'periodoAsientoManual'];
         ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
-                el.innerText = "---";
-                el.style.color = "#94a3b8"; 
-            }
+            if (el) { el.innerText = "---"; el.style.color = "#94a3b8"; }
         });
 
-        // 5. LIMPIAR CONTENEDORES DE DATOS (Para que no se vean tablas viejas)
+        // Vaciamos tablas
         if (document.getElementById('tabla-registros')) document.getElementById('tabla-registros').innerHTML = "";
-        if (document.getElementById('contenedor-mayor')) document.getElementById('contenedor-mayor').innerHTML = "";
-        if (document.getElementById('contenedor-balance')) document.getElementById('contenedor-balance').innerHTML = "";
 
-        await Swal.fire("Éxito", "Mes cerrado correctamente.", "success");
-        
-        // 6. Recarga para resetear todo el estado de la app
+        await Swal.fire("Éxito", "Mes cerrado y archivado correctamente.", "success");
         location.reload(); 
 
     } catch (err) {
         Swal.fire("Error", err.message, "error");
     }
-}
+    }
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

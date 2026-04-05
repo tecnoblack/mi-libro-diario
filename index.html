@@ -1871,22 +1871,60 @@ function irAMayor() {
     if (!nombreLimpio) return;
 
     try {
-        // 1. Guardar en la base de datos (Supabase)
+        // Guardar en Supabase
         await _supabase.from('empresa').update({ "nombre": nombreLimpio }).eq('id', 1);
 
-        // 2. ACTUALIZACIÓN INSTANTÁNEA:
-        // Buscamos los otros dos IDs y les ponemos el mismo nombre que acabas de escribir
+        // ACTUALIZACIÓN EN CALIENTE:
+        // Esto cambia los otros títulos sin esperar a recargar la página
         const ids = ['mayorEmpresaNombre', 'balance-empresa-nombre'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = nombreLimpio;
         });
 
-        console.log("Sincronización completa: " + nombreLimpio);
     } catch (e) {
-        console.error("Error al sincronizar nombres:", e);
+        console.error("Error al guardar:", e);
     }
-            }
+    }
+
+    async function sincronizarNombresAlInicio() {
+    try {
+        // 1. Traemos el nombre de la tabla empresa
+        const { data, error } = await _supabase
+            .from('empresa')
+            .select('nombre')
+            .eq('id', 1)
+            .single();
+
+        if (error) throw error;
+
+        if (data && data.nombre) {
+            const nombreGuardado = data.nombre;
+
+            // 2. Buscamos todos los IDs donde debe aparecer el nombre
+            const ids = [
+                'empresaNombre',          // El principal editable
+                'mayorEmpresaNombre',     // El del Libro Mayor
+                'balance-empresa-nombre'  // El del Balance
+            ];
+
+            // 3. Los actualizamos uno por uno
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerText = nombreGuardado;
+                }
+            });
+            
+            console.log("Nombres sincronizados desde la base de datos: " + nombreGuardado);
+        }
+    } catch (e) {
+        console.error("Error al sincronizar al inicio:", e.message);
+    }
+}
+
+// IMPORTANTE: Ejecutar la función apenas cargue el script
+sincronizarNombresAlInicio();
     
 </script>
 

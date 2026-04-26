@@ -1182,39 +1182,64 @@ if (authError || !user) {
 }
 
 // B. Insertar el cierre y OBTENER EL ID generado
-const { data: nuevoCierre, error: insertError } = await _supabase
-    .from('cierres_historicos')
-    .insert([{
-        nombre_periodo: periodoCerrando,
-        fecha_cierre: new Date().toISOString().split('T')[0],
-        usuario_id: user.id // <-- Columna correcta
-    }])
-    .select(); // El .select() es para que nos devuelva el ID creado
+async function cerrarMesActual() {
+    const pElement = document.getElementById('textoPeriodoDiario');
+    const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
 
-if (insertError) {
-    console.error("Error al registrar cierre:", insertError.message);
-    alert("No se pudo registrar el cierre: " + insertError.message);
-    return;
-}
+    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
+        Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
+        return;
+    }
 
-// C. (OPCIONAL PERO RECOMENDADO) Actualizar los asientos con el ID del cierre
-// Esto es lo que hace que el REF se reinicie de verdad
-if (nuevoCierre && nuevoCierre.length > 0) {
-    const idDelCierre = nuevoCierre[0].id;
-    
-    await _supabase
-        .from('asientos')
-        .update({ cierre_id: idDelCierre })
-        .eq('periodo', periodoCerrando)
-        .eq('user_id', user.id);
-}
+    const confirmacion = await Swal.fire({
+        title: `¿Cerrar ${periodoCerrando}?`,
+        text: "El periodo se archivará y los folios se reiniciarán.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cerrar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirmacion.isConfirmed) return;
+
+    try {
+        // --- AQUÍ EMPIEZA EL REEMPLAZO SEGURO ---
+        
+        const { data: { user } } = await _supabase.auth.getUser();
+        if (!user) throw new Error("No se detectó sesión de usuario.");
+
+        // 1. REGISTRAR EL CIERRE Y OBTENER EL ID
+        const { data: dataCierre, error: errorC } = await _supabase
+            .from('cierres_historicos')
+            .insert([{ 
+                nombre_periodo: periodoCerrando, 
+                fecha_cierre: new Date().toISOString().split('T')[0],
+                usuario_id: user.id // <-- Ahora sí es privado
+            }])
+            .select(); 
+
+        if (errorC) throw errorC;
+        const idGenerado = dataCierre[0].id;
+
+        // 2. ARCHIVAR ASIENTOS Y PONER EL ID (Se acabó el NULL)
+        const { error: errorA } = await _supabase
+            .from('asientos')
+            .update({ 
+                periodo: 'ARCHIVADO_' + periodoCerrando,
+                cierre_id: idGenerado // <-- Vinculación automática
+            })
+            .eq('periodo', periodoCerrando)
+            .eq('user_id', user.id);
+
+        if (errorA) throw errorA;
+
+        // --- FIN DEL REEMPLAZO ---
 
         // 3. LIMPIAR EMPRESA
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
         // 4. LIMPIAR LOCALSTORAGE
-        const userId = localStorage.getItem('usuario_id');
-        if (userId) localStorage.removeItem(`periodo_activo_${userId}`);
+        localStorage.removeItem(`periodo_activo_${user.id}`);
         periodoActivo = "---";
 
         // 5. LIMPIEZA VISUAL
@@ -1224,16 +1249,13 @@ if (nuevoCierre && nuevoCierre.length > 0) {
             if (el) { el.innerText = "---"; el.style.color = "#94a3b8"; }
         });
 
-        // Vaciamos tablas
-        if (document.getElementById('tabla-registros')) document.getElementById('tabla-registros').innerHTML = "";
-
-        await Swal.fire("Éxito", "Mes cerrado y archivado correctamente.", "success");
+        await Swal.fire("Éxito", "Mes cerrado correctamente. El próximo asiento será REF 1.", "success");
         location.reload(); 
 
     } catch (err) {
         Swal.fire("Error", err.message, "error");
     }
-    }
+}
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

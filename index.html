@@ -1111,41 +1111,46 @@ async function cerrarMesActual() {
         const pElement = document.getElementById('textoPeriodoDiario');
         const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
         
-        if (periodoCerrando === "---" || !periodoCerrando) return;
+        if (!periodoCerrando || periodoCerrando === "---") return;
 
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // 1. REGISTRAR EL CIERRE PRIMERO
-        // Así, cuando actualicemos los asientos, el Trigger ya tendrá un ID listo
-        const { error: errC } = await _supabase.from('cierres_historicos').insert([{ 
-            nombre_periodo: periodoCerrando, 
-            fecha_cierre: new Date().toISOString().split('T')[0],
-            usuario_id: user.id 
-        }]);
-        if (errC) throw errC;
+        // A. CREAR EL CIERRE Y OBTENER EL ID EN EL MOMENTO
+        const { data: cierreCreado, error: errC } = await _supabase
+            .from('cierres_historicos')
+            .insert([{ 
+                nombre_periodo: periodoCerrando, 
+                fecha_cierre: new Date().toISOString().split('T')[0],
+                usuario_id: user.id 
+            }])
+            .select(); // <--- ESTO ES CLAVE: nos devuelve el ID recién creado
 
-        // 2. ARCHIVAR ASIENTOS
-        // Al ejecutarse esto, el Trigger de SQL le pone el ID de cierre automáticamente
+        if (errC) throw errC;
+        const idDelCierre = cierreCreado[0].id;
+
+        // B. ACTUALIZAR LOS ASIENTOS ENVIANDO EL ID DIRECTAMENTE
+        // Ya no dependemos del trigger, se lo damos "masticadito"
         const { error: errA } = await _supabase
             .from('asientos')
-            .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
+            .update({ 
+                periodo: 'ARCHIVADO_' + periodoCerrando,
+                cierre_id: idDelCierre  // <--- FORZAMOS EL ID AQUÍ
+            })
             .eq('periodo', periodoCerrando)
             .eq('user_id', user.id);
+
         if (errA) throw errA;
 
-        // 3. LIMPIAR MEMORIA DEL REF (Clave para que el próximo empiece en 1)
+        // C. RESETEAR MEMORIA PARA EL NUEVO MES
         diccionarioCuentasGlobal = {}; 
-        localStorage.removeItem(`periodo_activo_${user.id}`);
-
-        // 4. LIMPIAR EMPRESA
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
-        await Swal.fire("Éxito", "Mes cerrado. El próximo registro será REF 1.", "success");
-        location.reload(); 
+        await Swal.fire("Éxito", "Mes cerrado. El REF se ha reiniciado.", "success");
+        location.reload();
 
     } catch (err) {
-        console.error("Error al cerrar:", err);
-        Swal.fire("Error", "No se pudo cerrar el mes.", "error");
+        console.error("Error crítico:", err);
+        Swal.fire("Error", "No se pudo cerrar: " + err.message, "error");
     }
 }
     

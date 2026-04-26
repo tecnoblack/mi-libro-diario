@@ -1110,10 +1110,13 @@ async function cerrarMesActual() {
     try {
         const pElement = document.getElementById('textoPeriodoDiario');
         const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+        
+        if (periodoCerrando === "---" || !periodoCerrando) return;
+
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // PASO 1: CREAR EL CIERRE PRIMERO
-        // Así, cuando actualicemos los asientos, el Trigger ya tendrá un ID que copiar
+        // 1. REGISTRAR EL CIERRE PRIMERO
+        // Así, cuando actualicemos los asientos, el Trigger ya tendrá un ID listo
         const { error: errC } = await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0],
@@ -1121,8 +1124,8 @@ async function cerrarMesActual() {
         }]);
         if (errC) throw errC;
 
-        // PASO 2: ACTUALIZAR LOS ASIENTOS
-        // Aquí es donde el Trigger de SQL se activa y llena el cierre_id automáticamente
+        // 2. ARCHIVAR ASIENTOS
+        // Al ejecutarse esto, el Trigger de SQL le pone el ID de cierre automáticamente
         const { error: errA } = await _supabase
             .from('asientos')
             .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
@@ -1130,15 +1133,19 @@ async function cerrarMesActual() {
             .eq('user_id', user.id);
         if (errA) throw errA;
 
-        // PASO 3: LIMPIAR DATOS DE EMPRESA
+        // 3. LIMPIAR MEMORIA DEL REF (Clave para que el próximo empiece en 1)
+        diccionarioCuentasGlobal = {}; 
+        localStorage.removeItem(`periodo_activo_${user.id}`);
+
+        // 4. LIMPIAR EMPRESA
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
-        await Swal.fire("Éxito", "Mes cerrado. El próximo mes iniciará desde REF 1.", "success");
+        await Swal.fire("Éxito", "Mes cerrado. El próximo registro será REF 1.", "success");
         location.reload(); 
 
     } catch (err) {
-        console.error(err);
-        Swal.fire("Error", "No se pudo cerrar: " + err.message, "error");
+        console.error("Error al cerrar:", err);
+        Swal.fire("Error", "No se pudo cerrar el mes.", "error");
     }
 }
     

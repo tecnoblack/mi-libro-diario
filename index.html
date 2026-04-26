@@ -1113,7 +1113,8 @@ async function cerrarMesActual() {
         
         if (!periodoCerrando || periodoCerrando === "---") return;
 
-        // 1. Efecto Visual Inmediato: Bloquear botón y mostrar que está procesando
+        // 1. EFECTO VISUAL INMEDIATO
+        // Mostramos cargando para que el usuario no toque nada
         Swal.fire({
             title: 'Cerrando mes...',
             text: 'Guardando históricos y reiniciando folios',
@@ -1123,7 +1124,7 @@ async function cerrarMesActual() {
 
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // 2. CREAR EL CIERRE
+        // 2. CREAR EL REGISTRO DE CIERRE (Esto debe ir primero para tener el ID)
         const { data: cierreCreado, error: errC } = await _supabase
             .from('cierres_historicos')
             .insert([{ 
@@ -1136,31 +1137,35 @@ async function cerrarMesActual() {
         if (errC) throw errC;
         const idDelCierre = cierreCreado[0].id;
 
-        // 3. ACTUALIZAR ASIENTOS Y EMPRESA EN PARALELO (Para ganar velocidad)
-        // Usamos Promise.all para que ambas cosas se hagan al mismo tiempo
+        // 3. PROCESO EN PARALELO (Aquí es donde ganas velocidad)
+        // Ejecutamos la actualización de asientos y el reset de empresa AL MISMO TIEMPO
         const [resAsientos, resEmpresa] = await Promise.all([
             _supabase.from('asientos')
-                .update({ periodo: 'ARCHIVADO_' + periodoCerrando, cierre_id: idDelCierre })
-                .eq('periodo', periodoCerrando).eq('user_id', user.id),
+                .update({ 
+                    periodo: 'ARCHIVADO_' + periodoCerrando,
+                    cierre_id: idDelCierre 
+                })
+                .eq('periodo', periodoCerrando)
+                .eq('user_id', user.id),
             
             _supabase.from('empresa')
                 .update({ "periodo_actual": "---" })
-                .eq('id', 1) // Asegúrate que el ID sea el correcto de tu empresa
+                .eq('id', 1) // Asegúrate que este sea el ID de tu fila de empresa
         ]);
 
         if (resAsientos.error) throw resAsientos.error;
         if (resEmpresa.error) throw resEmpresa.error;
 
-        // 4. LIMPIEZA RADICAL DE MEMORIA
+        // 4. LIMPIEZA TOTAL DE MEMORIA
         diccionarioCuentasGlobal = {}; 
-        localStorage.removeItem(`periodo_activo_${user.id}`);
+        localStorage.removeItem(`periodo_activo_${user.id}`); // <--- CRUCIAL
         
-        // Limpiar el texto en pantalla manualmente antes de recargar
+        // Cambiamos el texto en pantalla manualmente antes del reload
         if (pElement) pElement.innerText = "Periodo: ---";
 
-        await Swal.fire("Éxito", "Mes cerrado y REF reiniciado correctamente.", "success");
+        await Swal.fire("Éxito", "Mes cerrado. El REF se ha reiniciado.", "success");
         
-        // 5. RECARGA TOTAL para asegurar que todo el JS empiece de cero
+        // Forzamos el refresco para limpiar cualquier variable residual
         window.location.reload();
 
     } catch (err) {

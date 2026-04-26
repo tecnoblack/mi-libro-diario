@@ -1174,13 +1174,40 @@ async function cerrarMesActual() {
             .eq('periodo', periodoCerrando);
         
         // 2. REGISTRAR EL CIERRE
-       const { data: { user } } = await _supabase.auth.getUser(); // Obtenemos el usuario actual
+    const { data: { user }, error: authError } = await _supabase.auth.getUser();
 
-await _supabase.from('cierres_historicos').insert([{
-    nombre_periodo: periodoCerrando,
-    fecha_cierre: new Date().toISOString().split('T')[0],
-    usuario_id: user.id  // <--- ESTA ES LA LÍNEA QUE FALTA
-}]);
+if (authError || !user) {
+    alert("Sesión expirada. Por favor, inicia sesión de nuevo.");
+    return;
+}
+
+// B. Insertar el cierre y OBTENER EL ID generado
+const { data: nuevoCierre, error: insertError } = await _supabase
+    .from('cierres_historicos')
+    .insert([{
+        nombre_periodo: periodoCerrando,
+        fecha_cierre: new Date().toISOString().split('T')[0],
+        usuario_id: user.id // <-- Columna correcta
+    }])
+    .select(); // El .select() es para que nos devuelva el ID creado
+
+if (insertError) {
+    console.error("Error al registrar cierre:", insertError.message);
+    alert("No se pudo registrar el cierre: " + insertError.message);
+    return;
+}
+
+// C. (OPCIONAL PERO RECOMENDADO) Actualizar los asientos con el ID del cierre
+// Esto es lo que hace que el REF se reinicie de verdad
+if (nuevoCierre && nuevoCierre.length > 0) {
+    const idDelCierre = nuevoCierre[0].id;
+    
+    await _supabase
+        .from('asientos')
+        .update({ cierre_id: idDelCierre })
+        .eq('periodo', periodoCerrando)
+        .eq('user_id', user.id);
+}
 
         // 3. LIMPIAR EMPRESA
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);

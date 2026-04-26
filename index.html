@@ -576,46 +576,6 @@ function ocultarSplash() {
     }
 }
 
-function asignarRefInteligente(elemento) {
-    const fila = elemento.closest('tr');
-    const celdaRef = fila.querySelector('.col-ref');
-    const nombre = elemento.innerText.trim().toUpperCase();
-
-    if (nombre === "") {
-        celdaRef.innerText = "";
-        return;
-    }
-
-    // 1. Si la cuenta ya existe en la memoria, poner su número y salir
-    if (diccionarioCuentasGlobal[nombre]) {
-        celdaRef.innerText = diccionarioCuentasGlobal[nombre];
-        return;
-    }
-
-    // 2. Si es una cuenta NUEVA, vamos a buscar el máximo de verdad:
-    let maximoEncontrado = 0;
-
-    // Revisamos el diccionario (lo que viene de Supabase)
-    const valoresHistorial = Object.values(diccionarioCuentasGlobal);
-    if (valoresHistorial.length > 0) {
-        maximoEncontrado = Math.max(...valoresHistorial.map(v => parseInt(v) || 0));
-    }
-
-    // Revisamos también lo que tienes escrito en pantalla ahora mismo
-    document.querySelectorAll('.col-ref').forEach(celda => {
-        const num = parseInt(celda.innerText) || 0;
-        if (num > maximoEncontrado) maximoEncontrado = num;
-    });
-
-    // 3. El nuevo número es el máximo + 1
-    const nuevoNumero = maximoEncontrado + 1;
-    
-    celdaRef.innerText = nuevoNumero;
-    
-    // IMPORTANTE: Guardarlo en la memoria de inmediato para que no se repita
-    diccionarioCuentasGlobal[nombre] = nuevoNumero;
-}
-    
   function agregarFila() {
     const ahora = new Date();
     const fechaAuto = ahora.getDate() + '/' + (ahora.getMonth() + 1) + '/' + ahora.getFullYear();
@@ -1147,63 +1107,39 @@ async function cargarConfiguracionInicial() {
 document.addEventListener('DOMContentLoaded', cargarConfiguracionInicial);
 
 async function cerrarMesActual() {
-    const pElement = document.getElementById('textoPeriodoDiario');
-    const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
-
-    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
-        Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
-        return;
-    }
-
-    const confirmacion = await Swal.fire({
-        title: `¿Cerrar ${periodoCerrando}?`,
-        text: "El periodo se archivará y se limpiará tu vista actual.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, cerrar',
-        cancelButtonText: 'Cancelar'
-    });
-
-    if (!confirmacion.isConfirmed) return;
-
     try {
-        // 1. ARCHIVAR: Le ponemos el prefijo a los asientos para que el sistema sepa que están cerrados
-        await _supabase
+        const pElement = document.getElementById('textoPeriodoDiario');
+        const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+        if (periodoCerrando === "---" || !periodoCerrando) return;
+
+        const { data: { user } } = await _supabase.auth.getUser();
+
+        // PASO 1: Crear el cierre histórico primero
+        const { error: errC } = await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodoCerrando, 
+            fecha_cierre: new Date().toISOString().split('T')[0],
+            usuario_id: user.id 
+        }]);
+        if (errC) throw errC;
+
+        // PASO 2: Archivar asientos (Esto activa el Trigger de SQL automáticamente)
+        const { error: errA } = await _supabase
             .from('asientos')
             .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
-            .eq('periodo', periodoCerrando);
-        
-        // 2. REGISTRAR EL CIERRE
-        await _supabase.from('cierres_historicos').insert([{ 
-            nombre_periodo: periodoCerrando, 
-            fecha_cierre: new Date().toISOString().split('T')[0] 
-        }]);
+            .eq('periodo', periodoCerrando)
+            .eq('user_id', user.id);
+        if (errA) throw errA;
 
-        // 3. LIMPIAR EMPRESA
+        // PASO 3: Limpiar periodo actual
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
-        // 4. LIMPIAR LOCALSTORAGE
-        const userId = localStorage.getItem('usuario_id');
-        if (userId) localStorage.removeItem(`periodo_activo_${userId}`);
-        periodoActivo = "---";
-
-        // 5. LIMPIEZA VISUAL
-        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial', 'periodoAsientoManual'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { el.innerText = "---"; el.style.color = "#94a3b8"; }
-        });
-
-        // Vaciamos tablas
-        if (document.getElementById('tabla-registros')) document.getElementById('tabla-registros').innerHTML = "";
-
-        await Swal.fire("Éxito", "Mes cerrado y archivado correctamente.", "success");
+        await Swal.fire("Éxito", "Mes cerrado. El próximo mes iniciará desde REF 1.", "success");
         location.reload(); 
 
     } catch (err) {
-        Swal.fire("Error", err.message, "error");
+        Swal.fire("Error", "No se pudo completar el cierre", "error");
     }
-    }
+}
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');

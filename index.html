@@ -1113,9 +1113,17 @@ async function cerrarMesActual() {
         
         if (!periodoCerrando || periodoCerrando === "---") return;
 
+        // 1. Efecto Visual Inmediato: Bloquear botón y mostrar que está procesando
+        Swal.fire({
+            title: 'Cerrando mes...',
+            text: 'Guardando históricos y reiniciando folios',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // A. CREAR EL CIERRE Y OBTENER EL ID EN EL MOMENTO
+        // 2. CREAR EL CIERRE
         const { data: cierreCreado, error: errC } = await _supabase
             .from('cierres_historicos')
             .insert([{ 
@@ -1123,30 +1131,37 @@ async function cerrarMesActual() {
                 fecha_cierre: new Date().toISOString().split('T')[0],
                 usuario_id: user.id 
             }])
-            .select(); // <--- ESTO ES CLAVE: nos devuelve el ID recién creado
+            .select();
 
         if (errC) throw errC;
         const idDelCierre = cierreCreado[0].id;
 
-        // B. ACTUALIZAR LOS ASIENTOS ENVIANDO EL ID DIRECTAMENTE
-        // Ya no dependemos del trigger, se lo damos "masticadito"
-        const { error: errA } = await _supabase
-            .from('asientos')
-            .update({ 
-                periodo: 'ARCHIVADO_' + periodoCerrando,
-                cierre_id: idDelCierre  // <--- FORZAMOS EL ID AQUÍ
-            })
-            .eq('periodo', periodoCerrando)
-            .eq('user_id', user.id);
+        // 3. ACTUALIZAR ASIENTOS Y EMPRESA EN PARALELO (Para ganar velocidad)
+        // Usamos Promise.all para que ambas cosas se hagan al mismo tiempo
+        const [resAsientos, resEmpresa] = await Promise.all([
+            _supabase.from('asientos')
+                .update({ periodo: 'ARCHIVADO_' + periodoCerrando, cierre_id: idDelCierre })
+                .eq('periodo', periodoCerrando).eq('user_id', user.id),
+            
+            _supabase.from('empresa')
+                .update({ "periodo_actual": "---" })
+                .eq('id', 1) // Asegúrate que el ID sea el correcto de tu empresa
+        ]);
 
-        if (errA) throw errA;
+        if (resAsientos.error) throw resAsientos.error;
+        if (resEmpresa.error) throw resEmpresa.error;
 
-        // C. RESETEAR MEMORIA PARA EL NUEVO MES
+        // 4. LIMPIEZA RADICAL DE MEMORIA
         diccionarioCuentasGlobal = {}; 
-        await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
+        localStorage.removeItem(`periodo_activo_${user.id}`);
+        
+        // Limpiar el texto en pantalla manualmente antes de recargar
+        if (pElement) pElement.innerText = "Periodo: ---";
 
-        await Swal.fire("Éxito", "Mes cerrado. El REF se ha reiniciado.", "success");
-        location.reload();
+        await Swal.fire("Éxito", "Mes cerrado y REF reiniciado correctamente.", "success");
+        
+        // 5. RECARGA TOTAL para asegurar que todo el JS empiece de cero
+        window.location.reload();
 
     } catch (err) {
         console.error("Error crítico:", err);

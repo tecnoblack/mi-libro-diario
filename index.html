@@ -1110,11 +1110,10 @@ async function cerrarMesActual() {
     try {
         const pElement = document.getElementById('textoPeriodoDiario');
         const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
-        if (periodoCerrando === "---" || !periodoCerrando) return;
-
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // PASO 1: Crear el cierre histórico primero
+        // PASO 1: CREAR EL CIERRE PRIMERO
+        // Así, cuando actualicemos los asientos, el Trigger ya tendrá un ID que copiar
         const { error: errC } = await _supabase.from('cierres_historicos').insert([{ 
             nombre_periodo: periodoCerrando, 
             fecha_cierre: new Date().toISOString().split('T')[0],
@@ -1122,7 +1121,8 @@ async function cerrarMesActual() {
         }]);
         if (errC) throw errC;
 
-        // PASO 2: Archivar asientos (Esto activa el Trigger de SQL automáticamente)
+        // PASO 2: ACTUALIZAR LOS ASIENTOS
+        // Aquí es donde el Trigger de SQL se activa y llena el cierre_id automáticamente
         const { error: errA } = await _supabase
             .from('asientos')
             .update({ periodo: 'ARCHIVADO_' + periodoCerrando })
@@ -1130,14 +1130,15 @@ async function cerrarMesActual() {
             .eq('user_id', user.id);
         if (errA) throw errA;
 
-        // PASO 3: Limpiar periodo actual
+        // PASO 3: LIMPIAR DATOS DE EMPRESA
         await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
         await Swal.fire("Éxito", "Mes cerrado. El próximo mes iniciará desde REF 1.", "success");
         location.reload(); 
 
     } catch (err) {
-        Swal.fire("Error", "No se pudo completar el cierre", "error");
+        console.error(err);
+        Swal.fire("Error", "No se pudo cerrar: " + err.message, "error");
     }
 }
     

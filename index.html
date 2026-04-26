@@ -1174,57 +1174,36 @@ async function cerrarMesActual() {
             .eq('periodo', periodoCerrando);
         
         // 2. REGISTRAR EL CIERRE
-    const { data: { user }, error: authError } = await _supabase.auth.getUser();
+        await _supabase.from('cierres_historicos').insert([{ 
+            nombre_periodo: periodoCerrando, 
+            fecha_cierre: new Date().toISOString().split('T')[0] 
+        }]);
 
-if (authError || !user) {
-    alert("Sesión expirada. Por favor, inicia sesión de nuevo.");
-    return;
-}
+        // 3. LIMPIAR EMPRESA
+        await _supabase.from('empresa').update({ "periodo_actual": "---" }).eq('id', 1);
 
-// B. Insertar el cierre y OBTENER EL ID generado
-async function cerrarMesActual() {
-    const pElement = document.getElementById('textoPeriodoDiario');
-    const periodoCerrando = pElement ? pElement.innerText.replace(/Periodo:|PERIODO:/gi, "").trim() : "";
+        // 4. LIMPIAR LOCALSTORAGE
+        const userId = localStorage.getItem('usuario_id');
+        if (userId) localStorage.removeItem(`periodo_activo_${userId}`);
+        periodoActivo = "---";
 
-    if (periodoCerrando === "---" || !periodoCerrando || periodoCerrando === "Sin asignar") {
-        Swal.fire("Aviso", "No hay un periodo activo para cerrar.", "info");
-        return;
+        // 5. LIMPIEZA VISUAL
+        const ids = ['textoPeriodoDiario', 'mayorPeriodoHeader', 'balance-periodo-header', 'periodoSeleccionadoHistorial', 'periodoAsientoManual'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.innerText = "---"; el.style.color = "#94a3b8"; }
+        });
+
+        // Vaciamos tablas
+        if (document.getElementById('tabla-registros')) document.getElementById('tabla-registros').innerHTML = "";
+
+        await Swal.fire("Éxito", "Mes cerrado y archivado correctamente.", "success");
+        location.reload(); 
+
+    } catch (err) {
+        Swal.fire("Error", err.message, "error");
     }
-
-    const confirmacion = await Swal.fire({
-        title: `¿Cerrar ${periodoCerrando}?`,
-        text: "El periodo se archivará y los folios se reiniciarán.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, cerrar',
-        cancelButtonText: 'Cancelar'
-    });
-
-    if (!confirmacion.isConfirmed) return;
-
-    try {
-        // --- AQUÍ EMPIEZA EL REEMPLAZO SEGURO ---
-        
-        const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) throw new Error("No se detectó sesión de usuario.");
-
-        // 1. REGISTRAR EL CIERRE Y OBTENER EL ID
-      // 1. ARCHIVAR ASIENTOS (Como lo tenías originalmente)
-await _supabase
-    .from('asientos')
-    .update({ 
-        periodo: 'ARCHIVADO_' + periodoCerrando 
-    })
-    .eq('periodo', periodoCerrando)
-    .eq('user_id', user.id);
-
-// 2. REGISTRAR EL CIERRE
-// Solo añadimos usuario_id para que no veas los cierres de otros
-await _supabase.from('cierres_historicos').insert([{ 
-    nombre_periodo: periodoCerrando, 
-    fecha_cierre: new Date().toISOString().split('T')[0],
-    usuario_id: user.id 
-}]);
+    }
     
 async function cargarListaCierres() {
     const contenedor = document.getElementById('lista-meses-historial');
@@ -1256,6 +1235,7 @@ async function cargarListaCierres() {
 }
 
 async function cargarRegistros() {
+    // 1. Obtenemos el periodo de la etiqueta azul
     const periodoElemento = document.getElementById('textoPeriodoDiario');
     if (!periodoElemento) return;
     
@@ -1263,42 +1243,44 @@ async function cargarRegistros() {
     const periodo = periodoRaw.replace(/Periodo:|PERIODO:/gi, "").trim();
 
     try {
-        // --- NUEVO: OBTENER EL USUARIO ACTUAL ---
-        const { data: { user } } = await _supabase.auth.getUser();
-        if (!user) {
-            console.error("No hay sesión de usuario activa");
-            return;
-        }
-
-        // 2. CONSULTA FILTRADA (Periodo + Usuario)
+        // 2. CONSULTA COMPLETA A SUPABASE (Todo el bloque debe ir junto)
         const { data, error } = await _supabase
             .from('asientos')
             .select('*')
-            .eq('periodo', periodo)      // Filtra por mes
-            .eq('user_id', user.id)      // <--- FILTRO CRÍTICO: Filtra por dueño
+            .eq('periodo', periodo)
             .order('fecha', { ascending: true });
 
         if (error) throw error;
 
-        // ... (el resto de tu código de limpieza de tablas sigue igual)
+        // 3. Limpiamos las tablas visualmente
         const cuerpoDiario = document.getElementById('cuerpo-diario');
+        const contenedorMayor = document.getElementById('contenedor-cuentas-mayor');
+        
         if (cuerpoDiario) cuerpoDiario.innerHTML = '';
+        if (contenedorMayor) contenedorMayor.innerHTML = '';
 
+        // 4. Si el periodo es "---" o no hay datos, mostramos mensaje de vacío
         if (!data || data.length === 0) {
             if (cuerpoDiario) {
-                cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">📭 Hoja en blanco. Este periodo es solo tuyo.</td></tr>';
+                cuerpoDiario.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">📭 Hoja en blanco. Seleccione un periodo activo.</td></tr>';
             }
             return;
         }
 
+        // 5. DIBUJAR LAS TABLAS
+        // Aquí usamos "false" porque cargarRegistros() se usa para el diario de trabajo (editable)
         if (typeof mostrarAsientosEnTabla === 'function') {
             mostrarAsientosEnTabla(data, false); 
         }
-        // ...
+        
+        if (typeof generarMayor === 'function') {
+            generarMayor(data);
+        }
+
     } catch (err) {
         console.error("Error al sincronizar libros:", err);
     }
-}
+            }
     
     // 1. Función para mostrar los botones de Diario/Mayor
 function mostrarOpcionesReporte() {

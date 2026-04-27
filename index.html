@@ -613,7 +613,6 @@ function ocultarSplash() {
     let montoTotal = 0;
     let esVenta = false; 
 
-    // 1. Identificar la fila que tiene el monto total (Caja, Banco, CxC, CxP)
     const palabrasTotal = ['caja', 'banco', 'cobrar', 'pagar', 'cliente', 'proveedor'];
     
     filas.forEach(f => {
@@ -625,7 +624,6 @@ function ocultarSplash() {
             if (d > 0 || c > 0) {
                 filaTotal = f;
                 montoTotal = d > 0 ? d : c;
-                // Si el monto total está en el DEBE, es una Venta (entra dinero o deuda a favor)
                 esVenta = d > 0; 
             }
         }
@@ -633,45 +631,48 @@ function ocultarSplash() {
 
     if (!filaTotal || montoTotal === 0) return;
 
-    // 2. Cálculos (IVA 16%)
-    const neto = (montoTotal / 1.16).toFixed(2);
-    const iva = (montoTotal - (montoTotal / 1.16)).toFixed(2);
+    // Calculamos montos fijos con 2 decimales
+    const netoNum = montoTotal / 1.16;
+    const ivaNum = montoTotal - netoNum;
 
-    // 3. Llenar las demás filas
     filas.forEach(f => {
-        if (f === filaTotal) return; // No tocar la fila del total
+        if (f === filaTotal) return; 
 
         const cuenta = f.querySelector('.txt-cuenta').innerText.toLowerCase().trim();
         const celdaD = f.querySelector('.val-debito');
         const celdaC = f.querySelector('.val-credito');
 
-        const estaVacia = (celda) => {
-            const v = celda.innerText.trim();
-            return v === "0" || v === "" || v === "0.00";
+        // Función para asignar valor en un lado y poner 0.00 en el otro
+        const asignarMonto = (lado, valor) => {
+            if (lado === 'DEBE') {
+                celdaD.innerText = valor.toFixed(2);
+                celdaC.innerText = "0.00"; // Limpia el lado contrario
+            } else {
+                celdaC.innerText = valor.toFixed(2);
+                celdaD.innerText = "0.00"; // Limpia el lado contrario
+            }
         };
 
-        // LÓGICA DE IVA
-        if (cuenta.includes('iva') || cuenta.includes('fiscal')) {
-            if (esVenta) {
-                // Venta -> IVA Débito Fiscal al HABER
-                if (estaVacia(celdaC)) celdaC.innerText = iva;
-            } else {
-                // Compra -> IVA Crédito Fiscal al DEBE
-                if (estaVacia(celdaD)) celdaD.innerText = iva;
-            }
-        } 
-        // LÓGICA DE LA CUENTA COMPLEMENTARIA (Venta, Compra, Gasto)
-        else if (cuenta !== "") {
-            if (esVenta) {
-                // Venta -> La cuenta de ingresos va al HABER
-                if (estaVacia(celdaC)) celdaC.innerText = neto;
-            } else {
-                // Compra -> La cuenta de gastos/activos va al DEBE
-                if (estaVacia(celdaD)) celdaD.innerText = neto;
+        const estaVacia = (cD, cC) => {
+            const vD = cD.innerText.trim();
+            const vC = cC.innerText.trim();
+            return (vD === "0" || vD === "" || vD === "0.00") && (vC === "0" || vC === "" || vC === "0.00");
+        };
+
+        // Solo actuamos si la fila de la cuenta está vacía en ambos lados
+        if (estaVacia(celdaD, celdaC) && cuenta !== "") {
+            if (cuenta.includes('iva') || cuenta.includes('fiscal')) {
+                if (esVenta) asignarMonto('HABER', ivaNum); // IVA Débito
+                else asignarMonto('DEBE', ivaNum);          // IVA Crédito
+            } 
+            else {
+                if (esVenta) asignarMonto('HABER', netoNum); // Ingreso por Venta
+                else asignarMonto('DEBE', netoNum);          // Gasto/Compra
             }
         }
     });
 
+    // IMPORTANTE: Al terminar, refrescar los totales
     actualizarTotales();
     }
     

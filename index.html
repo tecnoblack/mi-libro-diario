@@ -415,13 +415,38 @@ function ocultarSplash() {
             return;
         }
         
-        if (!perfil.suscripcion_activa) {
-            ocultarSplash(); 
-            await Swal.fire("Suscripción Vencida", "Tu acceso ha expirado.", "info");
-            await _supabase.auth.signOut();
-            cambiarVista('vista-login');
-            return;
+        // 1. Definimos la fecha de hoy (en formato AAAA-MM-DD para comparar fácil)
+const hoy = new Date().toISOString().split('T')[0]; 
+
+// 2. Verificamos si la suscripción está inactiva O si la fecha ya venció
+if (!perfil.suscripcion_activa || perfil.vencimiento < hoy) {
+    
+    // Si en la base de datos aún sale como "true" pero la fecha ya pasó, 
+    // lo actualizamos a "false" automáticamente en Supabase.
+    if (perfil.suscripcion_activa && perfil.vencimiento < hoy) {
+        try {
+            await _supabase
+                .from('perfiles')
+                .update({ suscripcion_activa: false })
+                .eq('id', perfil.id);
+        } catch (error) {
+            console.error("Error al auto-desactivar suscripción:", error);
         }
+    }
+
+    // 3. Bloqueamos el acceso y sacamos al usuario
+    ocultarSplash(); 
+    await Swal.fire({
+        icon: "warning",
+        title: "Suscripción Vencida",
+        text: `Tu acceso expiró el día ${perfil.vencimiento}. Por favor, contacta al administrador.`,
+        confirmButtonColor: "#2563eb"
+    });
+    
+    await _supabase.auth.signOut();
+    cambiarVista('vista-login');
+    return; // Detenemos la ejecución para que no entre a la app
+}
 
         if (estadoTexto) estadoTexto.innerText = "Sincronizando datos...";
         

@@ -125,6 +125,7 @@
                 <button id="btnActivarBorrado" class="btn-accion-azul" onclick="activarModoBorrado()">🗑️ Eliminar Asiento</button>
                 <button id="btnConfirmarBorrado" class="btn-accion-azul" style="display:none; background-color: var(--rojo-error);" onclick="confirmarEliminacion()">Confirmar Eliminación</button>
                 <button id="btnCancelarBorrado" class="btn-regresar" style="display:none; margin-bottom:0;" onclick="cancelarModoBorrado()">Cancelar</button>
+                <button class="btn-imprimir" onclick="imprimirLibroDiario()">🖨️ Imprimir</button>
             </div>
             <div id="tabla-registros">Cargando registros...</div>
             <button id="btn-abrir-modal" class="btn-flotante" onclick="abrirRegistroNuevo()">+</button>
@@ -134,6 +135,7 @@
     <div id="vista-mayor" class="seccion-vista">
         <div class="contenedor-principal">
             <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+            <button type="button" class="btn-imprimir" onclick="imprimirLibroMayor()">🖨️ Imprimir</button>
             <div class="header-contable">
                 <h1 id="mayorEmpresaNombre">COMERCIAL A B C, C.A.</h1>
                 <p>RIF: <span id="mayorEmpresaRif">J-00000000-0</span></p>
@@ -197,6 +199,9 @@
             <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                 <span>🔒</span> Finalizar y Cerrar Mes
             </button>
+            <span style="font-size:0.78rem; color:#64748b; font-weight:bold; align-self:center; white-space:nowrap;">📥 DESCARGAR PDF:</span>
+<button class="btn-imprimir" style="flex:1; font-size:0.85rem; padding:9px 14px;" onclick="imprimirHistorialDiario()">🖨️ Imprimir Diario</button>
+<button class="btn-imprimir" style="flex:1; font-size:0.85rem; padding:9px 14px; background:#1e40af;" onclick="imprimirHistorialMayor()">🖨️ Imprimir Mayor</button>
         </div>
         
         <div class="contenedor-principal">

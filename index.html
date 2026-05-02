@@ -180,6 +180,10 @@
                 <span>D: <span id="totalDebito">0.00</span> | C: <span id="totalCredito">0.00</span></span>
             </div>
             <div id="mensajeValidacion" style="margin-top:10px; font-weight:bold; text-align: center;"></div>
+           <button type="button" onclick="ejecutarIVAManualLibre()" 
+    style="background-color: #8b5cf6; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px;">
+    ✨ Desglosar IVA de la diferencia
+</button>
             <button id="btnGuardar" class="btn-accion-azul" style="width:100%; padding:15px; margin-top:20px;" onclick="guardarAsiento()">Guardar Asiento</button>
         </div>
     </div>
@@ -1932,6 +1936,72 @@ sincronizarNombresAlInicio();
 
 // Llama a la función al final del script para que se ejecute al abrir
 cargarNombreEmpresaInicial();
+
+    function ejecutarIVAManualLibre() {
+    const filas = Array.from(document.querySelectorAll('#contenedor-filas tr'));
+    
+    // 1. Calcular el total actual del Debe y del Haber
+    let sumaDebe = 0;
+    let sumaHaber = 0;
+
+    filas.forEach(f => {
+        sumaDebe += parseFloat(f.querySelector('.val-debito').innerText) || 0;
+        sumaHaber += parseFloat(f.querySelector('.val-credito').innerText) || 0;
+    });
+
+    // 2. Determinar qué lado es el que tiene el "Monto Total" y cuánto falta para cuadrar
+    let montoADesglosar = 0;
+    let ladoDestino = '';
+
+    if (sumaDebe > sumaHaber) {
+        // Si el Debe es mayor, el desglose (Neto e IVA) debe ir al HABER
+        montoADesglosar = sumaDebe - sumaHaber;
+        ladoDestino = 'HABER';
+    } else if (sumaHaber > sumaDebe) {
+        // Si el Haber es mayor, el desglose debe ir al DEBE
+        montoADesglosar = sumaHaber - sumaDebe;
+        ladoDestino = 'DEBE';
+    } else {
+        return Swal.fire("Asiento Cuadrado", "No hay ninguna diferencia para desglosar.", "info");
+    }
+
+    // 3. Buscar las dos primeras filas vacías para poner el resultado
+    const filasVacias = filas.filter(f => {
+        const cuenta = f.querySelector('.txt-cuenta').innerText.trim();
+        const d = parseFloat(f.querySelector('.val-debito').innerText) || 0;
+        const c = parseFloat(f.querySelector('.val-credito').innerText) || 0;
+        return cuenta !== "" && d === 0 && c === 0;
+    });
+
+    if (filasVacias.length < 2) {
+        return Swal.fire("Faltan filas", "Necesitas al menos 2 filas vacías (con cuenta seleccionada) para el Neto y el IVA", "warning");
+    }
+
+    // 4. Cálculos (IVA 16%)
+    const neto = montoADesglosar / 1.16;
+    const iva = montoADesglosar - neto;
+
+    // 5. Función para escribir el dinero
+    const escribir = (fila, valor) => {
+        const celdaD = fila.querySelector('.val-debito');
+        const celdaC = fila.querySelector('.val-credito');
+        if (ladoDestino === 'DEBE') {
+            celdaD.innerText = valor.toFixed(2);
+            celdaC.innerText = "0.00";
+        } else {
+            celdaC.innerText = valor.toFixed(2);
+            celdaD.innerText = "0.00";
+        }
+    };
+
+    // Asignar Neto a la primera vacía e IVA a la segunda
+    escribir(filasVacias[0], neto);
+    escribir(filasVacias[1], iva);
+
+    if (typeof actualizarTotales === "function") actualizarTotales();
+
+    Swal.fire("Desglosado", `Se desglosó la diferencia de ${montoADesglosar.toFixed(2)}`, "success");
+}
     
 </script>
 

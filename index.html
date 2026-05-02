@@ -191,43 +191,53 @@
     </div>
 
     <div id="vista-historial" class="seccion-vista">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <div>
+            <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
+            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
+        </div>
+        <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <span>🔒</span> Finalizar y Cerrar Mes
+        </button>
+    </div>
+    
+    <div class="contenedor-principal">
+        <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
+
+        <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h2 style="margin: 0; color: var(--azul-pro);">Historial de Cierres</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">Archiva el mes actual aquí</p>
+                <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
+                <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">---</h2>
             </div>
-            <button onclick="cerrarMesActual()" style="background: var(--rojo-error); color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                <span>🔒</span> Finalizar y Cerrar Mes
-            </button>        
-        <div class="contenedor-principal">
-            <button class="btn-regresar" onclick="cambiarVista('vista-menu')">← Menú</button>
-            <div style="background: white; border: 2px solid var(--azul-pro); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span style="color: #64748b; font-size: 0.8rem; font-weight: bold;">PERIODO SELECCIONADO:</span>
-                    <h2 id="periodoSeleccionadoHistorial" style="margin:0; color: var(--azul-pro);">---</h2>
-                </div>
-                <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px;">+</button>
+            <button onclick="abrirModalCierre()" style="background:var(--azul-pro); color:white; border:none; border-radius:50%; width:50px; height:50px; cursor:pointer; font-size:28px;">+</button>
+        </div>
+
+        <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
+        <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;"></div>
+        
+        <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
+            <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
+            
+            <span style="font-size:0.75rem; color:#64748b; font-weight:bold; margin-bottom:-5px;">👁️ VER EN PANTALLA:</span>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Diario</button>
+                <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Mayor</button>
+                <button class="btn-accion-azul" 
+                    style="flex:1; background: #ffffff; color: #1e293b; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" 
+                    onclick="verDetalleReporte('balance')">
+                    <span>⚖️</span> Bal.
+                </button>
             </div>
 
-            <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Cierres Archivados</h3>
-            <div id="lista-meses-historial" style="display: grid; gap: 10px; margin-top: 10px;"></div>
-            
-            <div id="selector-reportes" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--azul-pro); flex-direction: column; gap: 15px;">
-                <h3 id="titulo-reporte-seleccionado" style="margin:0; color:var(--azul-pro); text-align:center;"></h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 15px;">
+                <span style="font-size:0.78rem; color:#64748b; font-weight:bold; align-self:center; white-space:nowrap;">📥 DESCARGAR PDF:</span>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn-accion-azul" style="flex:1;" onclick="verDetalleReporte('diario')">📖 Libro Diario</button>
-                    <button class="btn-accion-azul" style="flex:1; background:#64748b;" onclick="verDetalleReporte('mayor')">🏦 Libro Mayor</button>
-                    <button class="btn-accion-azul" 
-        style="flex:1; background: #ffffff; color: #1e293b; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s;" 
-        onclick="verDetalleReporte('balance')"
-        onmouseover="this.style.borderColor='#2563eb'; this.style.color='#2563eb'"
-        onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#1e293b'">
-    <span style="font-size: 1.2rem;">⚖️</span> Balance
-        </div>
-                    </button>
+                    <button class="btn-imprimir" style="flex:1; font-size:0.85rem; padding:9px 14px;" onclick="imprimirHistorialDiario()">🖨️ Diario</button>
+                    <button class="btn-imprimir" style="flex:1; font-size:0.85rem; padding:9px 14px; background:#1e40af;" onclick="imprimirHistorialMayor()">🖨️ Mayor</button>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <div id="vista-balance" class="seccion-vista">

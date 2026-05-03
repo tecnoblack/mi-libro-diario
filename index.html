@@ -2019,8 +2019,6 @@ cargarNombreEmpresaInicial();
 
 async function imprimirHistorialDiario() {
     const { jsPDF } = window.jspdf;
-    
-    // 1. Identificar el periodo
     const tituloReporte = document.getElementById('titulo-reporte-seleccionado');
     let periodo = tituloReporte ? tituloReporte.innerText.replace('MES SELECCIONADO:', '').trim() : "";
     
@@ -2028,18 +2026,15 @@ async function imprimirHistorialDiario() {
         return Swal.fire("Error", "No se detectó el mes activo.", "error");
     }
 
-    // Mostrar carga
     Swal.fire({ 
-        title: 'Preparando documento...', 
-        text: 'Consultando base de datos',
+        title: 'Procesando...', 
+        text: 'Generando reporte contable',
         allowOutsideClick: false, 
         didOpen: () => { Swal.showLoading(); } 
     });
 
     try {
         const { data: { user } } = await _supabase.auth.getUser();
-
-        // 2. Obtener datos de Supabase
         const { data: asientos, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -2052,7 +2047,6 @@ async function imprimirHistorialDiario() {
             return Swal.fire("Sin datos", "No hay registros para este periodo.", "info");
         }
 
-        // 3. Crear el PDF en memoria
         const doc = new jsPDF();
         doc.setFontSize(16);
         doc.text("LIBRO DIARIO", 105, 20, { align: 'center' });
@@ -2075,42 +2069,63 @@ async function imprimirHistorialDiario() {
             headStyles: { fillColor: [37, 99, 235] }
         });
 
-        // 4. GENERAR EL ARCHIVO
-        const pdfBlob = doc.output('blob');
-        const pdfUrl = URL.createObjectURL(pdfBlob);
+        // --- SOLUCIÓN PARA MÓVILES QUE NO REACCIONAN ---
+        
+        // 1. Convertimos el PDF a una cadena de datos Base64
+        const pdfBase64 = doc.output('datauristring');
+        
+        Swal.close();
 
-        // 5. ¡PASO CRUCIAL! Mostramos un botón para que el usuario lo abra manualmente
-        // Esto evita que el navegador bloquee la descarga.
+        // 2. Usamos un menú de selección más agresivo
         Swal.fire({
-            title: '¡PDF Generado!',
-            text: 'Tu reporte está listo para ser visualizado.',
+            title: 'Reporte Listo',
+            html: `Elige cómo quieres obtener tu PDF de <b>${periodo}</b>:`,
             icon: 'success',
+            showDenyButton: true,
             showCancelButton: true,
+            confirmButtonText: '📲 Compartir (WhatsApp/Email)',
+            denyButtonText: '📂 Abrir en Navegador',
+            cancelButtonText: 'Cancelar',
             confirmButtonColor: '#2563eb',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: '📂 Abrir y Guardar PDF',
-            cancelButtonText: 'Cerrar'
-        }).then((result) => {
+            denyButtonColor: '#059669',
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                // Intentamos compartir primero
-                if (navigator.share) {
-                    const file = new File([pdfBlob], `Diario_${periodo}.pdf`, { type: 'application/pdf' });
-                    navigator.share({
-                        files: [file],
-                        title: 'Libro Diario',
-                    }).catch(() => {
-                        // Si falla compartir, abrimos en nueva pestaña
-                        window.open(pdfUrl, '_blank');
-                    });
-                } else {
-                    window.open(pdfUrl, '_blank');
+                // MÉTODO A: COMPARTIR
+                try {
+                    const blob = doc.output('blob');
+                    const file = new File([blob], `Diario_${periodo}.pdf`, { type: 'application/pdf' });
+                    if (navigator.share) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Libro Diario',
+                        });
+                    } else {
+                        throw new Error("Tu dispositivo no soporta compartir directamente.");
+                    }
+                } catch (err) {
+                    // Si falla el compartir, intentamos el método B automáticamente
+                    window.location.href = pdfBase64;
                 }
+            } else if (result.isDenied) {
+                // MÉTODO B: FORZAR APERTURA
+                // Creamos un link invisible y lo clickeamos
+                const link = document.createElement('a');
+                link.href = pdfBase64;
+                link.download = `Libro_Diario_${periodo}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Si el link no funciona, intentamos redirección directa
+                setTimeout(() => {
+                    window.location.href = pdfBase64;
+                }, 500);
             }
         });
 
     } catch (err) {
         console.error(err);
-        Swal.fire("Error", "No se pudo conectar con la base de datos", "error");
+        Swal.fire("Error", "Error de conexión o datos.", "error");
     }
 }
     

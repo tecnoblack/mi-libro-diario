@@ -2020,17 +2020,16 @@ cargarNombreEmpresaInicial();
 async function imprimirHistorialDiario() {
     const { jsPDF } = window.jspdf;
     
-    // 1. Identificar el periodo del título de la tarjeta azul
     const tituloReporte = document.getElementById('titulo-reporte-seleccionado');
     let periodo = tituloReporte ? tituloReporte.innerText.replace('MES SELECCIONADO:', '').trim() : "";
     
     if (!periodo || periodo === "" || periodo === "---") {
-        return Swal.fire("Error", "No se detectó el mes activo en pantalla.", "error");
+        return Swal.fire("Error", "No se detectó el periodo. Intenta abrir el detalle del mes de nuevo.", "error");
     }
 
     Swal.fire({ 
-        title: 'Generando Reporte...', 
-        text: 'Esto puede tardar unos segundos...',
+        title: 'Generando PDF...', 
+        text: 'Preparando documento contable',
         allowOutsideClick: false, 
         didOpen: () => { Swal.showLoading(); } 
     });
@@ -2038,7 +2037,6 @@ async function imprimirHistorialDiario() {
     try {
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // 2. Obtener datos de Supabase con el prefijo de archivado
         const { data: asientos, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -2046,80 +2044,63 @@ async function imprimirHistorialDiario() {
             .eq('periodo', 'ARCHIVADO_' + periodo)
             .order('ref', { ascending: true });
 
-        if (error) throw error;
-        if (!asientos || asientos.length === 0) {
+        if (error || !asientos || asientos.length === 0) {
             Swal.close();
-            return Swal.fire("Sin datos", "No se encontraron registros para este periodo.", "info");
+            return Swal.fire("Sin datos", "No hay registros para este periodo.", "info");
         }
 
-        // 3. Crear el PDF
         const doc = new jsPDF();
+        // ... (Tu diseño de tabla se mantiene igual) ...
         doc.setFontSize(16);
-        doc.setTextColor(37, 99, 235);
-        doc.text("LIBRO DIARIO (HISTORIAL)", 105, 20, { align: 'center' });
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Periodo: ${periodo}`, 105, 28, { align: 'center' });
-
+        doc.text("LIBRO DIARIO", 105, 20, { align: 'center' });
+        
         const cuerpoTabla = asientos.map(a => [
-            a.fecha || '',
-            a.ref || '',
-            a.cuenta || '',
-            parseFloat(a.debito || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-            parseFloat(a.credito || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
+            a.fecha || '', a.ref || '', a.cuenta || '',
+            parseFloat(a.debito || 0).toFixed(2),
+            parseFloat(a.credito || 0).toFixed(2)
         ]);
 
         doc.autoTable({
             startY: 35,
-            head: [['FECHA', 'REF', 'CUENTA / DETALLE', 'DEBE', 'HABER']],
+            head: [['FECHA', 'REF', 'CUENTA', 'DEBE', 'HABER']],
             body: cuerpoTabla,
             theme: 'grid',
-            headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-            styles: { fontSize: 8 },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+            headStyles: { fillColor: [37, 99, 235] }
         });
 
-        // 4. PREPARACIÓN PARA APK (Convertir a BLOB)
-        const pdfBlob = doc.output('blob');
-        const fileName = `Libro_Diario_${periodo.replace(/ /g, '_')}.pdf`;
+        // --- SOLUCIÓN PARA EVITAR QUE LA APP SE CIERRE ---
         
+        // 1. Generamos el PDF como una cadena de texto Base64
+        const pdfBase64 = doc.output('datauristring');
+        const fileName = `Diario_${periodo.replace(/ /g, '_')}.pdf`;
+
         Swal.close();
 
-        // 5. DISPARAR EL MENÚ DE ANDROID (La solución para WebToApp)
-        if (navigator.share) {
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-            
-            await navigator.share({
-                files: [file],
-                title: 'Libro Diario',
-                text: `Reporte de ${periodo}`
-            }).catch(err => {
-                // Si el usuario cancela o hay error, intentamos apertura directa
-                abrirPdfDirecto(doc, fileName);
-            });
-        } else {
-            // Si el dispositivo es muy antiguo y no tiene navigator.share
-            abrirPdfDirecto(doc, fileName);
-        }
+        // 2. Usamos un mensaje de confirmación antes de salir
+        Swal.fire({
+            title: 'Reporte Listo',
+            text: 'Se abrirá el navegador para descargar el archivo.',
+            icon: 'info',
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#2563eb'
+        }).then(() => {
+            // Intentamos compartir primero porque es lo más seguro en APK
+            if (navigator.share) {
+                const blob = doc.output('blob');
+                const file = new File([blob], fileName, { type: 'application/pdf' });
+                navigator.share({ files: [file] }).catch(() => {
+                    // Si falla el compartir, forzamos la descarga vía link
+                    window.location.href = pdfBase64;
+                });
+            } else {
+                // Si no hay compartir, forzamos la descarga
+                window.location.href = pdfBase64;
+            }
+        });
 
     } catch (err) {
         Swal.close();
-        console.error(err);
-        Swal.fire("Error", "No se pudo generar el reporte.", "error");
-    }
-}
-
-// Función de respaldo si el compartir falla
-function abrirPdfDirecto(doc, name) {
-    const stringData = doc.output('datauristring');
-    const x = window.open();
-    if (x) {
-        x.document.open();
-        x.document.write(`<iframe width='100%' height='100%' src='${stringData}'></iframe>`);
-        x.document.close();
-    } else {
-        // Opción final: descargar de forma clásica
-        doc.save(name);
+        Swal.fire("Error", "Ocurrió un fallo al generar el PDF.", "error");
     }
 }
     

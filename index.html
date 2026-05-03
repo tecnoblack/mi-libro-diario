@@ -2021,31 +2021,19 @@ async function imprimirHistorialDiario() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // 1. CORRECCIÓN CLAVE: Buscamos el título dentro de la tarjeta azul de reportes
+    // 1. Obtener el periodo del título del panel
     const tituloReporte = document.getElementById('titulo-reporte-seleccionado');
-    let periodo = "";
-
-    if (tituloReporte) {
-        // Esto limpia el texto "MES SELECCIONADO: " y se queda solo con "FEBRERO 2026"
-        periodo = tituloReporte.innerText.replace('MES SELECCIONADO:', '').trim();
-    }
+    let periodo = tituloReporte ? tituloReporte.innerText.replace('MES SELECCIONADO:', '').trim() : "";
     
     if (!periodo || periodo === "" || periodo === "---") {
-        return Swal.fire("Error", "No se pudo identificar el mes. Por favor, toca de nuevo en 'Ver Reporte'", "error");
+        return Swal.fire("Error", "No se detectó el mes activo.", "error");
     }
 
-    Swal.fire({ 
-        title: 'Generando PDF...', 
-        text: `Descargando Libro Diario de ${periodo}`,
-        allowOutsideClick: false, 
-        didOpen: () => { Swal.showLoading(); } 
-    });
+    Swal.fire({ title: 'Generando PDF...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
     try {
         const { data: { user } } = await _supabase.auth.getUser();
 
-        // 2. BUSCAR EN SUPABASE
-        // Usamos el prefijo ARCHIVADO_ porque así guardaste los datos al cerrar el mes
         const { data: asientos, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -2054,48 +2042,61 @@ async function imprimirHistorialDiario() {
             .order('ref', { ascending: true });
 
         if (error) throw error;
-
         if (!asientos || asientos.length === 0) {
             Swal.close();
-            return Swal.fire("Sin registros", `No se encontraron datos en la base de datos para ARCHIVADO_${periodo}`, "info");
+            return Swal.fire("Sin datos", "No hay registros para este mes.", "info");
         }
 
-        // 3. DISEÑO DEL PDF PROFESIONAL
+        // --- DISEÑO DEL PDF ---
         doc.setFontSize(16);
-        doc.setTextColor(37, 99, 235);
-        doc.text("LIBRO DIARIO (HISTÓRICO)", 105, 20, { align: 'center' });
-        
-        doc.setFontSize(11);
-        doc.setTextColor(100, 116, 139);
+        doc.text("LIBRO DIARIO", 105, 20, { align: 'center' });
+        doc.setFontSize(10);
         doc.text(`Periodo: ${periodo}`, 105, 28, { align: 'center' });
 
-        // 4. PREPARAR LOS DATOS
         const cuerpoTabla = asientos.map(a => [
             a.fecha || '',
             a.ref || '',
             a.cuenta || '',
-            parseFloat(a.debito || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-            parseFloat(a.credito || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
+            parseFloat(a.debito || 0).toFixed(2),
+            parseFloat(a.credito || 0).toFixed(2)
         ]);
 
-        // 5. GENERAR TABLA AUTO-TABLE
         doc.autoTable({
             startY: 35,
-            head: [['FECHA', 'REF', 'CUENTA / DETALLE', 'DEBE', 'HABER']],
+            head: [['FECHA', 'REF', 'CUENTA', 'DEBE', 'HABER']],
             body: cuerpoTabla,
             theme: 'grid',
-            headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-            styles: { fontSize: 8 },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+            headStyles: { fillColor: [37, 99, 235] }
         });
 
+        // --- AQUÍ ESTÁ EL CAMBIO PARA APP MÓVIL ---
+        
+        const pdfBlob = doc.output('blob');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        
         Swal.close();
-        doc.save(`Libro_Diario_${periodo.replace(/ /g, '_')}.pdf`);
+
+        // Intentar compartir (Ideal para móviles)
+        if (navigator.share) {
+            const file = new File([pdfBlob], `Diario_${periodo}.pdf`, { type: 'application/pdf' });
+            navigator.share({
+                files: [file],
+                title: 'Reporte Contable',
+                text: `Libro Diario de ${periodo}`
+            }).then(() => {
+                console.log('Compartido con éxito');
+            }).catch((err) => {
+                // Si falla el compartir (ej. cancelado), abrimos en ventana nueva
+                window.open(pdfUrl, '_blank');
+            });
+        } else {
+            // Si el dispositivo no tiene la función de compartir, abre el PDF en pantalla
+            window.open(pdfUrl, '_blank');
+        }
 
     } catch (err) {
         Swal.close();
-        console.error("Error completo:", err);
-        Swal.fire("Error", "Hubo un problema al conectar con Supabase.", "error");
+        Swal.fire("Error", err.message, "error");
     }
 }
     

@@ -2017,54 +2017,71 @@ cargarNombreEmpresaInicial();
     Swal.fire("Desglosado", `Se desglosó la diferencia de ${montoADesglosar.toFixed(2)}`, "success");
 }
 
-    async function imprimirHistorialDiario() {
+async function imprimirHistorialDiario() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // 1. Obtener datos básicos
+    // 1. Obtener el periodo que el usuario seleccionó en la lista
     const periodo = document.getElementById('periodoSeleccionadoHistorial').innerText;
-    const nombreEmpresa = document.getElementById('nombreEmpresaHeader')?.innerText || "Empresa Sin Nombre";
-
-    // 2. Título y Encabezado
-    doc.setFontSize(18);
-    doc.setTextColor(37, 99, 235); // Azul Pro
-    doc.text("LIBRO DIARIO", 105, 20, { align: 'center' });
     
-    doc.setFontSize(12);
-    doc.setTextColor(100, 116, 139); // Gris
-    doc.text(nombreEmpresa, 105, 28, { align: 'center' });
-    doc.text(`Periodo: ${periodo}`, 105, 35, { align: 'center' });
-
-    // 3. Obtener los datos de la tabla que está en pantalla
-    // Asumimos que tu tabla de historial tiene una estructura de filas
-    const filasTabla = Array.from(document.querySelectorAll('#detalle-reporte-contenido tr'));
-    
-    if (filasTabla.length === 0) {
-        Swal.fire("Error", "No hay datos cargados para imprimir. Primero selecciona un mes y presiona 'Libro Diario'", "error");
-        return;
+    if (!periodo || periodo === "---") {
+        return Swal.fire("Aviso", "Primero selecciona un mes de la lista de cierres", "warning");
     }
 
-    const cuerpoTabla = filasTabla.map(fila => {
-        const celdas = fila.querySelectorAll('td');
-        return Array.from(celdas).map(c => c.innerText);
-    });
+    Swal.fire({ title: 'Generando PDF...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
-    // 4. Generar la tabla en el PDF
-    doc.autoTable({
-        startY: 45,
-        head: [['FECHA', 'REF', 'CUENTA / DETALLE', 'DEBE', 'HABER']],
-        body: cuerpoTabla,
-        theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255 }, // Azul Pro
-        styles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: {
-            3: { halign: 'right' }, // Debe
-            4: { halign: 'right' }  // Haber
+    try {
+        const { data: { user } } = await _supabase.auth.getUser();
+
+        // 2. BUSCAR DATOS EN SUPABASE (Igual que cuando los ves en pantalla)
+        // Buscamos los asientos que tengan el prefijo ARCHIVADO_
+        const { data: asientos, error } = await _supabase
+            .from('asientos')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('periodo', 'ARCHIVADO_' + periodo)
+            .order('ref', { ascending: true });
+
+        if (error) throw error;
+
+        if (!asientos || asientos.length === 0) {
+            Swal.close();
+            return Swal.fire("Sin datos", "No se encontraron registros para este periodo archivado.", "info");
         }
-    });
 
-    // 5. Descargar el archivo
-    doc.save(`Libro_Diario_${periodo.replace(/ /g, '_')}.pdf`);
+        // 3. ENCABEZADO DEL PDF
+        doc.setFontSize(16);
+        doc.text("LIBRO DIARIO ARCHIVADO", 105, 20, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text(`Periodo: ${periodo}`, 105, 28, { align: 'center' });
+
+        // 4. PREPARAR DATOS PARA LA TABLA
+        const cuerpoTabla = asientos.map(a => [
+            a.fecha,
+            a.ref,
+            a.cuenta,
+            parseFloat(a.debito || 0).toFixed(2),
+            parseFloat(a.credito || 0).toFixed(2)
+        ]);
+
+        // 5. GENERAR TABLA
+        doc.autoTable({
+            startY: 35,
+            head: [['FECHA', 'REF', 'CUENTA', 'DEBE', 'HABER']],
+            body: cuerpoTabla,
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235] },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+        });
+
+        Swal.close();
+        doc.save(`Libro_Diario_${periodo}.pdf`);
+
+    } catch (err) {
+        Swal.close();
+        console.error(err);
+        Swal.fire("Error", "No se pudo generar el PDF: " + err.message, "error");
+    }
 }
     
 </script>

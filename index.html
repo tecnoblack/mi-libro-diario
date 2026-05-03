@@ -2019,20 +2019,26 @@ cargarNombreEmpresaInicial();
 }
 
 async function imprimirLibroDiario() {
+    const { jsPDF } = window.jspdf; // Mantener por si acaso, aunque usaremos HTML
+    
     const tituloReporte = document.getElementById('titulo-reporte-seleccionado');
     let periodo = tituloReporte ? tituloReporte.innerText.replace('MES SELECCIONADO:', '').trim() : "";
     
     if (!periodo || periodo === "" || periodo === "---") {
-        return Swal.fire("Aviso", "Primero selecciona un mes de la lista de cierres.", "warning");
+        return Swal.fire("Aviso", "Primero selecciona un mes en el Historial de Cierres.", "warning");
     }
 
     Swal.fire({ 
-        title: 'Preparando Impresión...', 
+        title: 'Preparando Reporte...', 
+        text: 'Generando vista de impresión',
+        allowOutsideClick: false,
         didOpen: () => { Swal.showLoading(); } 
     });
 
     try {
         const { data: { user } } = await _supabase.auth.getUser();
+
+        // 1. Obtener datos de Supabase
         const { data: asientos, error } = await _supabase
             .from('asientos')
             .select('*')
@@ -2042,32 +2048,72 @@ async function imprimirLibroDiario() {
 
         if (error || !asientos || asientos.length === 0) {
             Swal.close();
-            return Swal.fire("Sin datos", "No hay registros para este periodo.", "info");
+            return Swal.fire("Sin datos", "No se encontraron registros para este mes.", "info");
         }
 
-        // Crear una ventana nueva para la impresión
+        // 2. Crear la ventana de impresión
         const ventana = window.open('', '_blank');
         
-        // Estilos básicos para que la tabla se vea profesional
+        // 3. Estilos CSS (Incluye el botón azul y la regla para ocultarlo al imprimir)
         const estilos = `
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                h1 { text-align: center; color: #1a56db; margin-bottom: 5px; }
-                h3 { text-align: center; color: #666; margin-top: 0; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; }
+                .no-print-area { 
+                    background: #f0f7ff; 
+                    padding: 20px; 
+                    border-radius: 10px; 
+                    margin-bottom: 30px; 
+                    text-align: center; 
+                    border: 1px dashed #2563eb;
+                }
+                .btn-descargar {
+                    background: #2563eb;
+                    color: white;
+                    padding: 16px 24px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 18px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    width: 100%;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                }
+                h1 { text-align: center; color: #1e40af; margin-bottom: 5px; }
+                h3 { text-align: center; color: #64748b; margin-top: 0; font-weight: normal; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ccc; padding: 10px; text-align: left; font-size: 12px; }
-                th { background-color: #f3f4f6; color: #111; }
+                th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; font-size: 13px; }
+                th { background-color: #f8fafc; color: #1e293b; text-transform: uppercase; }
                 .text-right { text-align: right; }
-                @media print { .no-print { display: none; } }
+                
+                /* ESTO OCULTA EL BOTÓN EN EL PDF FINAL */
+                @media print {
+                    .no-print-area { display: none !important; }
+                    body { padding: 0; }
+                    table { border: 1px solid #000; }
+                }
             </style>
         `;
 
-        let tablaHtml = `
+        // 4. Construir el HTML del reporte
+        let contenidoHtml = `
             <html>
-            <head>${estilos}</head>
+            <head>
+                <title>Reporte_${periodo}</title>
+                ${estilos}
+            </head>
             <body>
+                <div class="no-print-area">
+                    <button class="btn-descargar" onclick="window.print()">
+                        📩 CLIC AQUÍ PARA GUARDAR COMO PDF
+                    </button>
+                    <p style="margin-top:10px; font-size:14px;">
+                        Luego selecciona <b>"Guardar como PDF"</b> en el menú de Android.
+                    </p>
+                </div>
+
                 <h1>LIBRO DIARIO</h1>
                 <h3>Periodo: ${periodo}</h3>
+
                 <table>
                     <thead>
                         <tr>
@@ -2082,34 +2128,39 @@ async function imprimirLibroDiario() {
         `;
 
         asientos.forEach(a => {
-            tablaHtml += `
+            contenidoHtml += `
                 <tr>
                     <td>${a.fecha || ''}</td>
                     <td>${a.ref || ''}</td>
                     <td>${a.cuenta || ''}</td>
-                    <td class="text-right">${parseFloat(a.debito || 0).toFixed(2)}</td>
-                    <td class="text-right">${parseFloat(a.credito || 0).toFixed(2)}</td>
+                    <td class="text-right">${parseFloat(a.debito || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">${parseFloat(a.credito || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                 </tr>
             `;
         });
 
-        tablaHtml += `</tbody></table></body></html>`;
+        contenidoHtml += `
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
 
-        ventana.document.write(tablaHtml);
+        // 5. Inyectar contenido y disparar
+        ventana.document.write(contenidoHtml);
         ventana.document.close();
 
         Swal.close();
 
-        // Esperar un momento a que cargue la ventana y disparar la impresión
+        // Intento de disparo automático (algunos móviles lo permiten)
         setTimeout(() => {
             ventana.print();
-            // Opcional: cerrar la ventana después de imprimir/cancelar
-            // ventana.close(); 
-        }, 500);
+        }, 1000);
 
     } catch (err) {
         Swal.close();
-        Swal.fire("Error", "No se pudo preparar la impresión.", "error");
+        console.error(err);
+        Swal.fire("Error", "No se pudo conectar con la base de datos.", "error");
     }
 }
     
